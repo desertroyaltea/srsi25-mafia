@@ -183,12 +183,12 @@
             <h2 class="text-2xl font-semibold text-gray-200 mb-4">Dashboard</h2>
             <p class="text-gray-400 mb-6">Select an action to proceed.</p>
 
-            <div id="player-dashboard-actions" class="grid grid-cols-1 md:grid-cols-2 gap-4 hidden"> <button id="btn-submit-accusation" class="bg-red-700 hover:bg-red-800 text-white font-bold py-3 px-6 rounded-lg focus:outline-none focus:shadow-outline transition duration-300 ease-in-out transform hover:scale-105 text-lg">
+            <div id="player-dashboard-actions" class="grid grid-cols-1 md:grid-cols-2 gap-4"> <button id="btn-submit-accusation" class="bg-red-700 hover:bg-red-800 text-white font-bold py-3 px-6 rounded-lg focus:outline-none focus:shadow-outline transition duration-300 ease-in-out transform hover:scale-105 text-lg">
                     Submit Accusation
                 </button>
                 </div>
 
-            <div id="admin-dashboard-actions" class="grid grid-cols-1 md:grid-cols-2 gap-4 hidden"> <button id="btn-review-accusations" class="bg-green-700 hover:bg-green-800 text-white font-bold py-3 px-6 rounded-lg focus:outline-none focus:shadow-outline transition duration-300 ease-in-out transform hover:scale-105 text-lg">
+            <div id="admin-dashboard-actions" class="grid grid-cols-1 md:grid-cols-2 gap-4"> <button id="btn-review-accusations" class="bg-green-700 hover:bg-green-800 text-white font-bold py-3 px-6 rounded-lg focus:outline-none focus:shadow-outline transition duration-300 ease-in-out transform hover:scale-105 text-lg">
                     Review Accusations
                 </button>
                 </div>
@@ -256,7 +256,7 @@
         const currentDaySpan = document.getElementById('current-day');
         const currentPhaseSpan = document.getElementById('current-phase');
         const lastAccusedPlayerSpan = document.getElementById('last-accused-player');
-        const lastTrialResultSpan = document.getElementById('last-trial-result');
+        const lastTrialResultSpan = document.getElementById('last-trial-result'); // Corrected variable name
         const messageBox = document.getElementById('message-box');
 
         // View Containers
@@ -293,8 +293,6 @@
         const pendingAccusationsList = document.getElementById('pending-accusations-list');
         const accusationsTranscript = document.getElementById('accusations-transcript');
         const approvalStatus = document.getElementById('approval-status'); 
-        // Removed the HTML element for manual approval form, so no need to get its reference
-        // const approvalForm = document.getElementById('approvalForm'); // THIS LINE IS REMOVED
 
         let allPlayersData = []; // To store fetched player data
         let isCurrentUserAdmin = false; // Track admin status
@@ -381,8 +379,8 @@
                     showMessage("Your user ID does not match any player. Please ensure your PlayerID is in the sheet. You cannot perform actions.", 8000);
                     // If user not found, disable forms or guide them to register/get ID
                     accusationForm.querySelectorAll('input, button, select').forEach(el => el.disabled = true);
-                    playerDashboardActions.classList.add('hidden');
-                    adminDashboardActions.classList.add('hidden');
+                    playerDashboardActions.classList.add('hidden'); // Hide all dashboard action buttons if user not found
+                    adminDashboardActions.classList.add('hidden'); // Hide all dashboard action buttons if user not found
                     console.error("Frontend: Current user ID not found in player data.");
                 }
 
