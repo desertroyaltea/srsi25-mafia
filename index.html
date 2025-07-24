@@ -320,8 +320,10 @@
             document.getElementById('record-button').addEventListener('click', startRecording);
             document.getElementById('stop-button').addEventListener('click', stopRecording);
             
-            const types = ['audio/webm;codecs=opus', 'audio/webm', 'audio/mp3', 'audio/mpeg'];
+            // Prioritize iOS-compatible formats
+            const types = ['audio/mp4', 'audio/webm;codecs=opus', 'audio/webm'];
             state.audioMimeType = types.find(type => MediaRecorder.isTypeSupported(type)) || 'audio/webm';
+            console.log("Using MIME type:", state.audioMimeType);
         }
 
         function initAdminReviewView() {
@@ -399,7 +401,7 @@
                 return showMessage("Please record your accusation audio first.");
             }
             
-            const extension = state.audioMimeType.includes('webm') ? 'webm' : 'mp3';
+            const extension = state.audioMimeType.includes('mp4') ? 'm4a' : 'webm';
             const audioFileName = `accusation_${state.currentUserId}_${Date.now()}.${extension}`;
             
             const formData = new FormData();
@@ -573,6 +575,9 @@
         async function startRecording() {
             if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
                 return showMessage("Audio recording is not supported on this browser.");
+            }
+            if (!window.isSecureContext) {
+                return showMessage("Microphone access requires a secure (HTTPS) connection.", 8000);
             }
             try {
                 const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
