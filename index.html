@@ -232,8 +232,6 @@
                             <div id="audio-playback-container" class="mt-2 hidden">
                                 <audio id="audio-playback" controls class="w-full"></audio>
                             </div>
-                            <p class="text-center text-gray-400 my-2">OR</p>
-                            <input type="file" id="audio-file-input" accept="audio/*" class="w-full">
                         </div>
                         <button type="submit" id="submit-accusation-button" class="bg-red-700 hover:bg-red-800 text-white font-bold py-3 px-6 rounded-lg w-full text-lg">Submit Accusation</button>
                     </form>
@@ -394,27 +392,20 @@
         async function handleAccusationSubmit(e) {
             e.preventDefault();
             const accusedPlayerId = document.getElementById('accused-select').value;
-            const audioFileInput = document.getElementById('audio-file-input');
             
             if (!accusedPlayerId) return showMessage("Please select a player to accuse.");
 
-            let audioToUpload = state.recordedAudioBlob;
-            let audioFileName = '';
-
-            if (state.recordedAudioBlob) {
-                const extension = state.audioMimeType.includes('webm') ? 'webm' : 'mp3';
-                audioFileName = `accusation_${state.currentUserId}_${Date.now()}.${extension}`;
-            } else if (audioFileInput.files.length > 0) {
-                audioToUpload = audioFileInput.files[0];
-                audioFileName = audioToUpload.name;
-            } else {
-                return showMessage("Please record or select an audio file.");
+            if (!state.recordedAudioBlob) {
+                return showMessage("Please record your accusation audio first.");
             }
+            
+            const extension = state.audioMimeType.includes('webm') ? 'webm' : 'mp3';
+            const audioFileName = `accusation_${state.currentUserId}_${Date.now()}.${extension}`;
             
             const formData = new FormData();
             formData.append('accuserPlayerId', state.currentUserId);
             formData.append('accusedPlayerId', accusedPlayerId);
-            formData.append('audioFile', audioToUpload, audioFileName);
+            formData.append('audioFile', state.recordedAudioBlob, audioFileName);
 
             await performFetchAction('/.netlify/functions/submit-accusation', formData, false, true);
         }
@@ -580,7 +571,9 @@
         }
         
         async function startRecording() {
-            if (!navigator.mediaDevices) return showMessage("Audio recording not supported.");
+            if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+                return showMessage("Audio recording is not supported on this browser.");
+            }
             try {
                 const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
                 state.mediaRecorder = new MediaRecorder(stream, { mimeType: state.audioMimeType });
@@ -591,6 +584,7 @@
                     const audioUrl = URL.createObjectURL(state.recordedAudioBlob);
                     document.getElementById('audio-playback').src = audioUrl;
                     document.getElementById('audio-playback-container').classList.remove('hidden');
+                    stream.getTracks().forEach(track => track.stop()); // Release microphone
                 };
                 state.mediaRecorder.start();
                 document.getElementById('record-button').disabled = true;
@@ -599,15 +593,15 @@
             } catch (err) {
                 console.error("Microphone Access Error:", err);
                 if (err.name === "NotAllowedError" || err.name === "PermissionDeniedError") {
-                    showMessage("Microphone access was denied. Please allow it in your browser settings.");
+                    showMessage("Microphone access was denied. Please allow it in your browser or phone settings.", 8000);
                 } else {
-                    showMessage("Could not access microphone. Please ensure it is connected and enabled.");
+                    showMessage("Could not access microphone. Please ensure it is connected and enabled.", 8000);
                 }
             }
         }
 
         function stopRecording() {
-            if (state.mediaRecorder) {
+            if (state.mediaRecorder && state.mediaRecorder.state === "recording") {
                 state.mediaRecorder.stop();
                 document.getElementById('record-button').disabled = false;
                 document.getElementById('stop-button').disabled = true;
