@@ -294,6 +294,10 @@
         async function handleActionConfirm(e) {
             const actionType = e.target.dataset.action;
             const targetPlayerId = document.getElementById('action-target-select').value;
+            
+            // ADDED LOGGING
+            console.log(`Confirming action: ${actionType}, Target ID: '${targetPlayerId}'`);
+
             if (!targetPlayerId) {
                 return showMessage("Please select a target player.");
             }
