@@ -235,18 +235,16 @@
             <button type="button" onclick="showView('dashboard-view')" class="mt-6 bg-gray-600 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded-lg w-full">Back to Dashboard</button>
         </div>
         
-        <!-- Reusable Action Modal -->
+        <!-- Reusable Action Modal (NO LONGER A FORM) -->
         <div id="action-modal-view" class="view-container bg-gray-900 p-5 rounded-lg shadow-lg mt-4 border border-gray-800">
             <h2 id="action-modal-title" class="text-2xl font-semibold text-red-500 mb-4">Perform Action</h2>
-            <form id="action-modal-form">
-                <div class="mb-6">
-                    <label for="action-target-select" class="block text-gray-300 text-base font-bold mb-2">Select Target:</label>
-                    <select id="action-target-select" name="targetPlayerId" class="shadow appearance-none border rounded w-full py-3 px-4 text-lg text-gray-200 leading-tight focus:outline-none focus:shadow-outline" required>
-                        <option value="">Choose a player...</option>
-                    </select>
-                </div>
-                <button type="submit" id="action-modal-confirm-button" class="bg-red-700 hover:bg-red-800 text-white font-bold py-3 px-6 rounded-lg w-full text-lg">Confirm</button>
-            </form>
+            <div class="mb-6">
+                <label for="action-target-select" class="block text-gray-300 text-base font-bold mb-2">Select Target:</label>
+                <select id="action-target-select" name="targetPlayerId" class="shadow appearance-none border rounded w-full py-3 px-4 text-lg text-gray-200 leading-tight focus:outline-none focus:shadow-outline" required>
+                    <option value="">Choose a player...</option>
+                </select>
+            </div>
+            <button type="button" id="action-modal-confirm-button" class="bg-red-700 hover:bg-red-800 text-white font-bold py-3 px-6 rounded-lg w-full text-lg">Confirm</button>
             <button type="button" onclick="showView('dashboard-view')" class="mt-6 bg-gray-600 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded-lg w-full">Back to Dashboard</button>
         </div>
 
@@ -284,7 +282,6 @@
         // Action Modal elements
         const actionModalView = document.getElementById('action-modal-view');
         const actionModalTitle = document.getElementById('action-modal-title');
-        const actionModalForm = document.getElementById('action-modal-form');
         const actionTargetSelect = document.getElementById('action-target-select');
         const actionModalConfirmButton = document.getElementById('action-modal-confirm-button');
 
@@ -367,14 +364,10 @@
             populatePlayerDropdown(actionTargetSelect, targetPlayers, 'Choose a target...');
             showView('action-modal-view');
         }
-
-        actionModalForm.addEventListener('submit', async (e) => {
-            e.preventDefault();
-            
-            // FIX: Use FormData to reliably get the selected value
-            const formData = new FormData(e.target);
-            const targetPlayerId = formData.get('targetPlayerId');
-
+        
+        // RADICAL FIX: Use a click listener instead of a form submit listener
+        actionModalConfirmButton.addEventListener('click', async () => {
+            const targetPlayerId = actionTargetSelect.value;
             if (!targetPlayerId) {
                 showMessage("Please select a target player.", 3000);
                 return;
