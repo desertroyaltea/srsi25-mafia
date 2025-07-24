@@ -2,42 +2,49 @@
 
 const { google } = require('googleapis');
 const { JWT } = require('google-auth-library');
-const Busboy = require('busboy'); // For parsing multipart/form-data
-const { Readable } = require('stream'); // Import Readable from Node.js stream module
+const Busboy = require('busboy');
+const { Storage } = require('@google-cloud/storage'); // Import Google Cloud Storage client
+const { Readable } = require('stream');
 
 const credentials = JSON.parse(process.env.GOOGLE_SERVICE_ACCOUNT_CREDENTIALS);
 const sheetId = process.env.GOOGLE_SHEET_ID;
-const driveFolderId = process.env.GOOGLE_DRIVE_FOLDER_ID; // New env variable
+// New environment variable for GCS bucket name
+const bucketName = process.env.GCS_BUCKET_NAME;
 
-// Extend scopes for Google Drive access
+// Initialize Google Cloud Storage client
+const storage = new Storage({
+    projectId: credentials.project_id,
+    credentials: {
+        client_email: credentials.client_email,
+        private_key: credentials.private_key,
+    },
+});
+
+// Extend scopes for Google Sheets access
 const auth = new JWT({
     email: credentials.client_email,
     key: credentials.private_key,
     scopes: [
-        'https://www.googleapis.com/auth/spreadsheets', // Full sheets access for writing
-        'https://www.googleapis.com/auth/drive.file', // Allows app to manage files it creates or opens
-        'https://www.googleapis.com/auth/drive' // Broader access, good for troubleshooting
+        'https://www.googleapis.com/auth/spreadsheets' // Full sheets access for writing
     ]
 });
 
 const sheets = google.sheets({ version: 'v4', auth });
-const drive = google.drive({ version: 'v3', auth });
 
 exports.handler = async (event, context) => {
     if (event.httpMethod !== 'POST') {
         return { statusCode: 405, body: 'Method Not Allowed' };
     }
 
-    if (!sheetId || !driveFolderId) {
-        console.error('Configuration Error: Google Sheet ID or Drive Folder ID is not configured.');
+    if (!sheetId || !bucketName) {
+        console.error('Configuration Error: Google Sheet ID or GCS Bucket Name is not configured.');
         return {
             statusCode: 500,
-            body: JSON.stringify({ error: 'Server configuration error: Sheet or Drive ID missing.' }),
+            body: JSON.stringify({ error: 'Server configuration error: Sheet ID or GCS Bucket Name missing.' }),
         };
     }
 
     return new Promise((resolve) => {
-        // Ensure event.body exists and is a string for Busboy to parse
         if (!event.body) {
             console.error('Busboy Error: Event body is empty.');
             resolve({ statusCode: 400, body: JSON.stringify({ error: 'Request body is empty.' }) });
@@ -47,15 +54,13 @@ exports.handler = async (event, context) => {
         const busboy = Busboy({ headers: event.headers });
         let fileBuffer = null;
         let originalFileName = '';
-        let fileMimeType = ''; // This is the variable that was undefined
+        let fileMimeType = '';
         let fields = {};
 
         busboy.on('file', (fieldname, file, filename, encoding, mimetype) => {
             console.log(`Busboy: File [${fieldname}]: filename=${filename.filename}, encoding=${encoding}, mimetype=${mimetype}`);
-            // Only process the first file, expecting audio
             originalFileName = filename.filename;
-            // Assign mimetype, providing a fallback if it's undefined or empty
-            fileMimeType = mimetype || 'application/octet-stream'; // Fallback to a generic binary type
+            fileMimeType = mimetype || 'application/octet-stream';
             const chunks = [];
             file.on('data', (data) => chunks.push(data));
             file.on('end', () => {
@@ -94,8 +99,7 @@ exports.handler = async (event, context) => {
                     return;
                 }
 
-                // Determine file extension from MIME type or a robust default
-                let fileExtension = 'bin'; // Default if MIME type is truly unknown
+                let fileExtension = 'bin';
                 if (fileMimeType.includes('webm')) {
                     fileExtension = 'webm';
                 } else if (fileMimeType.includes('mp4')) {
@@ -104,60 +108,70 @@ exports.handler = async (event, context) => {
                     fileExtension = 'ogg';
                 } else if (fileMimeType.includes('wav')) {
                     fileExtension = 'wav';
-                } else if (fileMimeType.includes('mpeg')) { // for mp3
+                } else if (fileMimeType.includes('mpeg')) {
                     fileExtension = 'mp3';
                 }
 
-                // Ensure fileMimeType is simplified for Google Drive if it contains codecs
-                const uploadMimeType = fileMimeType.split(';')[0]; // Take only the base MIME type
+                const uploadMimeType = fileMimeType.split(';')[0];
+                const gcsFileName = `accusation_${accuserPlayerId}_${Date.now()}.${fileExtension}`;
+                const gcsFilePath = `accusations/${gcsFileName}`; // Store in a subfolder within the bucket
+                
+                console.log(`Google Cloud Storage: Attempting to upload file: ${gcsFilePath} with MIME type: ${uploadMimeType}`);
 
-                // Construct a robust filename for Google Drive
-                const driveFileName = `accusation_${accuserPlayerId}_${Date.now()}.${fileExtension}`;
-                console.log(`Google Drive: Attempting to upload file: ${driveFileName} with simplified MIME type: ${uploadMimeType}`);
+                // Create a file object in the bucket
+                const file = storage.bucket(bucketName).file(gcsFilePath);
 
-                // Convert Buffer to a Readable stream for Google Drive API
-                const readableStream = new Readable();
-                readableStream.push(fileBuffer);
-                readableStream.push(null); // Indicate end of stream
-
-                // 1. Upload audio to Google Drive
-                const driveResponse = await drive.files.create({
-                    requestBody: {
-                        name: driveFileName,
-                        parents: [driveFolderId],
-                        mimeType: uploadMimeType, // Use the simplified MIME type
+                // Create a write stream to upload the buffer
+                const writeStream = file.createWriteStream({
+                    metadata: {
+                        contentType: uploadMimeType,
                     },
-                    media: {
-                        mimeType: uploadMimeType, // Use the simplified MIME type
-                        body: readableStream, // Pass the Readable stream here
-                    },
-                    fields: 'id, webViewLink, webContentLink', // Request specific fields for links
+                    resumable: false, // For smaller files, resumable upload is not needed
                 });
 
-                const fileId = driveResponse.data.id;
-                // Prefer webViewLink for direct browser playback, fallback to webContentLink
-                const driveLink = driveResponse.data.webViewLink || driveResponse.data.webContentLink || `https://drive.google.com/uc?id=${fileId}&export=download`;
-                console.log(`Google Drive: File uploaded. ID: ${fileId}, Link: ${driveLink}`);
+                // Pipe the file buffer to the write stream
+                await new Promise((streamResolve, streamReject) => {
+                    const bufferStream = new Readable();
+                    bufferStream.push(fileBuffer);
+                    bufferStream.push(null); // End the stream
+
+                    bufferStream.pipe(writeStream)
+                        .on('error', (err) => {
+                            console.error('GCS Upload Stream Error:', err);
+                            streamReject(err);
+                        })
+                        .on('finish', () => {
+                            console.log('GCS Upload Stream Finished.');
+                            streamResolve();
+                        });
+                });
+
+                // Make the file publicly readable (optional, but needed for direct playback links)
+                // WARNING: This makes the file accessible to anyone with the link.
+                // For production, consider signed URLs or more controlled access.
+                await file.makePublic(); 
+                
+                const gcsPublicUrl = `https://storage.googleapis.com/${bucketName}/${gcsFilePath}`;
+                console.log(`Google Cloud Storage: File uploaded. Public URL: ${gcsPublicUrl}`);
 
                 // 2. Add entry to Accusations sheet
-                // AccusationID,AccuserPlayerID,AccusedPlayerID,AudioDriveLink,SubmissionTime,AdminApprovalStatus,AdminApprovalTime,TrialStarted
-                const accusationId = `ACC_${Date.now()}`; // Simple unique ID
+                const accusationId = `ACC_${Date.now()}`;
                 const submissionTime = new Date().toISOString();
                 const values = [
                     accusationId,
                     accuserPlayerId,
                     accusedPlayerId,
-                    driveLink,
+                    gcsPublicUrl, // Use the GCS public URL here
                     submissionTime,
-                    'Pending', // Initial status
-                    '',        // AdminApprovalTime
-                    'FALSE'    // TrialStarted
+                    'Pending',
+                    '',
+                    'FALSE'
                 ];
                 console.log('Google Sheets: Appending new accusation:', values);
 
                 await sheets.spreadsheets.values.append({
                     spreadsheetId: sheetId,
-                    range: 'Accusations!A:H', // Adjust range if your sheet columns change
+                    range: 'Accusations!A:H',
                     valueInputOption: 'USER_ENTERED',
                     resource: {
                         values: [values],
@@ -171,15 +185,16 @@ exports.handler = async (event, context) => {
                     body: JSON.stringify({
                         message: 'Accusation submitted successfully!',
                         accusationId: accusationId,
-                        driveLink: driveLink
+                        driveLink: gcsPublicUrl // Return GCS URL
                     }),
                 });
 
             } catch (error) {
                 console.error('Server Error: Failed to submit accusation:', error);
-                // Provide more specific error details if available
                 let errorMessage = 'Failed to submit accusation.';
-                if (error.response && error.response.data && error.response.data.error) {
+                if (error.code) { // Google Cloud Storage errors often have a 'code'
+                    errorMessage = `GCS Error (${error.code}): ${error.message}`;
+                } else if (error.response && error.response.data && error.response.data.error) {
                     errorMessage = `Google API Error: ${error.response.data.error.message || error.message}`;
                     console.error('Google API Error Details:', error.response.data.error);
                 } else if (error.message) {
@@ -197,7 +212,6 @@ exports.handler = async (event, context) => {
             resolve({ statusCode: 500, body: JSON.stringify({ error: 'Failed to parse form data.' }) });
         });
 
-        // Pipe the event body to busboy
         try {
             busboy.end(Buffer.from(event.body, event.isBase64Encoded ? 'base64' : 'utf8'));
         } catch (parseError) {
