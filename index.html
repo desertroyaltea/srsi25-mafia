@@ -194,11 +194,45 @@
         </div>
 
         <div id="accusation-form-page" class="view-container bg-gray-900 p-5 rounded-lg shadow-lg mt-4 border border-gray-800">
-            <!-- ... Accusation form content remains the same ... -->
+            <h2 class="text-2xl font-semibold text-red-500 mb-3">Submit Accusation</h2>
+            <form id="accusationForm" enctype="multipart/form-data">
+                <div class="mb-4">
+                    <label class="block text-gray-300 text-base font-bold mb-2">Accuser (Your Name):</label>
+                    <p id="accuser-display-name" class="text-lg text-blue-400 font-semibold mb-2">Loading...</p>
+                    <input type="hidden" id="accuser-hidden-id" name="accuserPlayerId" required>
+                </div>
+                <div class="mb-4">
+                    <label for="accused" class="block text-gray-300 text-base font-bold mb-2">Accused Player:</label>
+                    <select id="accused" name="accusedPlayerId" class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline bg-gray-200" required>
+                        <option value="">Select a player</option>
+                    </select>
+                </div>
+                <div class="mb-4">
+                    <label class="block text-gray-300 text-base font-bold mb-2">Accusation Audio:</label>
+                    <div class="flex flex-col sm:flex-row gap-2">
+                        <button type="button" id="recordButton" class="bg-red-700 hover:bg-red-800 text-white font-bold py-2 px-4 rounded-lg transition duration-300 ease-in-out transform hover:scale-105 flex-1">Start Recording</button>
+                        <button type="button" id="stopButton" class="bg-gray-600 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded-lg transition duration-300 ease-in-out transform hover:scale-105 flex-1" disabled>Stop Recording</button>
+                    </div>
+                    <p id="recordingIndicator" class="recording-indicator text-center mt-2">Recording...</p>
+                    <div id="audioPlayerContainer" class="audio-player-container">
+                        <audio id="audioPlayback" controls></audio>
+                        <button type="button" id="resetAudioButton" class="bg-gray-500 hover:bg-gray-600 text-white text-sm py-1 px-3 rounded-lg">Clear Recording</button>
+                    </div>
+                    <p class="text-gray-400 text-sm mt-3 text-center">
+                        Or, if you prefer, select an existing audio file:
+                    </p>
+                    <input type="file" id="audioFile" name="audioFile" accept="audio/*" class="block w-full text-base text-gray-300 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-base file:font-semibold file:bg-red-700 file:text-white hover:file:bg-red-800 mt-2">
+                </div>
+                <button type="submit" id="submitAccusationButton" class="bg-red-700 hover:bg-red-800 text-white font-bold py-3 px-6 rounded-lg focus:outline-none focus:shadow-outline transition duration-300 ease-in-out transform hover:scale-105 w-full text-lg">Submit Accusation</button>
+            </form>
+            <p id="accusation-status" class="mt-3 text-sm text-gray-300 text-center"></p>
+            <button type="button" onclick="showView('dashboard-view')" class="mt-6 bg-gray-600 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded-lg transition duration-300 ease-in-out transform hover:scale-105 w-full">Back to Dashboard</button>
         </div>
 
         <div id="admin-review-page" class="view-container bg-gray-900 p-5 rounded-lg shadow-lg mt-4 border border-gray-800">
-            <!-- ... Admin review page content remains the same ... -->
+            <h2 class="text-2xl font-semibold text-green-500 mb-3">Admin Panel - Review Accusations</h2>
+            <div id="accusations-transcript" class="space-y-4"></div>
+            <button type="button" onclick="showView('dashboard-view')" class="mt-6 bg-gray-600 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded-lg w-full">Back to Dashboard</button>
         </div>
         
         <!-- NEW: Reusable Action Modal -->
@@ -207,13 +241,13 @@
             <form id="action-modal-form">
                 <div class="mb-6">
                     <label for="action-target-select" class="block text-gray-300 text-base font-bold mb-2">Select Target:</label>
-                    <select id="action-target-select" class="shadow appearance-none border rounded w-full py-3 px-4 text-lg text-gray-200 leading-tight focus:outline-none focus:shadow-outline" required>
+                    <select id="action-target-select" name="targetPlayerId" class="shadow appearance-none border rounded w-full py-3 px-4 text-lg text-gray-200 leading-tight focus:outline-none focus:shadow-outline" required>
                         <option value="">Choose a player...</option>
                     </select>
                 </div>
                 <button type="submit" id="action-modal-confirm-button" class="bg-red-700 hover:bg-red-800 text-white font-bold py-3 px-6 rounded-lg w-full text-lg">Confirm</button>
             </form>
-            <button onclick="showView('dashboard-view')" class="mt-6 bg-gray-600 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded-lg w-full">Back to Dashboard</button>
+            <button type="button" onclick="showView('dashboard-view')" class="mt-6 bg-gray-600 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded-lg w-full">Back to Dashboard</button>
         </div>
 
 
@@ -241,8 +275,13 @@
         const btnReviewAccusations = document.getElementById('btn-review-accusations');
         const playerDashboardActions = document.getElementById('player-dashboard-actions');
         const adminDashboardActions = document.getElementById('admin-dashboard-actions');
+        const accusationForm = document.getElementById('accusationForm');
+        const accuserDisplayName = document.getElementById('accuser-display-name');
+        const accuserHiddenId = document.getElementById('accuser-hidden-id');
+        const accusedSelect = document.getElementById('accused');
+        const accusationsTranscript = document.getElementById('accusations-transcript');
         
-        // NEW: Action Modal elements
+        // Action Modal elements
         const actionModalView = document.getElementById('action-modal-view');
         const actionModalTitle = document.getElementById('action-modal-title');
         const actionModalForm = document.getElementById('action-modal-form');
@@ -254,7 +293,7 @@
         let currentUserId = null;
         let currentUser = null;
         let isCurrentUserAdmin = false;
-        let currentAction = null; // To store the current action type (e.g., 'kill', 'protect')
+        let currentAction = null;
 
         // --- Core Functions ---
         function showMessage(message, duration = 3000) {
@@ -271,7 +310,6 @@
         }
 
         async function fetchPlayers() {
-            // Fetches all player data from the backend
             if (allPlayersData.length > 0) return allPlayersData;
             try {
                 const response = await fetch('/.netlify/functions/get-player-data');
@@ -321,7 +359,7 @@
             }
         }
         
-        // --- NEW: Action Handling ---
+        // --- Action Handling ---
         function openActionModal(actionType, title, buttonText, targetPlayers) {
             currentAction = actionType;
             actionModalTitle.textContent = title;
@@ -382,7 +420,6 @@
 
         // --- UI Updates ---
         function updateDashboardActions(currentPhase) {
-            // Clear previous role-specific buttons
             document.querySelectorAll('.role-action-button').forEach(btn => btn.remove());
             
             const isNight = currentPhase.toLowerCase() !== 'day';
@@ -398,24 +435,20 @@
             adminDashboardActions.classList.add('hidden');
 
             if (!isNight) {
-                showMessage("It's Day time. Actions are disabled.", 3000);
                 return;
             }
 
-            // Add role-specific buttons
             const role = currentUser.Role.toLowerCase();
             let actionButton;
 
             switch (role) {
                 case 'mafia':
                     actionButton = document.createElement('button');
-                    actionButton.id = 'btn-kill-player';
                     actionButton.textContent = 'Kill Player';
                     actionButton.className = 'bg-red-700 hover:bg-red-800 text-white font-bold py-3 px-6 rounded-lg transition role-action-button';
                     actionButton.onclick = () => {
-                        // Target all alive players except other mafia
                         const otherMafiaIds = allPlayersData.filter(p => p.Role.toLowerCase() === 'mafia').map(p => p.PlayerID);
-                        const targets = allPlayersData.filter(p => p.Status === 'Alive' && !otherMafiaIds.includes(p.PlayerID));
+                        const targets = allPlayersData.filter(p => p.Status && p.Status.toLowerCase() === 'alive' && !otherMafiaIds.includes(p.PlayerID));
                         openActionModal('kill', 'Choose a Target to Kill', 'Confirm Kill', targets);
                     };
                     playerDashboardActions.appendChild(actionButton);
@@ -423,11 +456,10 @@
 
                 case 'doctor':
                     actionButton = document.createElement('button');
-                    actionButton.id = 'btn-protect-player';
                     actionButton.textContent = 'Protect Player';
                     actionButton.className = 'bg-blue-700 hover:bg-blue-800 text-white font-bold py-3 px-6 rounded-lg transition role-action-button';
                     actionButton.onclick = () => {
-                        const targets = allPlayersData.filter(p => p.Status === 'Alive');
+                        const targets = allPlayersData.filter(p => p.Status && p.Status.toLowerCase() === 'alive');
                         openActionModal('protect', 'Choose a Player to Protect', 'Confirm Protection', targets);
                     };
                     playerDashboardActions.appendChild(actionButton);
@@ -435,11 +467,10 @@
 
                 case 'detective':
                     actionButton = document.createElement('button');
-                    actionButton.id = 'btn-check-player';
                     actionButton.textContent = 'Investigate Player';
                     actionButton.className = 'bg-yellow-600 hover:bg-yellow-700 text-white font-bold py-3 px-6 rounded-lg transition role-action-button';
                     actionButton.onclick = () => {
-                        const targets = allPlayersData.filter(p => p.Status === 'Alive' && p.PlayerID !== currentUserId);
+                        const targets = allPlayersData.filter(p => p.Status && p.Status.toLowerCase() === 'alive' && p.PlayerID !== currentUserId);
                         openActionModal('check', 'Choose a Player to Investigate', 'Confirm Investigation', targets);
                     };
                     playerDashboardActions.appendChild(actionButton);
@@ -448,11 +479,10 @@
                 case 'sheriff':
                      if (currentUser.SheriffShotUsed !== 'TRUE') {
                         actionButton = document.createElement('button');
-                        actionButton.id = 'btn-shoot-player';
                         actionButton.textContent = 'Shoot Player';
                         actionButton.className = 'bg-gray-700 hover:bg-gray-800 text-white font-bold py-3 px-6 rounded-lg transition role-action-button';
                         actionButton.onclick = () => {
-                            const targets = allPlayersData.filter(p => p.Status === 'Alive' && p.PlayerID !== currentUserId);
+                            const targets = allPlayersData.filter(p => p.Status && p.Status.toLowerCase() === 'alive' && p.PlayerID !== currentUserId);
                             openActionModal('shoot', 'Choose Your Target', 'Fire!', targets);
                         };
                         playerDashboardActions.appendChild(actionButton);
@@ -481,6 +511,8 @@
 
             isCurrentUserAdmin = currentUser.IsAdmin === 'TRUE';
             userIdDisplay.textContent = `${currentUser.Name} (${currentUser.Role})`;
+            accuserDisplayName.textContent = currentUser.Name;
+            accuserHiddenId.value = currentUser.PlayerID;
 
             await fetchGameState();
 
@@ -522,8 +554,8 @@
 
         // Event listeners for static buttons
         btnSubmitAccusation.addEventListener('click', () => {
-            // Accusation form logic would go here, similar to the action modal
-            // For now, it's a placeholder.
+            populatePlayerDropdown(accusedSelect, allPlayersData.filter(p => p.Status && p.Status.toLowerCase() === 'alive' && p.PlayerID !== currentUserId), 'Select a player to accuse...');
+            showView('accusation-form-page');
         });
         btnReviewAccusations.addEventListener('click', () => showView('admin-review-page'));
 
