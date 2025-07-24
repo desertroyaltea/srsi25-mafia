@@ -230,7 +230,7 @@
                             </div>
                             <p id="recording-indicator" class="text-red-500 text-center mt-2 hidden">Recording...</p>
                             <div id="audio-playback-container" class="mt-2 hidden">
-                                <audio id="audio-playback" controls class="w-full"></audio>
+                                <audio id="audio-playback" controls playsinline class="w-full"></audio>
                             </div>
                         </div>
                         <button type="submit" id="submit-accusation-button" class="bg-red-700 hover:bg-red-800 text-white font-bold py-3 px-6 rounded-lg w-full text-lg">Submit Accusation</button>
@@ -595,7 +595,7 @@
                 if (err.name === "NotAllowedError" || err.name === "PermissionDeniedError") {
                     showMessage("Microphone access was denied. Please allow it in your browser or phone settings.", 8000);
                 } else {
-                    showMessage("Could not access microphone. Please ensure it is connected and enabled.", 8000);
+                    showMessage(`Could not access microphone: ${err.name}. Please ensure it is connected and enabled.`, 8000);
                 }
             }
         }
