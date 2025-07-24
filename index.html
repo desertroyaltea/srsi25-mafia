@@ -410,6 +410,8 @@
                 const response = await fetch('/.netlify/functions/get-game-state');
                 if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
                 state.gameState = await response.json();
+                // ADDED LOGGING
+                console.log("DEBUG: Fetched Game State:", state.gameState);
             } catch (error) {
                 showMessage("Failed to load game state.", 5000);
                 state.gameState = null;
@@ -421,12 +423,18 @@
             const adminActions = document.getElementById('admin-dashboard-actions');
             if (!playerActions || !adminActions) return;
 
+            // ADDED LOGGING
+            console.log("--- Running updateDashboardActions ---");
+            console.log(`DEBUG: Received currentPhase: '${currentPhase}'`);
+
             document.querySelectorAll('.role-action-button').forEach(btn => btn.remove());
             
             const isNight = currentPhase && currentPhase.toLowerCase() !== 'day';
+            console.log(`DEBUG: Is it Night? -> ${isNight}`);
             document.getElementById('btn-submit-accusation').disabled = !isNight;
 
             if (state.isCurrentUserAdmin) {
+                console.log("DEBUG: User is an admin. Showing admin buttons.");
                 playerActions.style.display = 'none';
                 adminActions.style.display = 'grid';
                 return;
@@ -435,7 +443,23 @@
             playerActions.style.display = 'grid';
             adminActions.style.display = 'none';
 
+            if (!isNight) {
+                console.log("DEBUG: It is Day. No night actions will be shown.");
+                return;
+            }
+
+            console.log(`DEBUG: Checking MainUsed status. Value is: '${state.currentUser.MainUsed}'`);
+            if (state.currentUser.MainUsed === 'TRUE') {
+                console.log("DEBUG: MainUsed is TRUE. Showing 'action used' message.");
+                const usedActionNotice = document.createElement('p');
+                usedActionNotice.textContent = "You have already used your main action tonight.";
+                usedActionNotice.className = "text-gray-400 role-action-button";
+                playerActions.appendChild(usedActionNotice);
+                return;
+            }
+
             const role = state.currentUser.Role.toLowerCase();
+            console.log(`DEBUG: User role is '${role}'. Creating role-specific buttons.`);
             const createButton = (id, text, style, onClick) => {
                 const button = document.createElement('button');
                 button.id = id;
@@ -443,20 +467,11 @@
                 button.className = `${style} text-white font-bold py-3 px-6 rounded-lg transition role-action-button`;
                 button.onclick = onClick;
                 playerActions.appendChild(button);
+                console.log(`DEBUG: Created button: '${text}'`);
             };
 
             if (role === 'detective') {
                 createButton('btn-view-history', 'View Investigation History', 'bg-purple-700 hover:bg-purple-800', () => renderView('investigationHistory'));
-            }
-
-            if (!isNight) return;
-
-            if (state.currentUser.MainUsed === 'TRUE') {
-                const usedActionNotice = document.createElement('p');
-                usedActionNotice.textContent = "You have already used your main action tonight.";
-                usedActionNotice.className = "text-gray-400 role-action-button";
-                playerActions.appendChild(usedActionNotice);
-                return;
             }
 
             switch (role) {
@@ -511,7 +526,13 @@
             
             loadingOverlay.style.display = 'none';
             renderView('dashboard');
-            setInterval(fetchGameState, 30000);
+            setInterval(async () => {
+                await fetchGameState();
+                // Re-render dashboard to reflect phase changes
+                if (document.getElementById('dashboard-view')) {
+                    renderView('dashboard');
+                }
+            }, 30000);
         }
 
         window.onload = async () => {
