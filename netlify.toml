@@ -1,6 +1,11 @@
 [build]
-  publish = "." # Changed from "dist" to "." to publish from the root directory
-  functions = "netlify/functions" # This tells Netlify where to find your serverless functions
+  publish = "."
+  functions = "netlify/functions"
 
 [functions]
-  node_bundler = "esbuild" # Recommended for faster builds
+  node_bundler = "esbuild"
+
+[[redirects]]
+  from = "/netlify/functions/*"
+  to = "/.netlify/functions/:splat"
+  status = 200
