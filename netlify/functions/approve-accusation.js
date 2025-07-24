@@ -9,7 +9,7 @@ async function getSheetsService() {
     const auth = new JWT({
         email: credentials.client_email,
         key: credentials.private_key,
-        scopes: ['https://www.googleapis.com/auth/spreadsheets'] // Full access for writing
+        scopes: ['https://www.googleapis.com/auth/spreadsheets']
     });
     return google.sheets({ version: 'v4', auth });
 }
@@ -33,37 +33,34 @@ exports.handler = async (event, context) => {
 
         const sheets = await getSheetsService();
 
-        // 1. Find the accusation in the sheet
-        console.log(`approve-accusation: Searching for AccusationID ${accusationId}...`);
-        const accusationsResponse = await sheets.spreadsheets.values.get({
+        // 1. Get all data from the Accusations sheet to find the correct row
+        const range = 'Accusations!A:F'; // Only need columns A through F
+        const response = await sheets.spreadsheets.values.get({
             spreadsheetId: sheetId,
-            range: 'Accusations!A:H',
+            range: range,
         });
 
-        const allAccusations = accusationsResponse.data.values || [];
-        if (allAccusations.length < 2) throw new Error("Accusations sheet is empty or has no data.");
-
-        const headers = allAccusations[0];
-        const accusationRows = allAccusations.slice(1);
-
-        const idCol = headers.indexOf('AccusationID');
-        const statusCol = headers.indexOf('AdminApprovalStatus');
-        const timeCol = headers.indexOf('AdminApprovalTime');
-        const trialCol = headers.indexOf('TrialStarted');
-        const accusedIdCol = headers.indexOf('AccusedPlayerID');
-        const audioLinkCol = headers.indexOf('AudioDriveLink');
-
-        if ([idCol, statusCol, timeCol, trialCol, accusedIdCol, audioLinkCol].includes(-1)) {
-            throw new Error('One or more required columns not found in Accusations sheet.');
+        const allRows = response.data.values || [];
+        if (allRows.length < 2) {
+            throw new Error("Accusations sheet is empty or has no data.");
         }
 
-        let rowIndexToUpdate = -1;
-        let accusationData = null;
+        const headers = allRows[0];
+        const accusationRows = allRows.slice(1);
 
+        // 2. Find the index for the ID column (A) and Status column (F)
+        const idCol = headers.indexOf('AccusationID'); // Should be 0
+        const statusCol = headers.indexOf('AdminApprovalStatus'); // Should be 5
+
+        if (idCol === -1 || statusCol === -1) {
+            throw new Error('Required columns (AccusationID, AdminApprovalStatus) not found in Accusations sheet.');
+        }
+
+        // 3. Find the specific row index for the accusation to update
+        let rowIndexToUpdate = -1;
         for (let i = 0; i < accusationRows.length; i++) {
             if (accusationRows[i][idCol] === accusationId) {
-                rowIndexToUpdate = i + 2; // +2 for 0-index and header row
-                accusationData = accusationRows[i];
+                rowIndexToUpdate = i + 2; // +1 for slice, +1 for 1-based index of sheets
                 break;
             }
         }
@@ -71,59 +68,25 @@ exports.handler = async (event, context) => {
         if (rowIndexToUpdate === -1) {
             return { statusCode: 404, body: JSON.stringify({ error: 'Accusation not found.' }) };
         }
-        console.log(`approve-accusation: Found accusation at row ${rowIndexToUpdate}.`);
 
-        // 2. Modify the row data in memory
-        accusationData[statusCol] = 'Approved';
-        accusationData[timeCol] = new Date().toISOString();
-        accusationData[trialCol] = 'TRUE';
+        // 4. Update only the status cell (Column F)
+        const updateRange = `Accusations!F${rowIndexToUpdate}`;
+        
+        console.log(`approve-accusation: Updating range ${updateRange} to 'Approved' for AccusationID ${accusationId}`);
 
-        // 3. Update the entire row in the Accusations sheet
-        const updateRange = `Accusations!A${rowIndexToUpdate}:H${rowIndexToUpdate}`;
-        console.log(`approve-accusation: Updating Accusations sheet at range: ${updateRange}`);
         await sheets.spreadsheets.values.update({
             spreadsheetId: sheetId,
             range: updateRange,
             valueInputOption: 'USER_ENTERED',
             resource: {
-                values: [accusationData], // Write the entire modified row back
+                values: [['Approved']],
             },
-        });
-
-        // 4. Update Game_State
-        const accusedPlayerId = accusationData[accusedIdCol];
-        const gameStateAccusedPlayerRange = 'Game_State!E2'; // Column E for LastAccusedPlayerID
-        console.log(`approve-accusation: Updating Game_State at ${gameStateAccusedPlayerRange} with PlayerID ${accusedPlayerId}.`);
-        await sheets.spreadsheets.values.update({
-            spreadsheetId: sheetId,
-            range: gameStateAccusedPlayerRange,
-            valueInputOption: 'USER_ENTERED',
-            resource: { values: [[accusedPlayerId]] },
-        });
-
-        // 5. Add new entry to Trials sheet
-        const trialId = `TRL_${Date.now()}`;
-        const trialValues = [
-            trialId,
-            accusedPlayerId,
-            accusationData[audioLinkCol], // AccusationAudioLink
-            new Date().toISOString(), // TrialStartTime
-            new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(), // VotingDeadline (24 hours from now)
-            'Active', // Status
-            '' // Result
-        ];
-        console.log(`approve-accusation: Appending new trial ${trialId} to Trials sheet.`);
-        await sheets.spreadsheets.values.append({
-            spreadsheetId: sheetId,
-            range: 'Trials!A:G',
-            valueInputOption: 'USER_ENTERED',
-            resource: { values: [trialValues] },
         });
 
         return {
             statusCode: 200,
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ message: 'Accusation approved and trial initiated.', trialId: trialId }),
+            body: JSON.stringify({ message: 'Accusation has been approved.' }),
         };
 
     } catch (error) {
