@@ -4,7 +4,6 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>SRSI Mafia</title>
-    <!-- Tailwind CSS CDN -->
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
         body {
@@ -18,7 +17,7 @@
             padding: 20px;
             box-sizing: border-box;
             /* Blood stains background - REPLACE THIS URL WITH YOUR OWN! */
-            background-image: url('https://img.freepik.com/free-vector/red-blood-splatter-black-background-ideal-halloween_1048-19440.jpg?semt=ais_hybrid&w=740'); /* Placeholder */
+            background-image: url('https://placehold.co/1920x1080/000000/FF0000?text=BLOOD+STAINS+HERE'); /* Placeholder */
             background-size: cover; /* Cover the entire background */
             background-repeat: no-repeat;
             background-position: center center;
@@ -162,13 +161,11 @@
             SRSI MAFIA
         </h1>
 
-        <!-- User ID Display -->
         <div class="bg-gray-900 p-4 rounded-lg flex flex-col md:flex-row items-center justify-between shadow-inner border border-gray-800">
             <p class="text-base text-gray-400 mb-2 md:mb-0">Your User ID:</p>
             <span id="user-id-display" class="font-mono text-blue-400 text-base break-all text-center md:text-right">Generating...</span>
         </div>
 
-        <!-- Game State Display -->
         <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div class="bg-gray-900 p-5 rounded-lg shadow-lg border border-gray-800">
                 <h2 class="text-2xl font-semibold text-gray-200 mb-3">Game Status</h2>
@@ -182,36 +179,27 @@
             </div>
         </div>
 
-        <!-- Dashboard View -->
         <div id="dashboard-view" class="view-container bg-gray-900 p-5 rounded-lg shadow-lg border border-gray-800">
             <h2 class="text-2xl font-semibold text-gray-200 mb-4">Dashboard</h2>
             <p class="text-gray-400 mb-6">Select an action to proceed.</p>
 
-            <!-- Player-specific action buttons -->
-            <div id="player-dashboard-actions" class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <button id="btn-submit-accusation" class="bg-red-700 hover:bg-red-800 text-white font-bold py-3 px-6 rounded-lg focus:outline-none focus:shadow-outline transition duration-300 ease-in-out transform hover:scale-105 text-lg">
+            <div id="player-dashboard-actions" class="grid grid-cols-1 md:grid-cols-2 gap-4 hidden"> <button id="btn-submit-accusation" class="bg-red-700 hover:bg-red-800 text-white font-bold py-3 px-6 rounded-lg focus:outline-none focus:shadow-outline transition duration-300 ease-in-out transform hover:scale-105 text-lg">
                     Submit Accusation
                 </button>
-                <!-- Other player action buttons will go here -->
-            </div>
+                </div>
 
-            <!-- Admin-specific action buttons -->
-            <div id="admin-dashboard-actions" class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <button id="btn-review-accusations" class="bg-green-700 hover:bg-green-800 text-white font-bold py-3 px-6 rounded-lg focus:outline-none focus:shadow-outline transition duration-300 ease-in-out transform hover:scale-105 text-lg">
+            <div id="admin-dashboard-actions" class="grid grid-cols-1 md:grid-cols-2 gap-4 hidden"> <button id="btn-review-accusations" class="bg-green-700 hover:bg-green-800 text-white font-bold py-3 px-6 rounded-lg focus:outline-none focus:shadow-outline transition duration-300 ease-in-out transform hover:scale-105 text-lg">
                     Review Accusations
                 </button>
-                <!-- Other admin action buttons will go here -->
-            </div>
+                </div>
         </div>
 
-        <!-- Accusation Form Page -->
         <div id="accusation-form-page" class="view-container bg-gray-900 p-5 rounded-lg shadow-lg mt-4 border border-gray-800">
             <h2 class="text-2xl font-semibold text-red-500 mb-3">Submit Accusation</h2>
             <form id="accusationForm" enctype="multipart/form-data">
                 <div class="mb-4">
                     <label class="block text-gray-300 text-base font-bold mb-2">Accuser (Your Name):</label>
                     <p id="accuser-display-name" class="text-lg text-blue-400 font-semibold mb-2">Loading...</p>
-                    <!-- Hidden input to send accuser ID -->
                     <input type="hidden" id="accuser-hidden-id" name="accuserPlayerId" required>
                 </div>
                 <div class="mb-4">
@@ -242,16 +230,13 @@
             <button onclick="showView('dashboard-view')" class="mt-6 bg-gray-600 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded-lg transition duration-300 ease-in-out transform hover:scale-105 w-full">Back to Dashboard</button>
         </div>
 
-        <!-- Admin Review Page -->
         <div id="admin-review-page" class="view-container bg-gray-900 p-5 rounded-lg shadow-lg mt-4 border border-gray-800">
             <h2 class="text-2xl font-semibold text-green-500 mb-3">Admin Panel - Review Accusations</h2>
             <p class="text-gray-400 mb-4">Review and manage pending accusations.</p>
 
-            <!-- Pending Accusations Transcript -->
             <div id="pending-accusations-list" class="mb-6">
                 <h3 class="text-xl font-semibold text-gray-300 mb-3">Pending Accusations for Review:</h3>
                 <div id="accusations-transcript" class="space-y-4">
-                    <!-- Accusations will be loaded here dynamically -->
                     <p class="text-gray-500">No pending accusations.</p>
                 </div>
             </div>
@@ -260,7 +245,6 @@
             <button onclick="showView('dashboard-view')" class="mt-6 bg-gray-600 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded-lg transition duration-300 ease-in-out transform hover:scale-105 w-full">Back to Dashboard</button>
         </div>
 
-        <!-- Message Box -->
         <div id="message-box" class="message-box"></div>
     </div>
 
@@ -308,8 +292,7 @@
         // Admin Review Page Elements
         const pendingAccusationsList = document.getElementById('pending-accusations-list');
         const accusationsTranscript = document.getElementById('accusations-transcript');
-        const approvalStatus = document.getElementById('approval-status'); // Correctly declared here
-
+        const approvalStatus = document.getElementById('approval-status'); 
         // Removed the HTML element for manual approval form, so no need to get its reference
         // const approvalForm = document.getElementById('approvalForm'); // THIS LINE IS REMOVED
 
@@ -398,7 +381,6 @@
                     showMessage("Your user ID does not match any player. Please ensure your PlayerID is in the sheet. You cannot perform actions.", 8000);
                     // If user not found, disable forms or guide them to register/get ID
                     accusationForm.querySelectorAll('input, button, select').forEach(el => el.disabled = true);
-                    // The approvalForm is now part of the admin-actions-section, which will be hidden
                     playerDashboardActions.classList.add('hidden');
                     adminDashboardActions.classList.add('hidden');
                     console.error("Frontend: Current user ID not found in player data.");
@@ -412,7 +394,6 @@
                 console.error("Frontend: Error fetching player data:", error);
                 showMessage("Failed to load player data. Some features may not work.", 5000);
             }
-            // The finally block that hides the loading overlay is now in window.onload
         }
 
         // Helper function to populate a select element
@@ -489,7 +470,6 @@
                 console.error("Frontend: Error fetching game state:", error);
                 showMessage("Failed to load game state. Please check your connection or Netlify Functions.", 5000);
             }
-            // The finally block that hides the loading overlay is now in window.onload
         }
 
         // New function to fetch pending accusations for admin review
@@ -768,20 +748,6 @@
                 showMessage('Network error submitting accusation.', 5000);
             }
         });
-
-        // Event Listener for Admin Approval Form (manual input fallback)
-        // This form is now only for manual ID input, not part of the transcript buttons
-        // The HTML element for approvalForm and its listener are now completely removed.
-        /*
-        approvalForm.addEventListener('submit', async function(e) {
-            e.preventDefault();
-            const formData = new FormData(this);
-            const accusationId = formData.get('accusationId');
-            const adminPlayerId = currentUserId; // Use currentUserId directly
-
-            await handleAdminAction(accusationId, adminPlayerId, 'approve'); // Default to approve for submit button
-        });
-        */
 
         // Event listeners for dashboard buttons
         btnSubmitAccusation.addEventListener('click', () => showView('accusation-form-page'));
