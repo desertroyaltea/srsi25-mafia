@@ -76,7 +76,8 @@
         }
         @keyframes spin {
             0% { transform: rotate(0deg); }
-            100% { transform: rotate(360deg); }
+            50% { opacity: 0.5; }
+            100% { opacity: 1; }
         }
         /* Custom select styling */
         select {
@@ -303,6 +304,7 @@
         let mediaRecorder;
         let audioChunks = [];
         let recordedAudioBlob = null; // To store the final recorded audio
+        let audioMimeType = 'audio/webm'; // Default MIME type, will check for better ones
 
         // Global variable for a unique user ID (for now, a simple random UUID)
         let currentUserId = localStorage.getItem('mafiaGameUserId');
@@ -319,6 +321,24 @@
             setTimeout(() => {
                 messageBox.style.display = 'none';
             }, duration);
+        }
+
+        // Function to check supported audio MIME types
+        function getSupportedMimeType() {
+            const types = [
+                'audio/webm;codecs=opus',
+                'audio/webm',
+                'audio/ogg',
+                'audio/mp4'
+            ];
+            for (const type of types) {
+                if (MediaRecorder.isTypeSupported(type)) {
+                    console.log(`Using supported MIME type: ${type}`);
+                    return type;
+                }
+            }
+            console.warn('No common audio MIME types supported. Falling back to default.');
+            return 'audio/webm'; // Fallback
         }
 
         // Function to fetch player data and populate dropdowns
@@ -433,13 +453,22 @@
                         recordButton.disabled = true;
                         stopButton.disabled = true;
                         resetAudioButton.disabled = true;
+                        audioFileInput.disabled = true; // Ensure file input is also disabled
+                        submitAccusationButton.disabled = true; // Ensure submit is disabled
                     } else { // Night
                         showMessage("It's Night time. Actions are enabled!", 3000);
                         accusationForm.querySelectorAll('input, button, select').forEach(el => el.disabled = false);
                         // Only enable record button if no audio is recorded yet
                         if (!recordedAudioBlob) {
                             recordButton.disabled = false;
+                            audioFileInput.disabled = false; // Enable file input only if no recording
+                        } else {
+                            // If there's a recorded blob, disable recording and file input
+                            recordButton.disabled = true;
+                            audioFileInput.disabled = true;
                         }
+                        // Submit button status depends on whether audio is ready
+                        submitAccusationButton.disabled = !(recordedAudioBlob || audioFileInput.files.length > 0);
                     }
                 }
 
@@ -556,18 +585,44 @@
 
         // --- Audio Recording Logic ---
 
+        // Determine the best MIME type for recording
+        audioMimeType = getSupportedMimeType();
+
         recordButton.addEventListener('click', async () => {
+            if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+                showMessage('Microphone access not supported in this browser.', 5000);
+                console.error('getUserMedia not supported on your browser!');
+                return;
+            }
+
             try {
                 const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-                mediaRecorder = new MediaRecorder(stream);
+                mediaRecorder = new MediaRecorder(stream, { mimeType: audioMimeType });
                 audioChunks = [];
 
                 mediaRecorder.ondataavailable = event => {
-                    audioChunks.push(event.data);
+                    if (event.data.size > 0) {
+                        audioChunks.push(event.data);
+                    }
                 };
 
                 mediaRecorder.onstop = () => {
-                    recordedAudioBlob = new Blob(audioChunks, { type: 'audio/webm' }); // WebM is common and good quality
+                    if (audioChunks.length === 0) {
+                        showMessage("Recording failed: No audio data captured. Try again.", 5000);
+                        console.error("No audio data captured.");
+                        resetAudioState();
+                        return;
+                    }
+
+                    recordedAudioBlob = new Blob(audioChunks, { type: audioMimeType });
+                    console.log("Recorded Audio Blob:", recordedAudioBlob); // Log the blob
+                    if (recordedAudioBlob.size === 0) {
+                        showMessage("Recording failed: Empty audio file. Speak louder or check mic.", 5000);
+                        console.error("Recorded audio blob is empty.");
+                        resetAudioState();
+                        return;
+                    }
+
                     const audioUrl = URL.createObjectURL(recordedAudioBlob);
                     audioPlayback.src = audioUrl;
                     audioPlayerContainer.style.display = 'flex'; // Show audio player
@@ -575,6 +630,15 @@
                     submitAccusationButton.disabled = false; // Enable submit button
                     recordingIndicator.style.display = 'none'; // Hide indicator
                     // Stop all tracks in the stream
+                    stream.getTracks().forEach(track => track.stop());
+                    showMessage("Recording stopped. Review your audio.", 3000);
+                };
+
+                mediaRecorder.onerror = event => {
+                    console.error('MediaRecorder error:', event.error);
+                    showMessage(`Recording error: ${event.error.name}. Please try again.`, 5000);
+                    resetAudioState();
+                    // Stop all tracks in the stream if an error occurs
                     stream.getTracks().forEach(track => track.stop());
                 };
 
@@ -589,31 +653,38 @@
 
             } catch (err) {
                 console.error('Error accessing microphone:', err);
-                showMessage('Could not access microphone. Please check permissions.', 5000);
-                recordButton.disabled = false; // Re-enable if error
-                stopButton.disabled = true;
-                recordingIndicator.style.display = 'none';
+                if (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError') {
+                    showMessage('Microphone access denied. Please allow microphone permissions in your browser settings.', 8000);
+                } else if (err.name === 'NotFoundError') {
+                    showMessage('No microphone found. Please connect a microphone.', 5000);
+                } else {
+                    showMessage('Could not access microphone. Please check permissions or try another browser.', 5000);
+                }
+                resetAudioState(); // Reset UI state on error
             }
         });
 
         stopButton.addEventListener('click', () => {
             if (mediaRecorder && mediaRecorder.state === 'recording') {
                 mediaRecorder.stop();
-                recordButton.disabled = false;
-                stopButton.disabled = true;
-                showMessage("Recording stopped.", 2000);
             }
         });
 
         resetAudioButton.addEventListener('click', () => {
+            resetAudioState();
+            showMessage("Recording cleared.", 2000);
+        });
+
+        function resetAudioState() {
             recordedAudioBlob = null;
             audioPlayback.src = '';
             audioPlayerContainer.style.display = 'none';
             audioFileInput.disabled = false; // Re-enable file input
             recordButton.disabled = false; // Re-enable record button
-            submitAccusationButton.disabled = false; // Re-enable submit button
-            showMessage("Recording cleared.", 2000);
-        });
+            stopButton.disabled = true; // Ensure stop button is disabled
+            submitAccusationButton.disabled = !(audioFileInput.files.length > 0); // Re-evaluate submit button state
+            recordingIndicator.style.display = 'none'; // Hide indicator
+        }
 
         // Ensure only one method of audio input is active
         audioFileInput.addEventListener('change', () => {
@@ -622,8 +693,10 @@
                 stopButton.disabled = true;
                 audioPlayerContainer.style.display = 'none'; // Hide player if file selected
                 recordedAudioBlob = null; // Clear recorded blob if file is chosen
+                submitAccusationButton.disabled = false; // Enable submit button
             } else {
                 recordButton.disabled = false;
+                submitAccusationButton.disabled = true; // Disable submit if no file and no recording
             }
         });
 
@@ -638,16 +711,28 @@
             formData.append('accusedPlayerId', accusedSelect.value);
 
             // Prioritize recorded audio, then selected file
+            let audioToUpload = null;
+            let audioFileName = '';
+
             if (recordedAudioBlob) {
-                formData.append('audioFile', recordedAudioBlob, `accusation_${accuserSelect.value}_${Date.now()}.webm`);
+                audioToUpload = recordedAudioBlob;
+                audioFileName = `accusation_${accuserSelect.value}_${Date.now()}.webm`; // Use .webm for webm type
+                // If the recorded MIME type is different, adjust the extension
+                if (audioMimeType.includes('mp4')) audioFileName = audioFileName.replace('.webm', '.mp4');
+                else if (audioMimeType.includes('ogg')) audioFileName = audioFileName.replace('.webm', '.ogg');
+
             } else if (audioFileInput.files.length > 0) {
-                formData.append('audioFile', audioFileInput.files[0]);
+                audioToUpload = audioFileInput.files[0];
+                audioFileName = audioFileInput.files[0].name;
             } else {
                 showMessage("Please record audio or select an audio file.", 4000);
                 accusationStatus.textContent = 'Error: No audio provided.';
                 accusationStatus.classList.add('text-red-400');
                 return;
             }
+
+            formData.append('audioFile', audioToUpload, audioFileName);
+
 
             try {
                 const response = await fetch('/.netlify/functions/submit-accusation', {
@@ -661,14 +746,7 @@
                     accusationStatus.classList.add('text-green-400');
                     showMessage('Accusation submitted successfully!', 4000);
                     this.reset();
-                    // Reset audio recording state after successful submission
-                    recordedAudioBlob = null;
-                    audioPlayback.src = '';
-                    audioPlayerContainer.style.display = 'none';
-                    audioFileInput.disabled = false;
-                    recordButton.disabled = false;
-                    stopButton.disabled = true;
-                    submitAccusationButton.disabled = false;
+                    resetAudioState(); // Reset audio state after successful submission
                 } else {
                     accusationStatus.textContent = `Error: ${result.error || 'Unknown error'}`;
                     accusationStatus.classList.add('text-red-400');
