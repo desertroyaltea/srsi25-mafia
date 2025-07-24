@@ -400,7 +400,7 @@
                     adminDashboardActions.classList.add('hidden');
                     console.error("Frontend: Current user ID not found in player data.");
                     // Do not hide loading overlay here, let the finally block handle it
-                    return; // Stop further execution if user is not recognized
+                    // return; // Removed this return to ensure finally block is always hit
                 }
 
                 // Populate Accused dropdown (excluding admins)
@@ -411,8 +411,8 @@
                 console.error("Frontend: Error fetching player data:", error);
                 showMessage("Failed to load player data. Some features may not work.", 5000);
             } finally { // Ensure loading overlay is hidden even on error
-                loadingOverlay.classList.add('hidden');
-                gameContainer.classList.remove('hidden');
+                // loadingOverlay.classList.add('hidden'); // Moved to window.onload's final finally
+                // gameContainer.classList.remove('hidden'); // Moved to window.onload's final finally
             }
         }
 
@@ -490,9 +490,9 @@
                 console.error("Frontend: Error fetching game state:", error);
                 showMessage("Failed to load game state. Please check your connection or Netlify Functions.", 5000);
             } finally { // Ensure loading overlay is hidden even on error
-                loadingOverlay.classList.add('hidden');
-                gameContainer.classList.remove('hidden');
-                showView('dashboard-view'); // Show the dashboard after initial load
+                // loadingOverlay.classList.add('hidden'); // Moved to window.onload's final finally
+                // gameContainer.classList.remove('hidden'); // Moved to window.onload's final finally
+                // showView('dashboard-view'); // Moved to window.onload's final finally
             }
         }
 
@@ -797,6 +797,16 @@
             loadingOverlay.classList.remove('hidden');
             gameContainer.classList.add('hidden');
 
+            // Add a fallback timeout to hide loading overlay and show content
+            // This is a safety net to prevent eternal loading if an unexpected error occurs
+            const loadingTimeout = setTimeout(() => {
+                console.warn("Frontend: Loading timeout reached. Forcing display of game container.");
+                loadingOverlay.classList.add('hidden');
+                gameContainer.classList.remove('hidden');
+                showView('dashboard-view');
+                showMessage("Loading took longer than expected. Please check console for errors.", 7000);
+            }, 15000); // 15 seconds timeout
+
             try {
                 await fetchPlayers(); // Fetch players first to determine admin status
                 await fetchGameState(); // Then fetch game state and apply role-based visibility
@@ -805,6 +815,8 @@
                 console.error("Frontend: Critical error during initial load:", error);
                 showMessage("Failed to load game. Please refresh or contact support.", 10000);
             } finally {
+                // Clear the timeout if loading completes successfully
+                clearTimeout(loadingTimeout);
                 // Ensure loading overlay is hidden and game container is shown in all cases
                 loadingOverlay.classList.add('hidden');
                 gameContainer.classList.remove('hidden');
