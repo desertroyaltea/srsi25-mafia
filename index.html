@@ -185,7 +185,6 @@
             switch(viewName) {
                 case 'login':
                     appRoot.innerHTML = templates.login();
-                    // The event listener is now handled by the main appRoot listener
                     break;
                 case 'dashboard':
                     viewHtml = templates.dashboard();
@@ -209,7 +208,6 @@
 
         appRoot.addEventListener('click', async (e) => {
             const target = e.target;
-            // Removed login button from here, it's handled by the submit listener
             if (target.id === 'btn-submit-accusation') {
                  const targets = state.allPlayers.filter(p => p.Status && p.Status.toLowerCase() === 'alive' && p.PlayerID !== state.currentUserId);
                 renderView('accusationForm', { targets });
@@ -238,7 +236,9 @@
             loginError.textContent = '';
             loadingOverlay.style.display = 'flex';
             await fetchPlayers();
-            const player = state.allPlayers.find(p => p.Name && p.Name.toLowerCase() === nameInput.toLowerCase());
+            
+            // FIX: Trim whitespace from the sheet data before comparing
+            const player = state.allPlayers.find(p => p.Name && p.Name.trim().toLowerCase() === nameInput.toLowerCase());
             
             if (player) {
                 localStorage.setItem('mafiaGameUserId', player.PlayerID);
