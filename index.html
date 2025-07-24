@@ -91,42 +91,6 @@
             border: 1px solid #555555;
             color: #e2e8f0;
         }
-        input[type="file"]::file-selector-button {
-            background-color: #8b0000;
-            color: #ffffff;
-            border: none;
-            padding: 0.5rem 1rem;
-            border-radius: 0.375rem;
-            cursor: pointer;
-            transition: background-color 0.3s ease;
-        }
-        input[type="file"]::file-selector-button:hover {
-            background-color: #a30000;
-        }
-        button {
-            box-shadow: 0 4px 10px rgba(255, 0, 0, 0.3);
-        }
-        .recording-indicator {
-            color: #FF0000;
-            font-weight: bold;
-            animation: pulse 1s infinite;
-            display: none;
-        }
-        @keyframes pulse {
-            0% { opacity: 1; }
-            50% { opacity: 0.5; }
-            100% { opacity: 1; }
-        }
-        .audio-player-container {
-            margin-top: 1rem;
-            display: none;
-            flex-direction: column;
-            gap: 0.5rem;
-            align-items: center;
-        }
-        .view-container {
-            display: none;
-        }
     </style>
 </head>
 <body>
@@ -135,239 +99,160 @@
         Loading SRSI Mafia...
     </div>
 
-    <!-- Login View -->
-    <div id="login-view" class="container view-container">
-        <h1 class="text-4xl font-bold text-center text-red-500 mb-6">SRSI MAFIA LOGIN</h1>
-        <form id="login-form">
-            <div class="mb-6">
-                <label for="login-code" class="block text-gray-300 text-lg font-bold mb-2">Enter Your Player Code:</label>
-                <input type="text" id="login-code" class="shadow appearance-none border rounded w-full py-3 px-4 text-lg text-gray-200 leading-tight focus:outline-none focus:shadow-outline" required>
-            </div>
-            <button type="submit" id="login-button" class="bg-red-700 hover:bg-red-800 text-white font-bold py-3 px-6 rounded-lg focus:outline-none focus:shadow-outline transition duration-300 w-full text-xl">
-                Enter Game
-            </button>
-            <p id="login-error" class="text-red-500 text-center mt-4"></p>
-        </form>
-    </div>
+    <!-- Main application container where views will be rendered -->
+    <div id="app-root"></div>
 
-    <!-- Main Game Container -->
-    <div class="container hidden" id="game-container">
-        <h1 class="text-4xl font-bold text-center text-red-500 mb-6 rounded-lg p-4 bg-red-900 bg-opacity-40 border border-red-700 shadow-2xl tracking-wide">
-            SRSI MAFIA
-        </h1>
-
-        <div class="bg-gray-900 p-4 rounded-lg flex flex-col md:flex-row items-center justify-between shadow-inner border border-gray-800">
-            <p class="text-base text-gray-400 mb-2 md:mb-0">Logged in as:</p>
-            <span id="user-id-display" class="font-mono text-blue-400 text-base break-all text-center md:text-right">...</span>
-        </div>
-
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div class="bg-gray-900 p-5 rounded-lg shadow-lg border border-gray-800">
-                <h2 class="text-2xl font-semibold text-gray-200 mb-3">Game Status</h2>
-                <p class="text-lg text-gray-300">Current Day: <span id="current-day" class="font-bold text-red-400">Loading...</span></p>
-                <p class="text-lg text-gray-300">Current Phase: <span id="current-phase" class="font-bold text-red-400">Loading...</span></p>
-            </div>
-            <div class="bg-gray-900 p-5 rounded-lg shadow-lg border border-gray-800">
-                <h2 class="text-2xl font-semibold text-gray-200 mb-3">Trial Information</h2>
-                <p class="text-lg text-gray-300">Accused Player: <span id="last-accused-player" class="font-bold text-red-400">N/A</span></p>
-                <p class="text-lg text-gray-300">Last Trial Result: <span id="last-trial-result" class="font-bold text-green-400">N/A</span></p>
-            </div>
-        </div>
-
-        <div id="dashboard-view" class="view-container bg-gray-900 p-5 rounded-lg shadow-lg border border-gray-800">
-            <h2 class="text-2xl font-semibold text-gray-200 mb-4">Dashboard</h2>
-            <p class="text-gray-400 mb-6">Select an action to proceed.</p>
-
-            <div id="player-dashboard-actions" class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <!-- General Player Actions -->
-                 <button id="btn-submit-accusation" class="bg-red-800 hover:bg-red-900 text-white font-bold py-3 px-6 rounded-lg transition">
-                    Submit Accusation
-                </button>
-                <!-- Role-Specific Action Buttons will be dynamically inserted here -->
-            </div>
-
-            <div id="admin-dashboard-actions" class="grid grid-cols-1 md:grid-cols-2 gap-4 hidden">
-                 <button id="btn-review-accusations" class="bg-green-700 hover:bg-green-800 text-white font-bold py-3 px-6 rounded-lg transition">
-                    Review Accusations
-                </button>
-            </div>
-        </div>
-
-        <div id="accusation-form-page" class="view-container bg-gray-900 p-5 rounded-lg shadow-lg mt-4 border border-gray-800">
-            <h2 class="text-2xl font-semibold text-red-500 mb-3">Submit Accusation</h2>
-            <form id="accusationForm" enctype="multipart/form-data">
-                <div class="mb-4">
-                    <label class="block text-gray-300 text-base font-bold mb-2">Accuser (Your Name):</label>
-                    <p id="accuser-display-name" class="text-lg text-blue-400 font-semibold mb-2">Loading...</p>
-                    <input type="hidden" id="accuser-hidden-id" name="accuserPlayerId" required>
-                </div>
-                <div class="mb-4">
-                    <label for="accused" class="block text-gray-300 text-base font-bold mb-2">Accused Player:</label>
-                    <select id="accused" name="accusedPlayerId" class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline bg-gray-200" required>
-                        <option value="">Select a player</option>
-                    </select>
-                </div>
-                <div class="mb-4">
-                    <label class="block text-gray-300 text-base font-bold mb-2">Accusation Audio:</label>
-                    <div class="flex flex-col sm:flex-row gap-2">
-                        <button type="button" id="recordButton" class="bg-red-700 hover:bg-red-800 text-white font-bold py-2 px-4 rounded-lg transition duration-300 ease-in-out transform hover:scale-105 flex-1">Start Recording</button>
-                        <button type="button" id="stopButton" class="bg-gray-600 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded-lg transition duration-300 ease-in-out transform hover:scale-105 flex-1" disabled>Stop Recording</button>
-                    </div>
-                    <p id="recordingIndicator" class="recording-indicator text-center mt-2">Recording...</p>
-                    <div id="audioPlayerContainer" class="audio-player-container">
-                        <audio id="audioPlayback" controls></audio>
-                        <button type="button" id="resetAudioButton" class="bg-gray-500 hover:bg-gray-600 text-white text-sm py-1 px-3 rounded-lg">Clear Recording</button>
-                    </div>
-                    <p class="text-gray-400 text-sm mt-3 text-center">
-                        Or, if you prefer, select an existing audio file:
-                    </p>
-                    <input type="file" id="audioFile" name="audioFile" accept="audio/*" class="block w-full text-base text-gray-300 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-base file:font-semibold file:bg-red-700 file:text-white hover:file:bg-red-800 mt-2">
-                </div>
-                <button type="submit" id="submitAccusationButton" class="bg-red-700 hover:bg-red-800 text-white font-bold py-3 px-6 rounded-lg focus:outline-none focus:shadow-outline transition duration-300 ease-in-out transform hover:scale-105 w-full text-lg">Submit Accusation</button>
-            </form>
-            <p id="accusation-status" class="mt-3 text-sm text-gray-300 text-center"></p>
-            <button type="button" onclick="showView('dashboard-view')" class="mt-6 bg-gray-600 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded-lg transition duration-300 ease-in-out transform hover:scale-105 w-full">Back to Dashboard</button>
-        </div>
-
-        <div id="admin-review-page" class="view-container bg-gray-900 p-5 rounded-lg shadow-lg mt-4 border border-gray-800">
-            <h2 class="text-2xl font-semibold text-green-500 mb-3">Admin Panel - Review Accusations</h2>
-            <div id="accusations-transcript" class="space-y-4"></div>
-            <button type="button" onclick="showView('dashboard-view')" class="mt-6 bg-gray-600 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded-lg w-full">Back to Dashboard</button>
-        </div>
-        
-        <!-- Reusable Action Modal (NO LONGER A FORM) -->
-        <div id="action-modal-view" class="view-container bg-gray-900 p-5 rounded-lg shadow-lg mt-4 border border-gray-800">
-            <h2 id="action-modal-title" class="text-2xl font-semibold text-red-500 mb-4">Perform Action</h2>
-            <div class="mb-6">
-                <label for="action-target-select" class="block text-gray-300 text-base font-bold mb-2">Select Target:</label>
-                <select id="action-target-select" name="targetPlayerId" class="shadow appearance-none border rounded w-full py-3 px-4 text-lg text-gray-200 leading-tight focus:outline-none focus:shadow-outline" required>
-                    <option value="">Choose a player...</option>
-                </select>
-            </div>
-            <button type="button" id="action-modal-confirm-button" class="bg-red-700 hover:bg-red-800 text-white font-bold py-3 px-6 rounded-lg w-full text-lg">Confirm</button>
-            <button type="button" onclick="showView('dashboard-view')" class="mt-6 bg-gray-600 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded-lg w-full">Back to Dashboard</button>
-        </div>
-
-
-        <div id="message-box" class="message-box"></div>
-    </div>
+    <div id="message-box" class="message-box"></div>
 
     <script type="module">
-        // --- Element References ---
-        const loadingOverlay = document.getElementById('loading-overlay');
-        const loginView = document.getElementById('login-view');
-        const loginForm = document.getElementById('login-form');
-        const loginCodeInput = document.getElementById('login-code');
-        const loginError = document.getElementById('login-error');
-        const gameContainer = document.getElementById('game-container');
-        const userIdDisplay = document.getElementById('user-id-display');
-        const currentDaySpan = document.getElementById('current-day');
-        const currentPhaseSpan = document.getElementById('current-phase');
-        const lastAccusedPlayerSpan = document.getElementById('last-accused-player');
-        const lastTrialResultSpan = document.getElementById('last-trial-result');
+        // --- STATE MANAGEMENT ---
+        const state = {
+            allPlayers: [],
+            currentUserId: null,
+            currentUser: null,
+            isCurrentUserAdmin: false,
+            gameState: null,
+        };
+
+        // --- ELEMENT REFERENCES (App Root) ---
+        const appRoot = document.getElementById('app-root');
         const messageBox = document.getElementById('message-box');
-        const dashboardView = document.getElementById('dashboard-view');
-        const accusationFormPage = document.getElementById('accusation-form-page');
-        const adminReviewPage = document.getElementById('admin-review-page');
-        const btnSubmitAccusation = document.getElementById('btn-submit-accusation');
-        const btnReviewAccusations = document.getElementById('btn-review-accusations');
-        const playerDashboardActions = document.getElementById('player-dashboard-actions');
-        const adminDashboardActions = document.getElementById('admin-dashboard-actions');
-        const accusationForm = document.getElementById('accusationForm');
-        const accuserDisplayName = document.getElementById('accuser-display-name');
-        const accuserHiddenId = document.getElementById('accuser-hidden-id');
-        const accusedSelect = document.getElementById('accused');
-        const accusationsTranscript = document.getElementById('accusations-transcript');
-        
-        // Action Modal elements
-        const actionModalView = document.getElementById('action-modal-view');
-        const actionModalTitle = document.getElementById('action-modal-title');
-        const actionTargetSelect = document.getElementById('action-target-select');
-        const actionModalConfirmButton = document.getElementById('action-modal-confirm-button');
+        const loadingOverlay = document.getElementById('loading-overlay');
 
-        // --- State Variables ---
-        let allPlayersData = [];
-        let currentUserId = null;
-        let currentUser = null;
-        let isCurrentUserAdmin = false;
-        let currentAction = null;
+        // --- VIEW TEMPLATES ---
+        const templates = {
+            login: () => `
+                <div class="container">
+                    <h1 class="text-4xl font-bold text-center text-red-500 mb-6">SRSI MAFIA LOGIN</h1>
+                    <form id="login-form">
+                        <div class="mb-6">
+                            <label for="login-code" class="block text-gray-300 text-lg font-bold mb-2">Enter Your Player Code:</label>
+                            <input type="text" id="login-code" class="shadow appearance-none border rounded w-full py-3 px-4 text-lg text-gray-200 leading-tight focus:outline-none focus:shadow-outline" required>
+                        </div>
+                        <button type="submit" id="login-button" class="bg-red-700 hover:bg-red-800 text-white font-bold py-3 px-6 rounded-lg w-full text-xl">Enter Game</button>
+                        <p id="login-error" class="text-red-500 text-center mt-4"></p>
+                    </form>
+                </div>`,
 
-        // --- Core Functions ---
-        function showMessage(message, duration = 3000) {
-            messageBox.textContent = message;
-            messageBox.style.display = 'block';
-            setTimeout(() => { messageBox.style.display = 'none'; }, duration);
-        }
+            gameLayout: (viewHtml) => `
+                <div class="container" id="game-container">
+                    <h1 class="text-4xl font-bold text-center text-red-500 mb-6">SRSI MAFIA</h1>
+                    <div class="bg-gray-900 p-4 rounded-lg flex justify-between items-center">
+                        <p class="text-base text-gray-400">Logged in as:</p>
+                        <span id="user-id-display" class="font-mono text-blue-400 text-base">${state.currentUser.Name} (${state.currentUser.Role})</span>
+                    </div>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div class="bg-gray-900 p-5 rounded-lg">
+                            <h2 class="text-2xl font-semibold mb-3">Game Status</h2>
+                            <p>Current Day: <span id="current-day" class="font-bold text-red-400">${state.gameState?.CurrentDay || '...'}</span></p>
+                            <p>Current Phase: <span id="current-phase" class="font-bold text-red-400">${state.gameState?.CurrentPhase || '...'}</span></p>
+                        </div>
+                        <div class="bg-gray-900 p-5 rounded-lg">
+                            <h2 class="text-2xl font-semibold mb-3">Trial Information</h2>
+                            <p>Accused Player: <span id="last-accused-player" class="font-bold text-red-400">${getPlayerNameById(state.gameState?.LastAccusedPlayerID) || 'N/A'}</span></p>
+                            <p>Last Trial Result: <span id="last-trial-result" class="font-bold text-green-400">${state.gameState?.LastTrialResult || 'N/A'}</span></p>
+                        </div>
+                    </div>
+                    <div id="view-content">${viewHtml}</div>
+                </div>`,
 
-        const allViewContainers = document.querySelectorAll('.view-container');
-        window.showView = function(viewId) {
-            allViewContainers.forEach(container => container.style.display = 'none');
-            const viewToShow = document.getElementById(viewId);
-            if(viewToShow) viewToShow.style.display = 'block';
-        }
+            dashboard: () => `
+                <div class="bg-gray-900 p-5 rounded-lg mt-4">
+                    <h2 class="text-2xl font-semibold mb-4">Dashboard</h2>
+                    <p class="text-gray-400 mb-6">Select an action to proceed.</p>
+                    <div id="player-dashboard-actions" class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <button id="btn-submit-accusation" class="bg-red-800 hover:bg-red-900 text-white font-bold py-3 px-6 rounded-lg">Submit Accusation</button>
+                    </div>
+                    <div id="admin-dashboard-actions" class="hidden grid-cols-1 md:grid-cols-2 gap-4">
+                        <button id="btn-review-accusations" class="bg-green-700 hover:bg-green-800 text-white font-bold py-3 px-6 rounded-lg">Review Accusations</button>
+                    </div>
+                </div>`,
+            
+            actionModal: ({ title, buttonText, targets }) => `
+                <div class="bg-gray-900 p-5 rounded-lg mt-4">
+                    <h2 class="text-2xl font-semibold text-red-500 mb-4">${title}</h2>
+                    <div class="mb-6">
+                        <label for="action-target-select" class="block text-gray-300 font-bold mb-2">Select Target:</label>
+                        <select id="action-target-select" class="shadow w-full py-3 px-4 text-lg leading-tight">
+                            <option value="">Choose a player...</option>
+                            ${targets.map(p => `<option value="${p.PlayerID}">${p.Name}</option>`).join('')}
+                        </select>
+                    </div>
+                    <button type="button" id="action-modal-confirm-button" class="bg-red-700 hover:bg-red-800 text-white font-bold py-3 px-6 rounded-lg w-full text-lg">${buttonText}</button>
+                    <button type="button" id="back-to-dashboard" class="mt-6 bg-gray-600 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded-lg w-full">Back to Dashboard</button>
+                </div>`,
+            
+            // Add other templates here (accusation, admin review) when needed
+        };
 
-        async function fetchPlayers() {
-            if (allPlayersData.length > 0) return allPlayersData;
-            try {
-                const response = await fetch('/.netlify/functions/get-player-data');
-                if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
-                allPlayersData = await response.json();
-                return allPlayersData;
-            } catch (error) {
-                console.error("Frontend: Error fetching player data:", error);
-                showMessage("Failed to load player data.", 5000);
-                return [];
+        // --- RENDER ENGINE ---
+        function renderView(viewName, data = {}) {
+            let viewHtml;
+            switch(viewName) {
+                case 'login':
+                    appRoot.innerHTML = templates.login();
+                    initLoginView();
+                    break;
+                case 'dashboard':
+                    viewHtml = templates.dashboard();
+                    appRoot.innerHTML = templates.gameLayout(viewHtml);
+                    initDashboardView();
+                    break;
+                case 'actionModal':
+                    viewHtml = templates.actionModal(data);
+                    appRoot.innerHTML = templates.gameLayout(viewHtml);
+                    initActionModalView();
+                    break;
+                // Add other cases here
             }
         }
 
-        function populatePlayerDropdown(selectElement, players, defaultOptionText) {
-            selectElement.innerHTML = `<option value="">${defaultOptionText}</option>`;
-            players.forEach(player => {
-                const option = document.createElement('option');
-                option.value = player.PlayerID;
-                option.textContent = player.Name || player.PlayerID;
-                selectElement.appendChild(option);
+        // --- VIEW INITIALIZERS (to attach event listeners) ---
+        function initLoginView() {
+            document.getElementById('login-form').addEventListener('submit', handleLogin);
+        }
+        
+        function initDashboardView() {
+            updateDashboardActions(state.gameState?.CurrentPhase || 'Day');
+            document.getElementById('btn-submit-accusation').addEventListener('click', () => {
+                // Placeholder for accusation view
+                showMessage("Accusation form not implemented in this version yet.");
+            });
+            document.getElementById('btn-review-accusations').addEventListener('click', () => {
+                // Placeholder for admin review view
+                showMessage("Admin review page not implemented in this version yet.");
             });
         }
 
-        function getPlayerNameById(playerId) {
-            const player = allPlayersData.find(p => p.PlayerID === playerId);
-            return player ? player.Name : (playerId || 'N/A');
+        function initActionModalView() {
+            document.getElementById('action-modal-confirm-button').addEventListener('click', handleActionConfirm);
+            document.getElementById('back-to-dashboard').addEventListener('click', () => renderView('dashboard'));
         }
 
-        async function fetchGameState() {
-            try {
-                const response = await fetch('/.netlify/functions/get-game-state');
-                if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
-                const gameState = await response.json();
-                if (!gameState) throw new Error("Game state data is missing or empty.");
+        // --- EVENT HANDLERS ---
+        async function handleLogin(e) {
+            e.preventDefault();
+            const code = document.getElementById('login-code').value.trim();
+            const loginError = document.getElementById('login-error');
+            if (!code) return;
 
-                const { CurrentDay = 'N/A', CurrentPhase = 'Day', LastAccusedPlayerID = 'N/A', LastTrialResult = 'N/A' } = gameState;
-                currentDaySpan.textContent = CurrentDay;
-                currentPhaseSpan.textContent = CurrentPhase;
-                lastAccusedPlayerSpan.textContent = getPlayerNameById(LastAccusedPlayerID);
-                lastTrialResultSpan.textContent = LastTrialResult;
+            loginError.textContent = '';
+            loadingOverlay.style.display = 'flex';
 
-                updateDashboardActions(CurrentPhase);
+            await fetchPlayers();
+            const player = state.allPlayers.find(p => p.PlayerID.toLowerCase() === code.toLowerCase());
 
-            } catch (error) {
-                console.error("Frontend: Error fetching game state:", error);
-                showMessage("Failed to load game state.", 5000);
+            if (player) {
+                localStorage.setItem('mafiaGameUserId', player.PlayerID);
+                await initializeGame(player.PlayerID);
+            } else {
+                loadingOverlay.style.display = 'none';
+                loginError.textContent = 'Invalid Player Code. Please try again.';
             }
         }
         
-        // --- Action Handling ---
-        function openActionModal(actionType, title, buttonText, targetPlayers) {
-            currentAction = actionType;
-            actionModalTitle.textContent = title;
-            actionModalConfirmButton.textContent = buttonText;
-            populatePlayerDropdown(actionTargetSelect, targetPlayers, 'Choose a target...');
-            showView('action-modal-view');
-        }
-        
-        // RADICAL FIX: Use a click listener instead of a form submit listener
-        actionModalConfirmButton.addEventListener('click', async () => {
-            const targetPlayerId = actionTargetSelect.value;
+        async function handleActionConfirm() {
+            const targetPlayerId = document.getElementById('action-target-select').value;
             if (!targetPlayerId) {
                 showMessage("Please select a target player.", 3000);
                 return;
@@ -375,23 +260,24 @@
 
             let endpoint = '';
             let body = {};
+            const { currentAction } = window; // Get action from global scope for simplicity here
 
             switch (currentAction) {
                 case 'kill':
                     endpoint = '/.netlify/functions/kill-player';
-                    body = { mafiaPlayerId: currentUserId, targetPlayerId };
+                    body = { mafiaPlayerId: state.currentUserId, targetPlayerId };
                     break;
                 case 'protect':
                     endpoint = '/.netlify/functions/protect-player';
-                    body = { doctorPlayerId: currentUserId, protectedPlayerId: targetPlayerId };
+                    body = { doctorPlayerId: state.currentUserId, protectedPlayerId: targetPlayerId };
                     break;
                 case 'check':
                     endpoint = '/.netlify/functions/check-mafia';
-                    body = { detectivePlayerId: currentUserId, checkedPlayerId: targetPlayerId };
+                    body = { detectivePlayerId: state.currentUserId, checkedPlayerId: targetPlayerId };
                     break;
                 case 'shoot':
                     endpoint = '/.netlify/functions/shoot-player';
-                    body = { sheriffPlayerId: currentUserId, killedPlayerId: targetPlayerId };
+                    body = { sheriffPlayerId: state.currentUserId, killedPlayerId: targetPlayerId };
                     break;
                 default:
                     showMessage("Invalid action.", 3000);
@@ -399,6 +285,7 @@
             }
 
             try {
+                loadingOverlay.style.display = 'flex';
                 const response = await fetch(endpoint, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
@@ -408,136 +295,140 @@
                 if (!response.ok) throw new Error(result.error || 'Unknown error');
                 
                 showMessage(result.message || 'Action logged successfully!', 4000);
-                showView('dashboard-view');
+                await fetchGameState(); // Refresh state before re-rendering
+                renderView('dashboard');
             } catch (error) {
                 showMessage(`Error: ${error.message}`, 5000);
+            } finally {
+                loadingOverlay.style.display = 'none';
             }
-        });
+        }
 
+        // --- DATA & UI LOGIC ---
+        function showMessage(message, duration = 3000) {
+            messageBox.textContent = message;
+            messageBox.style.display = 'block';
+            setTimeout(() => { messageBox.style.display = 'none'; }, duration);
+        }
 
-        // --- UI Updates ---
+        async function fetchPlayers() {
+            if (state.allPlayers.length > 0) return;
+            try {
+                const response = await fetch('/.netlify/functions/get-player-data');
+                if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+                state.allPlayers = await response.json();
+            } catch (error) {
+                showMessage("Failed to load player data.", 5000);
+            }
+        }
+
+        function getPlayerNameById(playerId) {
+            const player = state.allPlayers.find(p => p.PlayerID === playerId);
+            return player ? player.Name : (playerId || 'N/A');
+        }
+
+        async function fetchGameState() {
+            try {
+                const response = await fetch('/.netlify/functions/get-game-state');
+                if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+                state.gameState = await response.json();
+            } catch (error) {
+                showMessage("Failed to load game state.", 5000);
+                state.gameState = null;
+            }
+        }
+
         function updateDashboardActions(currentPhase) {
+            const playerActions = document.getElementById('player-dashboard-actions');
+            const adminActions = document.getElementById('admin-dashboard-actions');
+            if (!playerActions || !adminActions) return;
+
             document.querySelectorAll('.role-action-button').forEach(btn => btn.remove());
             
             const isNight = currentPhase.toLowerCase() !== 'day';
-            btnSubmitAccusation.disabled = !isNight;
+            document.getElementById('btn-submit-accusation').disabled = !isNight;
 
-            if (isCurrentUserAdmin) {
-                playerDashboardActions.classList.add('hidden');
-                adminDashboardActions.classList.remove('hidden');
+            if (state.isCurrentUserAdmin) {
+                playerActions.classList.add('hidden');
+                adminActions.classList.remove('hidden');
                 return;
             }
             
-            playerDashboardActions.classList.remove('hidden');
-            adminDashboardActions.classList.add('hidden');
+            playerActions.classList.remove('hidden');
+            adminActions.classList.add('hidden');
 
-            if (!isNight) {
-                return;
-            }
+            if (!isNight) return;
 
-            const role = currentUser.Role.toLowerCase();
+            const role = state.currentUser.Role.toLowerCase();
             let actionButton;
+
+            const createButton = (id, text, style, onClick) => {
+                const button = document.createElement('button');
+                button.id = id;
+                button.textContent = text;
+                button.className = `${style} text-white font-bold py-3 px-6 rounded-lg transition role-action-button`;
+                button.onclick = onClick;
+                playerActions.appendChild(button);
+            };
 
             switch (role) {
                 case 'mafia':
-                    actionButton = document.createElement('button');
-                    actionButton.textContent = 'Kill Player';
-                    actionButton.className = 'bg-red-700 hover:bg-red-800 text-white font-bold py-3 px-6 rounded-lg transition role-action-button';
-                    actionButton.onclick = () => {
-                        const otherMafiaIds = allPlayersData.filter(p => p.Role.toLowerCase() === 'mafia').map(p => p.PlayerID);
-                        const targets = allPlayersData.filter(p => p.Status && p.Status.toLowerCase() === 'alive' && !otherMafiaIds.includes(p.PlayerID));
-                        openActionModal('kill', 'Choose a Target to Kill', 'Confirm Kill', targets);
-                    };
-                    playerDashboardActions.appendChild(actionButton);
+                    createButton('btn-kill', 'Kill Player', 'bg-red-700 hover:bg-red-800', () => {
+                        window.currentAction = 'kill';
+                        const otherMafiaIds = state.allPlayers.filter(p => p.Role.toLowerCase() === 'mafia').map(p => p.PlayerID);
+                        const targets = state.allPlayers.filter(p => p.Status && p.Status.toLowerCase() === 'alive' && !otherMafiaIds.includes(p.PlayerID));
+                        renderView('actionModal', { title: 'Choose a Target to Kill', buttonText: 'Confirm Kill', targets });
+                    });
                     break;
-
                 case 'doctor':
-                    actionButton = document.createElement('button');
-                    actionButton.textContent = 'Protect Player';
-                    actionButton.className = 'bg-blue-700 hover:bg-blue-800 text-white font-bold py-3 px-6 rounded-lg transition role-action-button';
-                    actionButton.onclick = () => {
-                        const targets = allPlayersData.filter(p => p.Status && p.Status.toLowerCase() === 'alive');
-                        openActionModal('protect', 'Choose a Player to Protect', 'Confirm Protection', targets);
-                    };
-                    playerDashboardActions.appendChild(actionButton);
+                    createButton('btn-protect', 'Protect Player', 'bg-blue-700 hover:bg-blue-800', () => {
+                        window.currentAction = 'protect';
+                        const targets = state.allPlayers.filter(p => p.Status && p.Status.toLowerCase() === 'alive');
+                        renderView('actionModal', { title: 'Choose a Player to Protect', buttonText: 'Confirm Protection', targets });
+                    });
                     break;
-
                 case 'detective':
-                    actionButton = document.createElement('button');
-                    actionButton.textContent = 'Investigate Player';
-                    actionButton.className = 'bg-yellow-600 hover:bg-yellow-700 text-white font-bold py-3 px-6 rounded-lg transition role-action-button';
-                    actionButton.onclick = () => {
-                        const targets = allPlayersData.filter(p => p.Status && p.Status.toLowerCase() === 'alive' && p.PlayerID !== currentUserId);
-                        openActionModal('check', 'Choose a Player to Investigate', 'Confirm Investigation', targets);
-                    };
-                    playerDashboardActions.appendChild(actionButton);
+                    createButton('btn-check', 'Investigate Player', 'bg-yellow-600 hover:bg-yellow-700', () => {
+                        window.currentAction = 'check';
+                        const targets = state.allPlayers.filter(p => p.Status && p.Status.toLowerCase() === 'alive' && p.PlayerID !== state.currentUserId);
+                        renderView('actionModal', { title: 'Choose a Player to Investigate', buttonText: 'Confirm Investigation', targets });
+                    });
                     break;
-
                 case 'sheriff':
-                     if (currentUser.SheriffShotUsed !== 'TRUE') {
-                        actionButton = document.createElement('button');
-                        actionButton.textContent = 'Shoot Player';
-                        actionButton.className = 'bg-gray-700 hover:bg-gray-800 text-white font-bold py-3 px-6 rounded-lg transition role-action-button';
-                        actionButton.onclick = () => {
-                            const targets = allPlayersData.filter(p => p.Status && p.Status.toLowerCase() === 'alive' && p.PlayerID !== currentUserId);
-                            openActionModal('shoot', 'Choose Your Target', 'Fire!', targets);
-                        };
-                        playerDashboardActions.appendChild(actionButton);
+                     if (state.currentUser.SheriffShotUsed !== 'TRUE') {
+                        createButton('btn-shoot', 'Shoot Player', 'bg-gray-700 hover:bg-gray-800', () => {
+                            window.currentAction = 'shoot';
+                            const targets = state.allPlayers.filter(p => p.Status && p.Status.toLowerCase() === 'alive' && p.PlayerID !== state.currentUserId);
+                            renderView('actionModal', { title: 'Choose Your Target', buttonText: 'Fire!', targets });
+                        });
                     }
                     break;
             }
         }
 
-
-        // --- Initialization and Login ---
+        // --- INITIALIZATION ---
         async function initializeGame(userId) {
             loadingOverlay.style.display = 'flex';
-            loginView.style.display = 'none';
-
-            currentUserId = userId;
-            await fetchPlayers();
+            state.currentUserId = userId;
             
-            currentUser = allPlayersData.find(p => p.PlayerID === currentUserId);
-            if (!currentUser) {
+            await fetchPlayers();
+            state.currentUser = state.allPlayers.find(p => p.PlayerID === state.currentUserId);
+            
+            if (!state.currentUser) {
                 localStorage.removeItem('mafiaGameUserId');
                 loadingOverlay.style.display = 'none';
-                loginView.style.display = 'block';
-                loginError.textContent = "Your player data could not be found. Please log in again.";
+                renderView('login');
+                document.getElementById('login-error').textContent = "Your player data could not be found.";
                 return;
             }
 
-            isCurrentUserAdmin = currentUser.IsAdmin === 'TRUE';
-            userIdDisplay.textContent = `${currentUser.Name} (${currentUser.Role})`;
-            accuserDisplayName.textContent = currentUser.Name;
-            accuserHiddenId.value = currentUser.PlayerID;
-
+            state.isCurrentUserAdmin = state.currentUser.IsAdmin === 'TRUE';
             await fetchGameState();
-
+            
             loadingOverlay.style.display = 'none';
-            gameContainer.classList.remove('hidden');
-            showView('dashboard-view');
+            renderView('dashboard');
             setInterval(fetchGameState, 30000);
         }
-
-        loginForm.addEventListener('submit', async (e) => {
-            e.preventDefault();
-            const code = loginCodeInput.value.trim();
-            if (!code) return;
-
-            loginError.textContent = '';
-            loadingOverlay.style.display = 'flex';
-
-            const players = await fetchPlayers();
-            const player = players.find(p => p.PlayerID.toLowerCase() === code.toLowerCase());
-
-            if (player) {
-                localStorage.setItem('mafiaGameUserId', player.PlayerID);
-                initializeGame(player.PlayerID);
-            } else {
-                loadingOverlay.style.display = 'none';
-                loginError.textContent = 'Invalid Player Code. Please try again.';
-            }
-        });
 
         window.onload = async () => {
             const savedUserId = localStorage.getItem('mafiaGameUserId');
@@ -545,17 +436,9 @@
                 await initializeGame(savedUserId);
             } else {
                 loadingOverlay.style.display = 'none';
-                loginView.style.display = 'block';
+                renderView('login');
             }
         };
-
-        // Event listeners for static buttons
-        btnSubmitAccusation.addEventListener('click', () => {
-            populatePlayerDropdown(accusedSelect, allPlayersData.filter(p => p.Status && p.Status.toLowerCase() === 'alive' && p.PlayerID !== currentUserId), 'Select a player to accuse...');
-            showView('accusation-form-page');
-        });
-        btnReviewAccusations.addEventListener('click', () => showView('admin-review-page'));
-
     </script>
 </body>
 </html>
