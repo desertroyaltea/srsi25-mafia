@@ -1,5 +1,5 @@
 [build]
-  publish = "dist" # Or wherever your HTML file will be after build
+  publish = "." # Changed from "dist" to "." to publish from the root directory
   functions = "netlify/functions" # This tells Netlify where to find your serverless functions
 
 [functions]
