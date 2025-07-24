@@ -321,7 +321,7 @@
             document.getElementById('stop-button').addEventListener('click', stopRecording);
             
             // Prioritize iOS-compatible formats
-            const types = ['audio/mp4', 'audio/webm;codecs=opus', 'audio/webm'];
+            const types = ['audio/mp4', 'audio/webm;codecs=opus', 'audio/webm', 'audio/mpeg'];
             state.audioMimeType = types.find(type => MediaRecorder.isTypeSupported(type)) || 'audio/webm';
             console.log("Using MIME type:", state.audioMimeType);
         }
