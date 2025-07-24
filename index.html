@@ -186,7 +186,7 @@
             accusationForm: () => `
                 <div class="bg-gray-900 p-5 rounded-lg mt-4">
                     <h2 class="text-2xl font-semibold text-red-500 mb-3">Submit Accusation</h2>
-                    <p class="text-gray-400 mb-4">Accusations can only be made during the Night phase.</p>
+                    <p class="text-gray-400 mb-4">Accusation feature is not fully implemented in this version.</p>
                     <button type="button" id="back-to-dashboard" class="mt-6 bg-gray-600 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded-lg w-full">Back to Dashboard</button>
                 </div>`,
 
@@ -226,7 +226,7 @@
                 case 'actionModal':
                     viewHtml = templates.actionModal(data);
                     appRoot.innerHTML = templates.gameLayout(viewHtml);
-                    initActionModalView();
+                    initActionModalView(data.actionType); // Pass actionType to initializer
                     break;
                 case 'accusationForm':
                     viewHtml = templates.accusationForm();
@@ -257,8 +257,19 @@
             });
         }
 
-        function initActionModalView() {
-            document.getElementById('action-modal-confirm-button').addEventListener('click', handleActionConfirm);
+        function initActionModalView(actionType) {
+            const confirmButton = document.getElementById('action-modal-confirm-button');
+            const targetSelect = document.getElementById('action-target-select');
+
+            confirmButton.addEventListener('click', async () => {
+                const targetPlayerId = targetSelect.value;
+                console.log(`Confirming action: ${actionType}, Target ID: '${targetPlayerId}'`);
+
+                if (!targetPlayerId) {
+                    return showMessage("Please select a target player.");
+                }
+                await handleActionConfirm(actionType, targetPlayerId);
+            });
             document.getElementById('back-to-dashboard').addEventListener('click', () => renderView('dashboard'));
         }
         
@@ -291,17 +302,7 @@
             }
         }
         
-        async function handleActionConfirm(e) {
-            const actionType = e.target.dataset.action;
-            const targetPlayerId = document.getElementById('action-target-select').value;
-            
-            // ADDED LOGGING
-            console.log(`Confirming action: ${actionType}, Target ID: '${targetPlayerId}'`);
-
-            if (!targetPlayerId) {
-                return showMessage("Please select a target player.");
-            }
-
+        async function handleActionConfirm(actionType, targetPlayerId) {
             let endpoint = '', body = {};
             switch (actionType) {
                 case 'kill':
