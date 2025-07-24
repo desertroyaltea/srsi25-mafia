@@ -240,7 +240,24 @@
                     <button type="button" id="back-to-dashboard" class="mt-6 bg-gray-600 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded-lg w-full">Back to Dashboard</button>
                 </div>`,
 
-            adminReview: () => `...`, // Unchanged
+            adminReview: () => `
+                <div class="bg-gray-900 p-5 rounded-lg mt-4">
+                    <h2 class="text-2xl font-semibold text-green-500 mb-3">Admin Panel - Review Accusations</h2>
+                    <div id="accusations-transcript" class="space-y-4">
+                        ${state.pendingAccusations.length === 0 ? '<p class="text-gray-500">No pending accusations.</p>' :
+                        state.pendingAccusations.map(acc => `
+                            <div class="bg-gray-800 p-4 rounded-lg border border-gray-700">
+                                <p>From: <b>${getPlayerNameById(acc.AccuserPlayerID)}</b> | Accused: <b>${getPlayerNameById(acc.AccusedPlayerID)}</b></p>
+                                <div class="my-2"><audio controls src="${acc.AudioDriveLink}" class="w-full max-w-xs"></audio></div>
+                                <div class="flex gap-2 mt-2">
+                                    <button data-id="${acc.AccusationID}" class="btn-approve flex-1 bg-green-700 hover:bg-green-800 text-white font-bold py-2 px-4 rounded-lg">Approve</button>
+                                    <button data-id="${acc.AccusationID}" class="btn-deny flex-1 bg-red-700 hover:bg-red-800 text-white font-bold py-2 px-4 rounded-lg">Deny</button>
+                                </div>
+                            </div>
+                        `).join('')}
+                    </div>
+                    <button type="button" id="back-to-dashboard" class="mt-6 bg-gray-600 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded-lg w-full">Back to Dashboard</button>
+                </div>`,
         };
 
         // --- RENDER ENGINE & EVENT HANDLING ---
@@ -399,21 +416,7 @@
             formData.append('accusedPlayerId', accusedPlayerId);
             formData.append('audioFile', audioToUpload, audioFileName);
 
-            loadingOverlay.style.display = 'flex';
-            try {
-                const response = await fetch('/.netlify/functions/submit-accusation', {
-                    method: 'POST',
-                    body: formData
-                });
-                const result = await response.json();
-                if (!response.ok) throw new Error(result.error || 'Upload failed');
-                showMessage("Accusation submitted successfully!");
-                renderView('dashboard');
-            } catch (error) {
-                showMessage(`Error: ${error.message}`);
-            } finally {
-                loadingOverlay.style.display = 'none';
-            }
+            await performFetchAction('/.netlify/functions/submit-accusation', formData, false, true);
         }
         
         async function handleAdminAction(accusationId, actionType) {
@@ -422,15 +425,19 @@
             await performFetchAction(endpoint, body, true);
         }
 
-        async function performFetchAction(endpoint, body, isAdminAction = false) {
+        async function performFetchAction(endpoint, body, isAdminAction = false, isFormData = false) {
             loadingOverlay.style.display = 'flex';
             let result = null;
             try {
-                const response = await fetch(endpoint, {
+                const fetchOptions = {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(body)
-                });
+                    body: isFormData ? body : JSON.stringify(body)
+                };
+                if (!isFormData) {
+                    fetchOptions.headers = { 'Content-Type': 'application/json' };
+                }
+
+                const response = await fetch(endpoint, fetchOptions);
                 result = await response.json();
                 if (!response.ok) throw new Error(result.error || 'Unknown server error');
                 
@@ -590,7 +597,12 @@
                 document.getElementById('stop-button').disabled = false;
                 document.getElementById('recording-indicator').classList.remove('hidden');
             } catch (err) {
-                showMessage("Microphone access denied.");
+                console.error("Microphone Access Error:", err);
+                if (err.name === "NotAllowedError" || err.name === "PermissionDeniedError") {
+                    showMessage("Microphone access was denied. Please allow it in your browser settings.");
+                } else {
+                    showMessage("Could not access microphone. Please ensure it is connected and enabled.");
+                }
             }
         }
 
