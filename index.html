@@ -47,6 +47,7 @@
             box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
             z-index: 1000;
             display: none;
+            align-items: center;
         }
         .loading-overlay {
             position: fixed;
@@ -264,7 +265,16 @@
 
         // --- DATA & UI LOGIC ---
         async function performFetchAction(endpoint, body, isAdminAction = false, isFormData = false) { /* ... Unchanged ... */ }
-        function showMessage(message, duration = 3000) { /* ... Unchanged ... */ }
+        
+        // REWRITTEN showMessage function to remove setTimeout
+        function showMessage(message) {
+            messageBox.innerHTML = `<span>${message}</span><button class="font-bold text-xl ml-4">&times;</button>`;
+            messageBox.style.display = 'flex';
+            messageBox.querySelector('button').addEventListener('click', () => {
+                messageBox.style.display = 'none';
+            }, { once: true });
+        }
+
         async function fetchPlayers(forceRefresh = false) { /* ... Unchanged ... */ }
         async function fetchPendingAccusations() { /* ... Unchanged ... */ }
         function getPlayerNameById(playerId) { /* ... Unchanged ... */ }
