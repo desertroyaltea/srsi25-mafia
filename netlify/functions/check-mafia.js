@@ -31,32 +31,40 @@ exports.handler = async (event, context) => {
 
         const sheets = await getSheetsService();
 
-        // 1. Check if the detective has already used their action
+        // 1. Get all player data
         const playersResponse = await sheets.spreadsheets.values.get({
             spreadsheetId: sheetId,
-            range: 'Players!A:T',
+            range: 'Players!A:U', // Read up to the new InvestigationHistory column
         });
         const players = playersResponse.data.values || [];
         const playerHeaders = players[0];
         const idCol = playerHeaders.indexOf('PlayerID');
         const roleCol = playerHeaders.indexOf('Role');
         const mainUsedCol = playerHeaders.indexOf('MainUsed');
+        const historyCol = playerHeaders.indexOf('InvestigationHistory'); // NEW
 
-        let playerRowIndex = -1;
+        if (historyCol === -1) {
+            return { statusCode: 500, body: JSON.stringify({ error: 'InvestigationHistory column not found in Players sheet.' }) };
+        }
+
+        // 2. Find the detective and check their status
+        let detectiveRowIndex = -1;
+        let currentHistory = '';
         for(let i = 0; i < players.length; i++) {
             if(players[i][idCol] === detectivePlayerId) {
-                playerRowIndex = i + 1; // 1-based index
+                detectiveRowIndex = i + 1; // 1-based index
                 if(players[i][mainUsedCol] === 'TRUE') {
                     return { statusCode: 403, body: JSON.stringify({ error: 'You have already used your action for tonight.' }) };
                 }
+                currentHistory = players[i][historyCol] || ''; // Get current history
                 break;
             }
         }
-        if (playerRowIndex === -1) {
+        if (detectiveRowIndex === -1) {
              return { statusCode: 404, body: JSON.stringify({ error: 'Player not found.' }) };
         }
         
-        // 2. Find the target's role
+        // 3. Find the target's role
         let targetRole = null;
         for (const playerRow of players.slice(1)) {
             if (playerRow[idCol] === checkedPlayerId) {
@@ -69,14 +77,14 @@ exports.handler = async (event, context) => {
         }
         const isMafiaResult = (targetRole.toLowerCase() === 'mafia') ? 'YES' : 'NO';
 
-        // 3. Get current day
+        // 4. Get current day
         const gameStateResponse = await sheets.spreadsheets.values.get({
             spreadsheetId: sheetId,
             range: 'Game_State!A2:A2',
         });
         const currentDay = gameStateResponse.data.values ? gameStateResponse.data.values[0][0] : 'Unknown';
 
-        // 4. Log the action
+        // 5. Log the action in the Actions_Detective sheet
         const newActionRow = [`ACT_CHECK_${Date.now()}`, currentDay, detectivePlayerId, checkedPlayerId, isMafiaResult, new Date().toISOString(), 'Logged'];
         await sheets.spreadsheets.values.append({
             spreadsheetId: sheetId,
@@ -85,13 +93,16 @@ exports.handler = async (event, context) => {
             resource: { values: [newActionRow] },
         });
 
-        // 5. Update the detective's MainUsed status to TRUE
-        const updateRange = `Players!${String.fromCharCode(65 + mainUsedCol)}${playerRowIndex}`;
+        // 6. Update the detective's MainUsed and InvestigationHistory
+        const newHistoryEntry = `${checkedPlayerId}:${isMafiaResult}`;
+        const updatedHistory = currentHistory ? `${currentHistory},${newHistoryEntry}` : newHistoryEntry;
+
+        const updateRange = `Players!${String.fromCharCode(65 + mainUsedCol)}${detectiveRowIndex}:${String.fromCharCode(65 + historyCol)}${detectiveRowIndex}`;
         await sheets.spreadsheets.values.update({
             spreadsheetId: sheetId,
             range: updateRange,
             valueInputOption: 'USER_ENTERED',
-            resource: { values: [['TRUE']] },
+            resource: { values: [['TRUE', updatedHistory]] },
         });
 
         return {
@@ -99,7 +110,7 @@ exports.handler = async (event, context) => {
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ 
                 message: 'Investigation has been logged.',
-                isMafiaResult: isMafiaResult // Return the result to the frontend
+                isMafiaResult: isMafiaResult
             }),
         };
 
