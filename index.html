@@ -189,9 +189,9 @@
             accusationForm: () => `...`, // Unchanged
             adminReview: () => `...`, // Unchanged
 
-            courtVote: ({ trial }) => `
+            juryVote: ({ trial }) => `
                 <div class="bg-gray-900 p-5 rounded-lg mt-4">
-                    <h2 class="text-2xl font-semibold text-orange-500 mb-4">court Duty: Trial of ${getPlayerNameById(trial.AccusedPlayerID)}</h2>
+                    <h2 class="text-2xl font-semibold text-orange-500 mb-4">Jury Duty: Trial of ${getPlayerNameById(trial.AccusedPlayerID)}</h2>
                     <p class="text-gray-400 mb-2">Listen to the accusation and cast your vote.</p>
                     <p class="text-gray-500 text-sm mb-4">Voting Deadline: ${new Date(trial.VotingDeadline).toLocaleString()}</p>
                     <div class="my-4">
@@ -204,44 +204,17 @@
                 </div>`,
         };
 
-        // --- RENDER ENGINE ---
+        // --- RENDER ENGINE & EVENT HANDLING ---
         function renderView(viewName, data = {}) {
             let viewHtml;
             switch(viewName) {
-                case 'login':
-                    appRoot.innerHTML = templates.login();
-                    initLoginView();
-                    break;
-                case 'dashboard':
-                    viewHtml = templates.dashboard();
-                    appRoot.innerHTML = templates.gameLayout(viewHtml);
-                    initDashboardView();
-                    break;
-                case 'actionModal':
-                    viewHtml = templates.actionModal(data);
-                    appRoot.innerHTML = templates.gameLayout(viewHtml);
-                    initActionModalView(data.actionType);
-                    break;
-                case 'accusationForm':
-                    viewHtml = templates.accusationForm(data);
-                    appRoot.innerHTML = templates.gameLayout(viewHtml);
-                    initAccusationView();
-                    break;
-                case 'adminReview':
-                    viewHtml = templates.adminReview();
-                    appRoot.innerHTML = templates.gameLayout(viewHtml);
-                    initAdminReviewView();
-                    break;
-                case 'investigationHistory':
-                    viewHtml = templates.investigationHistory();
-                    appRoot.innerHTML = templates.gameLayout(viewHtml);
-                    document.getElementById('back-to-dashboard').addEventListener('click', () => renderView('dashboard'));
-                    break;
-                case 'courtVote':
-                    viewHtml = templates.courtVote(data);
-                    appRoot.innerHTML = templates.gameLayout(viewHtml);
-                    initcourtVoteView();
-                    break;
+                case 'login': appRoot.innerHTML = templates.login(); initLoginView(); break;
+                case 'dashboard': viewHtml = templates.dashboard(); appRoot.innerHTML = templates.gameLayout(viewHtml); initDashboardView(); break;
+                case 'actionModal': viewHtml = templates.actionModal(data); appRoot.innerHTML = templates.gameLayout(viewHtml); initActionModalView(data.actionType); break;
+                case 'accusationForm': viewHtml = templates.accusationForm(data); appRoot.innerHTML = templates.gameLayout(viewHtml); initAccusationView(); break;
+                case 'adminReview': viewHtml = templates.adminReview(); appRoot.innerHTML = templates.gameLayout(viewHtml); initAdminReviewView(); break;
+                case 'investigationHistory': viewHtml = templates.investigationHistory(); appRoot.innerHTML = templates.gameLayout(viewHtml); document.getElementById('back-to-dashboard').addEventListener('click', () => renderView('dashboard')); break;
+                case 'juryVote': viewHtml = templates.juryVote(data); appRoot.innerHTML = templates.gameLayout(viewHtml); initJuryVoteView(); break;
             }
         }
         
@@ -272,9 +245,9 @@
         function initAccusationView() { /* ... Unchanged ... */ }
         function initAdminReviewView() { /* ... Unchanged ... */ }
         
-        function initcourtVoteView() {
-            document.getElementById('btn-vote-guilty').addEventListener('click', handlecourtVote);
-            document.getElementById('btn-vote-not-guilty').addEventListener('click', handlecourtVote);
+        function initJuryVoteView() {
+            document.getElementById('btn-vote-guilty').addEventListener('click', handleJuryVote);
+            document.getElementById('btn-vote-not-guilty').addEventListener('click', handleJuryVote);
         }
 
         // --- EVENT HANDLERS ---
@@ -283,11 +256,11 @@
         async function handleAccusationSubmit(e) { /* ... Unchanged ... */ }
         async function handleAdminAction(accusationId, actionType) { /* ... Unchanged ... */ }
 
-        async function handlecourtVote(e) {
+        async function handleJuryVote(e) {
             const trialId = e.target.dataset.trialId;
             const vote = e.target.id === 'btn-vote-guilty' ? 'GUILTY' : 'NOTGUILTY';
             
-            await performFetchAction('/.netlify/functions/submit-court-vote', {
+            await performFetchAction('/.netlify/functions/submit-jury-vote', {
                 voterPlayerId: state.currentUserId,
                 trialId: trialId,
                 vote: vote
@@ -354,13 +327,13 @@
                 playerActions.appendChild(button);
             };
 
-            if (state.currentUser.IscourtMember === 'TRUE') {
-                createButton('btn-court-duty', 'court Duty', 'bg-orange-600 hover:bg-orange-700', async () => {
+            if (state.currentUser.IsJuryMember === 'TRUE') {
+                createButton('btn-jury-duty', 'Jury Duty', 'bg-orange-600 hover:bg-orange-700', async () => {
                     loadingOverlay.style.display = 'flex';
                     await fetchActiveTrial();
                     loadingOverlay.style.display = 'none';
                     if (state.activeTrial) {
-                        renderView('courtVote', { trial: state.activeTrial });
+                        renderView('juryVote', { trial: state.activeTrial });
                     } else {
                         showMessage("There is no active trial at the moment.");
                     }
