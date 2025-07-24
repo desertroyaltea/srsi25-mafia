@@ -1,5 +1,14 @@
 // netlify/functions/get-game-state.js
+// netlify/functions/get-game-state.js
+console.log('Function get-game-state.js started execution.'); // Add this line
 
+const { google } = require('googleapis');
+const { JWT } = require('google-auth-library');
+
+const credentials = JSON.parse(process.env.GOOGLE_SERVICE_ACCOUNT_CREDENTIALS);
+const sheetId = process.env.GOOGLE_SHEET_ID;
+
+// ... rest of your function code
 const { google } = require('googleapis');
 const { JWT } = require('google-auth-library');
 
