@@ -226,7 +226,7 @@
                 case 'actionModal':
                     viewHtml = templates.actionModal(data);
                     appRoot.innerHTML = templates.gameLayout(viewHtml);
-                    initActionModalView(data.actionType); // Pass actionType to initializer
+                    initActionModalView(data.actionType);
                     break;
                 case 'accusationForm':
                     viewHtml = templates.accusationForm();
@@ -259,10 +259,12 @@
 
         function initActionModalView(actionType) {
             const confirmButton = document.getElementById('action-modal-confirm-button');
-            const targetSelect = document.getElementById('action-target-select');
-
+            
             confirmButton.addEventListener('click', async () => {
+                // DEFINITIVE FIX: Get the select element *inside* the click handler
+                const targetSelect = document.getElementById('action-target-select');
                 const targetPlayerId = targetSelect.value;
+                
                 console.log(`Confirming action: ${actionType}, Target ID: '${targetPlayerId}'`);
 
                 if (!targetPlayerId) {
