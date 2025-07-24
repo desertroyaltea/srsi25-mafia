@@ -97,6 +97,44 @@
             <!-- Specific action buttons/forms will be added here later -->
         </div>
 
+        <!-- Test Accusation Submission Form -->
+        <div class="bg-gray-700 p-4 rounded-lg shadow-md mt-4">
+            <h2 class="text-xl font-semibold text-gray-200 mb-2">Test Accusation Submission</h2>
+            <form id="accusationForm" enctype="multipart/form-data">
+                <div class="mb-3">
+                    <label for="accuser" class="block text-gray-300 text-sm font-bold mb-2">Accuser Player ID (Your ID):</label>
+                    <input type="text" id="accuser" name="accuserPlayerId" class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline" placeholder="e.g., S001" required>
+                </div>
+                <div class="mb-3">
+                    <label for="accused" class="block text-gray-300 text-sm font-bold mb-2">Accused Player ID:</label>
+                    <input type="text" id="accused" name="accusedPlayerId" class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline" placeholder="e.g., S002" required>
+                </div>
+                <div class="mb-3">
+                    <label for="audioFile" class="block text-gray-300 text-sm font-bold mb-2">Audio File (MP3/WAV):</label>
+                    <input type="file" id="audioFile" name="audioFile" accept="audio/mpeg, audio/wav" class="block w-full text-sm text-gray-300 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100" required>
+                </div>
+                <button type="submit" class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg focus:outline-none focus:shadow-outline">Submit Accusation</button>
+            </form>
+            <p id="accusation-status" class="mt-2 text-sm text-gray-300"></p>
+        </div>
+
+        <!-- Test Admin Approval Form (for Admin users) -->
+        <div class="bg-gray-700 p-4 rounded-lg shadow-md mt-4">
+            <h2 class="text-xl font-semibold text-gray-200 mb-2">Test Admin Accusation Approval</h2>
+            <form id="approvalForm">
+                <div class="mb-3">
+                    <label for="adminAccusationId" class="block text-gray-300 text-sm font-bold mb-2">Accusation ID to Approve:</label>
+                    <input type="text" id="adminAccusationId" name="accusationId" class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline" placeholder="e.g., ACC_1700000000000" required>
+                </div>
+                <div class="mb-3">
+                    <label for="adminPlayerId" class="block text-gray-300 text-sm font-bold mb-2">Admin Player ID:</label>
+                    <input type="text" id="adminPlayerId" name="adminPlayerId" class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline" placeholder="e.g., ADMIN_001" required>
+                </div>
+                <button type="submit" class="bg-green-500 hover:bg-green-700 text-white font-bold py-2 px-4 rounded-lg focus:outline-none focus:shadow-outline">Approve Accusation</button>
+            </form>
+            <p id="approval-status" class="mt-2 text-sm text-gray-300"></p>
+        </div>
+
         <!-- Message Box -->
         <div id="message-box" class="message-box"></div>
     </div>
@@ -112,8 +150,16 @@
         const lastTrialResultSpan = document.getElementById('last-trial-result');
         const messageBox = document.getElementById('message-box');
 
+        // Accusation Form Elements
+        const accusationForm = document.getElementById('accusationForm');
+        const accusationStatus = document.getElementById('accusation-status');
+
+        // Approval Form Elements
+        const approvalForm = document.getElementById('approvalForm');
+        const approvalStatus = document.getElementById('approval-status');
+
+
         // Global variable for a unique user ID (for now, a simple random UUID)
-        // In a real Netlify app, you might integrate Netlify Identity for proper user management.
         let currentUserId = localStorage.getItem('mafiaGameUserId');
         if (!currentUserId) {
             currentUserId = crypto.randomUUID();
@@ -133,8 +179,6 @@
         // Function to fetch game state from a Netlify Function
         async function fetchGameState() {
             try {
-                // This will call a Netlify Function named 'get-game-state'
-                // You will create this function in a '.netlify/functions' directory.
                 const response = await fetch('/.netlify/functions/get-game-state');
                 if (!response.ok) {
                     throw new Error(`HTTP error! status: ${response.status}`);
@@ -160,11 +204,15 @@
                 lastAccusedPlayerSpan.textContent = lastAccusedPlayer;
                 lastTrialResultSpan.textContent = lastTrialResult;
 
-                // TODO: Implement logic to enable/disable UI elements based on currentPhase
+                // Enable/disable forms based on currentPhase
                 if (currentPhase === 'Day') {
                     showMessage("It's Day time. Actions are currently disabled.", 3000);
+                    accusationForm.querySelectorAll('input, button').forEach(el => el.disabled = true);
+                    approvalForm.querySelectorAll('input, button').forEach(el => el.disabled = true);
                 } else { // Night
                     showMessage("It's Night time. Actions are enabled!", 3000);
+                    accusationForm.querySelectorAll('input, button').forEach(el => el.disabled = false);
+                    approvalForm.querySelectorAll('input, button').forEach(el => el.disabled = false);
                 }
 
             } catch (error) {
@@ -176,11 +224,84 @@
             }
         }
 
+        // Event Listener for Accusation Form
+        accusationForm.addEventListener('submit', async function(e) {
+            e.preventDefault();
+            accusationStatus.textContent = 'Submitting...';
+            accusationStatus.className = 'mt-2 text-sm text-gray-300'; // Reset styling
+
+            const formData = new FormData(this); // 'this' refers to the form element
+
+            try {
+                const response = await fetch('/.netlify/functions/submit-accusation', {
+                    method: 'POST',
+                    body: formData // Busboy expects FormData
+                });
+
+                const result = await response.json();
+                if (response.ok) {
+                    accusationStatus.textContent = 'Success: ' + result.message + ' (ID: ' + result.accusationId + ')';
+                    accusationStatus.classList.add('text-green-400');
+                    showMessage('Accusation submitted successfully!', 4000);
+                    this.reset(); // Clear form
+                } else {
+                    accusationStatus.textContent = 'Error: ' + (result.error || 'Unknown error');
+                    accusationStatus.classList.add('text-red-400');
+                    showMessage('Failed to submit accusation: ' + (result.error || 'Unknown error'), 5000);
+                }
+            } catch (error) {
+                console.error('Fetch error for submit-accusation:', error);
+                accusationStatus.textContent = 'Network error or function not running.';
+                accusationStatus.classList.add('text-red-400');
+                showMessage('Network error submitting accusation.', 5000);
+            }
+        });
+
+        // Event Listener for Admin Approval Form
+        approvalForm.addEventListener('submit', async function(e) {
+            e.preventDefault();
+            approvalStatus.textContent = 'Approving...';
+            approvalStatus.className = 'mt-2 text-sm text-gray-300'; // Reset styling
+
+            const formData = new FormData(this);
+            const accusationId = formData.get('accusationId');
+            const adminPlayerId = formData.get('adminPlayerId');
+
+            try {
+                const response = await fetch('/.netlify/functions/approve-accusation', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ accusationId, adminPlayerId })
+                });
+
+                const result = await response.json();
+                if (response.ok) {
+                    approvalStatus.textContent = 'Success: ' + result.message;
+                    approvalStatus.classList.add('text-green-400');
+                    showMessage('Accusation approved!', 4000);
+                    this.reset(); // Clear form
+                    fetchGameState(); // Refresh game state to show new accused player
+                } else {
+                    approvalStatus.textContent = 'Error: ' + (result.error || 'Unknown error');
+                    approvalStatus.classList.add('text-red-400');
+                    showMessage('Failed to approve accusation: ' + (result.error || 'Unknown error'), 5000);
+                }
+            } catch (error) {
+                console.error('Fetch error for approve-accusation:', error);
+                approvalStatus.textContent = 'Network error or function not running.';
+                approvalStatus.classList.add('text-red-400');
+                showMessage('Network error approving accusation.', 5000);
+            }
+        });
+
+
         // Initialize game state fetch when the window loads
         window.onload = fetchGameState;
 
         // Optional: Periodically refresh game state (e.g., every 30 seconds)
-        // setInterval(fetchGameState, 30000);
+        setInterval(fetchGameState, 30000); // Refresh every 30 seconds
     </script>
 </body>
 </html>
