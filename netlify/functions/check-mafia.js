@@ -31,16 +31,32 @@ exports.handler = async (event, context) => {
 
         const sheets = await getSheetsService();
 
-        // 1. Get all player data to find the target's role
+        // 1. Check if the detective has already used their action
         const playersResponse = await sheets.spreadsheets.values.get({
             spreadsheetId: sheetId,
-            range: 'Players!A:C', // PlayerID, Name, Role
+            range: 'Players!A:T',
         });
         const players = playersResponse.data.values || [];
         const playerHeaders = players[0];
         const idCol = playerHeaders.indexOf('PlayerID');
         const roleCol = playerHeaders.indexOf('Role');
+        const mainUsedCol = playerHeaders.indexOf('MainUsed');
 
+        let playerRowIndex = -1;
+        for(let i = 0; i < players.length; i++) {
+            if(players[i][idCol] === detectivePlayerId) {
+                playerRowIndex = i + 1; // 1-based index
+                if(players[i][mainUsedCol] === 'TRUE') {
+                    return { statusCode: 403, body: JSON.stringify({ error: 'You have already used your action for tonight.' }) };
+                }
+                break;
+            }
+        }
+        if (playerRowIndex === -1) {
+             return { statusCode: 404, body: JSON.stringify({ error: 'Player not found.' }) };
+        }
+        
+        // 2. Find the target's role
         let targetRole = null;
         for (const playerRow of players.slice(1)) {
             if (playerRow[idCol] === checkedPlayerId) {
@@ -48,44 +64,43 @@ exports.handler = async (event, context) => {
                 break;
             }
         }
-
         if (!targetRole) {
             return { statusCode: 404, body: JSON.stringify({ error: 'Target player not found.' }) };
         }
-
         const isMafiaResult = (targetRole.toLowerCase() === 'mafia') ? 'YES' : 'NO';
 
-        // 2. Get the current day from Game_State
+        // 3. Get current day
         const gameStateResponse = await sheets.spreadsheets.values.get({
             spreadsheetId: sheetId,
             range: 'Game_State!A2:A2',
         });
         const currentDay = gameStateResponse.data.values ? gameStateResponse.data.values[0][0] : 'Unknown';
 
-        // 3. Prepare and append the new row to Actions_Detective
-        const newActionRow = [
-            `ACT_CHECK_${Date.now()}`, // ActionID
-            currentDay,
-            detectivePlayerId,
-            checkedPlayerId,
-            isMafiaResult, // Result
-            new Date().toISOString() // Timestamp
-        ];
-
-        console.log(`check-mafia: Logging check action from ${detectivePlayerId} on ${checkedPlayerId}. Result: ${isMafiaResult}`);
+        // 4. Log the action
+        const newActionRow = [`ACT_CHECK_${Date.now()}`, currentDay, detectivePlayerId, checkedPlayerId, isMafiaResult, new Date().toISOString(), 'Logged'];
         await sheets.spreadsheets.values.append({
             spreadsheetId: sheetId,
-            range: 'Actions_Detective!A:F',
+            range: 'Actions_Detective!A:G',
             valueInputOption: 'USER_ENTERED',
-            resource: {
-                values: [newActionRow],
-            },
+            resource: { values: [newActionRow] },
+        });
+
+        // 5. Update the detective's MainUsed status to TRUE
+        const updateRange = `Players!${String.fromCharCode(65 + mainUsedCol)}${playerRowIndex}`;
+        await sheets.spreadsheets.values.update({
+            spreadsheetId: sheetId,
+            range: updateRange,
+            valueInputOption: 'USER_ENTERED',
+            resource: { values: [['TRUE']] },
         });
 
         return {
             statusCode: 200,
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ message: 'Investigation has been logged.' }),
+            body: JSON.stringify({ 
+                message: 'Investigation has been logged.',
+                isMafiaResult: isMafiaResult // Return the result to the frontend
+            }),
         };
 
     } catch (error) {

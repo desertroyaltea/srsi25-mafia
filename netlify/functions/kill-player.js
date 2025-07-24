@@ -3,7 +3,6 @@
 const { google } = require('googleapis');
 const { JWT } = require('google-auth-library');
 
-// Helper function to initialize Google Sheets API
 async function getSheetsService() {
     const credentials = JSON.parse(process.env.GOOGLE_SERVICE_ACCOUNT_CREDENTIALS);
     const auth = new JWT({
@@ -21,7 +20,6 @@ exports.handler = async (event, context) => {
 
     const sheetId = process.env.GOOGLE_SHEET_ID;
     if (!sheetId) {
-        console.error("kill-player: Google Sheet ID is not configured.");
         return { statusCode: 500, body: JSON.stringify({ error: 'Server configuration error.' }) };
     }
 
@@ -33,39 +31,53 @@ exports.handler = async (event, context) => {
 
         const sheets = await getSheetsService();
 
-        // 1. Get the current day from the Game_State sheet
+        // 1. Check if the player has already used their action
+        const playersResponse = await sheets.spreadsheets.values.get({
+            spreadsheetId: sheetId,
+            range: 'Players!A:T', // Read up to MainUsed column
+        });
+        const players = playersResponse.data.values || [];
+        const playerHeaders = players[0];
+        const idCol = playerHeaders.indexOf('PlayerID');
+        const mainUsedCol = playerHeaders.indexOf('MainUsed');
+
+        let playerRowIndex = -1;
+        for(let i = 0; i < players.length; i++) {
+            if(players[i][idCol] === mafiaPlayerId) {
+                playerRowIndex = i + 1; // 1-based index for sheet ranges
+                if(players[i][mainUsedCol] === 'TRUE') {
+                    return { statusCode: 403, body: JSON.stringify({ error: 'You have already used your action for tonight.' }) };
+                }
+                break;
+            }
+        }
+        if (playerRowIndex === -1) {
+             return { statusCode: 404, body: JSON.stringify({ error: 'Player not found.' }) };
+        }
+
+        // 2. Get current day
         const gameStateResponse = await sheets.spreadsheets.values.get({
             spreadsheetId: sheetId,
-            range: 'Game_State!A2:A2', // Assuming CurrentDay is in cell A2
+            range: 'Game_State!A2:A2',
         });
-
         const currentDay = gameStateResponse.data.values ? gameStateResponse.data.values[0][0] : 'Unknown';
 
-        // 2. Prepare the new row for the Actions_Mafia sheet
-        const actionId = `ACT_KILL_${Date.now()}`;
-        const timestamp = new Date().toISOString();
-        const actionType = 'Kill';
-        const status = 'Logged'; // The action is logged; processing happens at the end of the night
-
-        const newActionRow = [
-            actionId,
-            currentDay,
-            mafiaPlayerId,
-            actionType,
-            targetPlayerId,
-            timestamp,
-            status
-        ];
-
-        // 3. Append the new row to the Actions_Mafia sheet
-        console.log(`kill-player: Logging kill action from ${mafiaPlayerId} on ${targetPlayerId}`);
+        // 3. Log the action
+        const newActionRow = [`ACT_KILL_${Date.now()}`, currentDay, mafiaPlayerId, 'Kill', targetPlayerId, new Date().toISOString(), 'Logged'];
         await sheets.spreadsheets.values.append({
             spreadsheetId: sheetId,
             range: 'Actions_Mafia!A:G',
             valueInputOption: 'USER_ENTERED',
-            resource: {
-                values: [newActionRow],
-            },
+            resource: { values: [newActionRow] },
+        });
+
+        // 4. Update the player's MainUsed status to TRUE
+        const updateRange = `Players!${String.fromCharCode(65 + mainUsedCol)}${playerRowIndex}`;
+        await sheets.spreadsheets.values.update({
+            spreadsheetId: sheetId,
+            range: updateRange,
+            valueInputOption: 'USER_ENTERED',
+            resource: { values: [['TRUE']] },
         });
 
         return {

@@ -176,7 +176,7 @@
                         <label for="action-target-select" class="block text-gray-300 font-bold mb-2">Select Target:</label>
                         <select id="action-target-select" class="shadow w-full py-3 px-4 text-lg leading-tight">
                             <option value="">Choose a player...</option>
-                            ${targets.map(p => `<option value="${p.PlayerID}">${p.PlayerID}</option>`).join('')}
+                            ${targets.map(p => `<option value="${p.PlayerID}">${p.Name}</option>`).join('')}
                         </select>
                     </div>
                     <button type="button" id="action-modal-confirm-button" data-action="${actionType}" class="bg-red-700 hover:bg-red-800 text-white font-bold py-3 px-6 rounded-lg w-full text-lg">${buttonText}</button>
@@ -264,8 +264,6 @@
                 const targetSelect = document.getElementById('action-target-select');
                 const targetPlayerId = targetSelect.value;
                 
-                console.log(`Confirming action: ${actionType}, Target ID: '${targetPlayerId}'`);
-
                 if (!targetPlayerId) {
                     return showMessage("Please select a target player.");
                 }
@@ -324,7 +322,13 @@
                     break;
                 default: return showMessage("Invalid action.");
             }
-            await performFetchAction(endpoint, body);
+            const result = await performFetchAction(endpoint, body);
+            
+            // NEW: Handle detective result
+            if (actionType === 'check' && result) {
+                const targetName = getPlayerNameById(targetPlayerId);
+                showMessage(`Investigation Result: Your target, ${targetName}, is ${result.isMafiaResult === 'YES' ? 'MAFIA' : 'NOT MAFIA'}.`, 10000);
+            }
         }
         
         async function handleAdminAction(accusationId, actionType) {
@@ -336,16 +340,22 @@
         // --- DATA & UI LOGIC ---
         async function performFetchAction(endpoint, body, isAdminAction = false) {
             loadingOverlay.style.display = 'flex';
+            let result = null;
             try {
                 const response = await fetch(endpoint, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify(body)
                 });
-                const result = await response.json();
+                result = await response.json();
                 if (!response.ok) throw new Error(result.error || 'Unknown server error');
+                
                 showMessage(result.message || 'Action successful!');
-                await fetchGameState(); // Refresh state
+                
+                // Refresh player data to get updated MainUsed status
+                await fetchPlayers(true); 
+                state.currentUser = state.allPlayers.find(p => p.PlayerID === state.currentUserId);
+
                 if (isAdminAction) {
                     await fetchPendingAccusations();
                     renderView('adminReview');
@@ -354,8 +364,10 @@
                 }
             } catch (error) {
                 showMessage(`Error: ${error.message}`, 5000);
+                result = null;
             } finally {
                 loadingOverlay.style.display = 'none';
+                return result;
             }
         }
 
@@ -365,8 +377,8 @@
             setTimeout(() => { messageBox.style.display = 'none'; }, duration);
         }
 
-        async function fetchPlayers() {
-            if (state.allPlayers.length > 0) return;
+        async function fetchPlayers(forceRefresh = false) {
+            if (state.allPlayers.length > 0 && !forceRefresh) return;
             try {
                 const response = await fetch('/.netlify/functions/get-player-data');
                 if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
@@ -423,6 +435,15 @@
             adminActions.style.display = 'none';
 
             if (!isNight) return;
+
+            // NEW: Check if MainUsed is TRUE
+            if (state.currentUser.MainUsed === 'TRUE') {
+                const usedActionNotice = document.createElement('p');
+                usedActionNotice.textContent = "You have already used your main action tonight.";
+                usedActionNotice.className = "text-gray-400 role-action-button";
+                playerActions.appendChild(usedActionNotice);
+                return;
+            }
 
             const role = state.currentUser.Role.toLowerCase();
             const createButton = (text, style, onClick) => {

@@ -31,27 +31,30 @@ exports.handler = async (event, context) => {
 
         const sheets = await getSheetsService();
 
-        // 1. Check if Sheriff has already used their shot and find their row index
+        // 1. Check Sheriff's status
         const playersResponse = await sheets.spreadsheets.values.get({
             spreadsheetId: sheetId,
-            range: 'Players!A:R', // Read up to SheriffShotUsed column
+            range: 'Players!A:T',
         });
         const players = playersResponse.data.values || [];
         const playerHeaders = players[0];
         const idCol = playerHeaders.indexOf('PlayerID');
         const shotUsedCol = playerHeaders.indexOf('SheriffShotUsed');
+        const mainUsedCol = playerHeaders.indexOf('MainUsed');
 
         let sheriffRowIndex = -1;
         for(let i = 0; i < players.length; i++) {
             if(players[i][idCol] === sheriffPlayerId) {
                 sheriffRowIndex = i + 1; // 1-based index
                 if(players[i][shotUsedCol] === 'TRUE') {
-                    return { statusCode: 403, body: JSON.stringify({ error: 'Sheriff has already used their shot.' }) };
+                    return { statusCode: 403, body: JSON.stringify({ error: 'Sheriff has already used their one-time shot.' }) };
+                }
+                if(players[i][mainUsedCol] === 'TRUE') {
+                    return { statusCode: 403, body: JSON.stringify({ error: 'You have already used your action for tonight.' }) };
                 }
                 break;
             }
         }
-        
         if (sheriffRowIndex === -1) {
              return { statusCode: 404, body: JSON.stringify({ error: 'Sheriff player not found.' }) };
         }
@@ -63,15 +66,8 @@ exports.handler = async (event, context) => {
         });
         const currentDay = gameStateResponse.data.values ? gameStateResponse.data.values[0][0] : 'Unknown';
 
-        // 3. Log the action in Actions_Sheriff
-        const newActionRow = [
-            `ACT_SHOOT_${Date.now()}`,
-            currentDay,
-            sheriffPlayerId,
-            killedPlayerId,
-            new Date().toISOString(),
-            'Used'
-        ];
+        // 3. Log the action
+        const newActionRow = [`ACT_SHOOT_${Date.now()}`, currentDay, sheriffPlayerId, killedPlayerId, new Date().toISOString(), 'Used'];
         await sheets.spreadsheets.values.append({
             spreadsheetId: sheetId,
             range: 'Actions_Sheriff!A:F',
@@ -79,13 +75,13 @@ exports.handler = async (event, context) => {
             resource: { values: [newActionRow] },
         });
 
-        // 4. Update the Sheriff's status in the Players sheet
-        const updateRange = `Players!${String.fromCharCode(65 + shotUsedCol)}${sheriffRowIndex}`;
+        // 4. Update both SheriffShotUsed and MainUsed to TRUE
+        const updateRange = `Players!${String.fromCharCode(65 + shotUsedCol)}${sheriffRowIndex}:${String.fromCharCode(65 + mainUsedCol)}${sheriffRowIndex}`;
         await sheets.spreadsheets.values.update({
             spreadsheetId: sheetId,
             range: updateRange,
             valueInputOption: 'USER_ENTERED',
-            resource: { values: [['TRUE']] },
+            resource: { values: [['TRUE', 'TRUE']] },
         });
 
         return {
