@@ -1,60 +1,16 @@
 // netlify/functions/get-game-state.js
 
-// console.log('Function get-game-state.js started execution.'); // Keep this for debugging if needed, or remove it now
-
-const { google } = require('googleapis'); // This should only appear ONCE
-const { JWT } = require('google-auth-library'); // This should only appear ONCE
-
-const credentials = JSON.parse(process.env.GOOGLE_SERVICE_ACCOUNT_CREDENTIALS); // This should only appear ONCE
-const sheetId = process.env.GOOGLE_SHEET_ID; // This should only appear ONCE
-
-const auth = new JWT({
-    email: credentials.client_email,
-    key: credentials.private_key,
-    scopes: ['https://www.googleapis.com/auth/spreadsheets.readonly'] // Read-only access to sheets
-});
-
-const sheets = google.sheets({ version: 'v4', auth });
+// This is a minimal version to test if *any* logging works.
+// We will build it back up once we see this log.
 
 exports.handler = async (event, context) => {
     try {
-        if (!sheetId) {
-            console.error('Configuration Error: Google Sheet ID is not configured.');
-            return {
-                statusCode: 500,
-                body: JSON.stringify({ error: 'Server configuration error: Google Sheet ID missing.' }),
-            };
-        }
-
-        const range = 'Game_State!A1:G2'; // Adjust 'G' if you add more columns to Game_State tab
-
-        console.log(`Attempting to fetch data from Sheet ID: ${sheetId}, Range: ${range}`); // Keep this log
-        const response = await sheets.spreadsheets.values.get({
-            spreadsheetId: sheetId,
-            range: range,
-        });
-
-        const values = response.data.values;
-        console.log('Raw values from sheet (Game_State):', values); // Keep this log
-
-        if (!values || values.length < 2) {
-            console.log('No game state data or only headers found. Returning 404.');
-            return {
-                statusCode: 404,
-                body: JSON.stringify({ message: 'Game state data not found or sheet is empty.' }),
-            };
-        }
-
-        const headers = values[0];
-        const gameStateData = values[1];
-
-        const gameState = {};
-        headers.forEach((header, index) => {
-            const cleanHeader = header.replace(/[^a-zA-Z0-9]/g, '');
-            gameState[cleanHeader] = gameStateData[index];
-        });
-
-        console.log('Parsed Game State:', gameState); // Keep this log
+        console.log('--- get-game-state.js: Function started (Minimal Version) ---');
+        
+        // This will attempt to access an environment variable. If GOOGLE_SHEET_ID is missing or malformed,
+        // it might still crash here, but we're trying to get a log before that.
+        const testSheetId = process.env.GOOGLE_SHEET_ID || 'NOT_SET';
+        console.log(`Test: GOOGLE_SHEET_ID is: ${testSheetId}`);
 
         return {
             statusCode: 200,
@@ -62,21 +18,14 @@ exports.handler = async (event, context) => {
                 'Content-Type': 'application/json',
                 'Access-Control-Allow-Origin': '*',
             },
-            body: JSON.stringify(gameState),
+            body: JSON.stringify({ message: 'Minimal function response. Check logs for details.' }),
         };
 
     } catch (error) {
-        console.error('Server Error: Failed to fetch game state:', error);
-        let errorMessage = 'Failed to fetch game state.';
-        if (error.response && error.response.data && error.response.data.error) {
-            errorMessage = `Google API Error: ${error.response.data.error.message || error.message}`;
-            console.error('Google API Error Details:', error.response.data.error);
-        } else if (error.message) {
-            errorMessage = `Internal Server Error: ${error.message}`;
-        }
+        console.error('--- get-game-state.js: UNEXPECTED ERROR (Minimal Version) ---', error);
         return {
             statusCode: 500,
-            body: JSON.stringify({ error: errorMessage }),
+            body: JSON.stringify({ error: 'Minimal function failed unexpectedly.' }),
         };
     }
 };
