@@ -1,81 +1,101 @@
-    // netlify/functions/get-game-state.js
+// netlify/functions/get-player-data.js
 
-    const { google } = require('googleapis');
-    const { JWT } = require('google-auth-library');
+// This version tries to log even before parsing credentials, and handles potential parsing errors.
 
-    const credentials = JSON.parse(process.env.GOOGLE_SERVICE_ACCOUNT_CREDENTIALS);
-    const sheetId = process.env.GOOGLE_SHEET_ID;
+let credentials;
+let sheetId;
 
-    const auth = new JWT({
-        email: credentials.client_email,
-        key: credentials.private_key,
-        scopes: ['https://www.googleapis.com/auth/spreadsheets.readonly'] // Read-only access to sheets
-    });
+try {
+    console.log('--- get-player-data.js: Attempting initial setup ---');
+    // Attempt to parse credentials. This is the most common point of failure for empty logs.
+    credentials = JSON.parse(process.env.GOOGLE_SERVICE_ACCOUNT_CREDENTIALS);
+    sheetId = process.env.GOOGLE_SHEET_ID;
+    console.log('--- get-player-data.js: Credentials parsed successfully ---');
+    console.log(`Test: GOOGLE_SHEET_ID is: ${sheetId || 'NOT_SET'}`);
 
-    const sheets = google.sheets({ version: 'v4', auth });
+} catch (e) {
+    console.error('--- get-player-data.js: CRITICAL ERROR during initial setup (JSON.parse or env access) ---', e);
+    // If parsing fails, set dummy credentials so the handler can still return an error
+    credentials = { client_email: 'error@example.com', private_key: 'dummy' };
+    sheetId = 'ERROR_LOADING';
+}
 
-    exports.handler = async (event, context) => {
-        try {
-            if (!sheetId) {
-                console.error('Configuration Error: Google Sheet ID is not configured.');
-                return {
-                    statusCode: 500,
-                    body: JSON.stringify({ error: 'Server configuration error: Google Sheet ID missing.' }),
-                };
-            }
+const { google } = require('googleapis');
+const { JWT } = require('google-auth-library');
 
-            const range = 'Game_State!A1:G2'; // Reads columns A to G from the Game_State tab
-
-            console.log(`Attempting to fetch data from Sheet ID: ${sheetId}, Range: ${range}`);
-            const response = await sheets.spreadsheets.values.get({
-                spreadsheetId: sheetId,
-                range: range,
-            });
-
-            const values = response.data.values;
-            console.log('Raw values from sheet (Game_State):', values);
-
-            if (!values || values.length < 2) {
-                console.log('No game state data or only headers found. Returning 404.');
-                return {
-                    statusCode: 404,
-                    body: JSON.stringify({ message: 'Game state data not found or sheet is empty.' }),
-                };
-            }
-
-            const headers = values[0];
-            const gameStateData = values[1];
-
-            const gameState = {};
-            headers.forEach((header, index) => {
-                const cleanHeader = header.replace(/[^a-zA-Z0-9]/g, '');
-                gameState[cleanHeader] = gameStateData[index];
-            });
-
-            console.log('Parsed Game State:', gameState);
-
-            return {
-                statusCode: 200,
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Access-Control-Allow-Origin': '*',
-                },
-                body: JSON.stringify(gameState),
-            };
-
-        } catch (error) {
-            console.error('Server Error: Failed to fetch game state:', error);
-            let errorMessage = 'Failed to fetch game state.';
-            if (error.response && error.response.data && error.response.data.error) {
-                errorMessage = `Google API Error: ${error.response.data.error.message || error.message}`;
-                console.error('Google API Error Details:', error.response.data.error);
-            } else if (error.message) {
-                errorMessage = `Internal Server Error: ${error.message}`;
-            }
+// Now, define the handler function
+exports.handler = async (event, context) => {
+    try {
+        console.log('--- get-player-data.js: Handler invoked ---');
+        
+        if (sheetId === 'ERROR_LOADING') {
+            console.error('--- get-player-data.js: Handler detected initial setup error ---');
             return {
                 statusCode: 500,
-                body: JSON.stringify({ error: errorMessage }),
+                body: JSON.stringify({ error: 'Function failed to load environment variables correctly. Check Netlify logs for critical errors.' }),
             };
         }
-    };
-    
+
+        const auth = new JWT({
+            email: credentials.client_email,
+            key: credentials.private_key,
+            scopes: ['https://www.googleapis.com/auth/spreadsheets.readonly']
+        });
+
+        const sheets = google.sheets({ version: 'v4', auth });
+
+        const range = 'Players!A:Z'; // Reads all columns from the Players sheet
+
+        console.log(`Attempting to fetch data from Sheet ID: ${sheetId}, Range: ${range}`);
+        const response = await sheets.spreadsheets.values.get({
+            spreadsheetId: sheetId,
+            range: range,
+        });
+
+        const values = response.data.values;
+        console.log('Raw values from sheet (Players):', values);
+
+        if (!values || values.length === 0) {
+            console.log('No player data found. Returning empty array.');
+            return {
+                statusCode: 404, // Or 200 with empty array, depending on desired frontend behavior
+                body: JSON.stringify([]),
+            };
+        }
+
+        const headers = values[0];
+        const playerData = values.slice(1).map(row => {
+            const player = {};
+            headers.forEach((header, index) => {
+                const cleanHeader = header.replace(/[^a-zA-Z0-9]/g, '');
+                player[cleanHeader] = row[index];
+            });
+            return player;
+        });
+
+        console.log('Parsed player data:', playerData);
+
+        return {
+            statusCode: 200,
+            headers: {
+                'Content-Type': 'application/json',
+                'Access-Control-Allow-Origin': '*',
+            },
+            body: JSON.stringify(playerData),
+        };
+
+    } catch (error) {
+        console.error('--- get-player-data.js: UNEXPECTED ERROR during handler execution ---', error);
+        let errorMessage = 'Failed to fetch player data.';
+        if (error.response && error.response.data && error.response.data.error) {
+            errorMessage = `Google API Error: ${error.response.data.error.message || error.message}`;
+            console.error('Google API Error Details:', error.response.data.error);
+        } else if (error.message) {
+            errorMessage = `Internal Server Error: ${error.message}`;
+        }
+        return {
+            statusCode: 500,
+            body: JSON.stringify({ error: errorMessage }),
+        };
+    }
+};
