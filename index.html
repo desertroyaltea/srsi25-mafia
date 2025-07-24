@@ -146,6 +146,9 @@
             border-radius: 0.5rem;
             padding: 0.5rem;
         }
+        .view-container {
+            display: none; /* Hidden by default, shown by JS */
+        }
     </style>
 </head>
 <body>
@@ -179,53 +182,70 @@
             </div>
         </div>
 
-        <!-- Player Actions Section (Placeholder) -->
-        <div id="player-actions-section" class="bg-gray-900 p-5 rounded-lg shadow-lg border border-gray-800">
-            <h2 class="text-2xl font-semibold text-gray-200 mb-4">Your Actions</h2>
-            <p class="text-gray-400">Actions will appear here based on your role and the current game phase.</p>
+        <!-- Dashboard View -->
+        <div id="dashboard-view" class="view-container bg-gray-900 p-5 rounded-lg shadow-lg border border-gray-800">
+            <h2 class="text-2xl font-semibold text-gray-200 mb-4">Dashboard</h2>
+            <p class="text-gray-400 mb-6">Select an action to proceed.</p>
 
-            <!-- Accusation Submission Form (Visible for non-admins) -->
-            <div id="accusation-form-container" class="mt-4">
-                <h2 class="text-2xl font-semibold text-red-500 mb-3">Submit Accusation</h2>
-                <form id="accusationForm" enctype="multipart/form-data">
-                    <div class="mb-4">
-                        <label for="accuser" class="block text-gray-300 text-base font-bold mb-2">Accuser (Your Name):</label>
-                        <select id="accuser" name="accuserPlayerId" class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline bg-gray-200" required disabled>
-                            <option value="">Loading your name...</option>
-                        </select>
-                    </div>
-                    <div class="mb-4">
-                        <label for="accused" class="block text-gray-300 text-base font-bold mb-2">Accused Player:</label>
-                        <select id="accused" name="accusedPlayerId" class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline bg-gray-200" required>
-                            <option value="">Select a player</option>
-                        </select>
-                    </div>
-                    <div class="mb-4">
-                        <label class="block text-gray-300 text-base font-bold mb-2">Accusation Audio:</label>
-                        <div class="flex flex-col sm:flex-row gap-2">
-                            <button type="button" id="recordButton" class="bg-red-700 hover:bg-red-800 text-white font-bold py-2 px-4 rounded-lg transition duration-300 ease-in-out transform hover:scale-105 flex-1">Start Recording</button>
-                            <button type="button" id="stopButton" class="bg-gray-600 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded-lg transition duration-300 ease-in-out transform hover:scale-105 flex-1" disabled>Stop Recording</button>
-                        </div>
-                        <p id="recordingIndicator" class="recording-indicator text-center mt-2">Recording...</p>
-                        <div id="audioPlayerContainer" class="audio-player-container">
-                            <audio id="audioPlayback" controls></audio>
-                            <button type="button" id="resetAudioButton" class="bg-gray-500 hover:bg-gray-600 text-white text-sm py-1 px-3 rounded-lg">Clear Recording</button>
-                        </div>
-                        <p class="text-gray-400 text-sm mt-3 text-center">
-                            Or, if you prefer, select an existing audio file:
-                        </p>
-                        <input type="file" id="audioFile" name="audioFile" accept="audio/mpeg, audio/wav" class="block w-full text-base text-gray-300 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-base file:font-semibold file:bg-red-700 file:text-white hover:file:bg-red-800 mt-2">
-                    </div>
-                    <button type="submit" id="submitAccusationButton" class="bg-red-700 hover:bg-red-800 text-white font-bold py-3 px-6 rounded-lg focus:outline-none focus:shadow-outline transition duration-300 ease-in-out transform hover:scale-105 w-full text-lg">Submit Accusation</button>
-                </form>
-                <p id="accusation-status" class="mt-3 text-sm text-gray-300 text-center"></p>
+            <!-- Player-specific action buttons -->
+            <div id="player-dashboard-actions" class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <button id="btn-submit-accusation" class="bg-red-700 hover:bg-red-800 text-white font-bold py-3 px-6 rounded-lg focus:outline-none focus:shadow-outline transition duration-300 ease-in-out transform hover:scale-105 text-lg">
+                    Submit Accusation
+                </button>
+                <!-- Other player action buttons will go here -->
+            </div>
+
+            <!-- Admin-specific action buttons -->
+            <div id="admin-dashboard-actions" class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <button id="btn-review-accusations" class="bg-green-700 hover:bg-green-800 text-white font-bold py-3 px-6 rounded-lg focus:outline-none focus:shadow-outline transition duration-300 ease-in-out transform hover:scale-105 text-lg">
+                    Review Accusations
+                </button>
+                <!-- Other admin action buttons will go here -->
             </div>
         </div>
 
-        <!-- Admin Actions Section (Visible for admins) -->
-        <div id="admin-actions-section" class="bg-gray-900 p-5 rounded-lg shadow-lg mt-4 border border-gray-800 hidden">
-            <h2 class="text-2xl font-semibold text-green-500 mb-3">Admin Panel</h2>
-            <p class="text-gray-400 mb-4">Review and manage game actions.</p>
+        <!-- Accusation Form Page -->
+        <div id="accusation-form-page" class="view-container bg-gray-900 p-5 rounded-lg shadow-lg mt-4 border border-gray-800">
+            <h2 class="text-2xl font-semibold text-red-500 mb-3">Submit Accusation</h2>
+            <form id="accusationForm" enctype="multipart/form-data">
+                <div class="mb-4">
+                    <label class="block text-gray-300 text-base font-bold mb-2">Accuser (Your Name):</label>
+                    <p id="accuser-display-name" class="text-lg text-blue-400 font-semibold mb-2">Loading...</p>
+                    <!-- Hidden input to send accuser ID -->
+                    <input type="hidden" id="accuser-hidden-id" name="accuserPlayerId" required>
+                </div>
+                <div class="mb-4">
+                    <label for="accused" class="block text-gray-300 text-base font-bold mb-2">Accused Player:</label>
+                    <select id="accused" name="accusedPlayerId" class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline bg-gray-200" required>
+                        <option value="">Select a player</option>
+                    </select>
+                </div>
+                <div class="mb-4">
+                    <label class="block text-gray-300 text-base font-bold mb-2">Accusation Audio:</label>
+                    <div class="flex flex-col sm:flex-row gap-2">
+                        <button type="button" id="recordButton" class="bg-red-700 hover:bg-red-800 text-white font-bold py-2 px-4 rounded-lg transition duration-300 ease-in-out transform hover:scale-105 flex-1">Start Recording</button>
+                        <button type="button" id="stopButton" class="bg-gray-600 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded-lg transition duration-300 ease-in-out transform hover:scale-105 flex-1" disabled>Stop Recording</button>
+                    </div>
+                    <p id="recordingIndicator" class="recording-indicator text-center mt-2">Recording...</p>
+                    <div id="audioPlayerContainer" class="audio-player-container">
+                        <audio id="audioPlayback" controls></audio>
+                        <button type="button" id="resetAudioButton" class="bg-gray-500 hover:bg-gray-600 text-white text-sm py-1 px-3 rounded-lg">Clear Recording</button>
+                    </div>
+                    <p class="text-gray-400 text-sm mt-3 text-center">
+                        Or, if you prefer, select an existing audio file:
+                    </p>
+                    <input type="file" id="audioFile" name="audioFile" accept="audio/mpeg, audio/wav" class="block w-full text-base text-gray-300 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-base file:font-semibold file:bg-red-700 file:text-white hover:file:bg-red-800 mt-2">
+                </div>
+                <button type="submit" id="submitAccusationButton" class="bg-red-700 hover:bg-red-800 text-white font-bold py-3 px-6 rounded-lg focus:outline-none focus:shadow-outline transition duration-300 ease-in-out transform hover:scale-105 w-full text-lg">Submit Accusation</button>
+            </form>
+            <p id="accusation-status" class="mt-3 text-sm text-gray-300 text-center"></p>
+            <button onclick="showView('dashboard-view')" class="mt-6 bg-gray-600 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded-lg transition duration-300 ease-in-out transform hover:scale-105 w-full">Back to Dashboard</button>
+        </div>
+
+        <!-- Admin Review Page -->
+        <div id="admin-review-page" class="view-container bg-gray-900 p-5 rounded-lg shadow-lg mt-4 border border-gray-800">
+            <h2 class="text-2xl font-semibold text-green-500 mb-3">Admin Panel - Review Accusations</h2>
+            <p class="text-gray-400 mb-4">Review and manage pending accusations.</p>
 
             <!-- Pending Accusations Transcript -->
             <div id="pending-accusations-list" class="mb-6">
@@ -236,22 +256,8 @@
                 </div>
             </div>
 
-            <!-- Admin Accusation Approval/Denial Form (for manual ID input if needed) -->
-            <!-- This section is now purely illustrative, as actions are handled by transcript buttons -->
-            <h3 class="text-xl font-semibold text-green-500 mb-3">Manual Review (Advanced)</h3>
-            <p class="text-sm text-gray-500 mb-4">This section is for direct ID input if specific manual review is needed. Use the transcript above for general review.</p>
-            <form id="approvalForm">
-                <div class="mb-4">
-                    <label for="adminAccusationId" class="block text-gray-300 text-base font-bold mb-2">Accusation ID:</label>
-                    <input type="text" id="adminAccusationId" name="accusationId" class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline bg-gray-200" placeholder="e.g., ACC_1700000000000" required>
-                </div>
-                <!-- Admin Name dropdown is removed here as it's automatically determined -->
-                <div class="flex flex-col sm:flex-row gap-4">
-                    <button type="submit" data-action="approve" class="bg-green-700 hover:bg-green-800 text-white font-bold py-3 px-6 rounded-lg focus:outline-none focus:shadow-outline transition duration-300 ease-in-out transform hover:scale-105 w-full sm:w-1/2 text-lg">Approve Accusation</button>
-                    <button type="button" data-action="deny" class="bg-red-700 hover:bg-red-800 text-white font-bold py-3 px-6 rounded-lg focus:outline-none focus:shadow-outline transition duration-300 ease-in-out transform hover:scale-105 w-full sm:w-1/2 text-lg">Deny Accusation</button>
-                </div>
-            </form>
             <p id="approval-status" class="mt-3 text-sm text-gray-300 text-center"></p>
+            <button onclick="showView('dashboard-view')" class="mt-6 bg-gray-600 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded-lg transition duration-300 ease-in-out transform hover:scale-105 w-full">Back to Dashboard</button>
         </div>
 
         <!-- Message Box -->
@@ -269,13 +275,22 @@
         const lastTrialResultSpan = document.getElementById('last-trial-result');
         const messageBox = document.getElementById('message-box');
 
-        // Player Actions Section
-        const playerActionsSection = document.getElementById('player-actions-section');
-        const accusationFormContainer = document.getElementById('accusation-form-container');
+        // View Containers
+        const dashboardView = document.getElementById('dashboard-view');
+        const accusationFormPage = document.getElementById('accusation-form-page');
+        const adminReviewPage = document.getElementById('admin-review-page');
+
+        // Dashboard Action Buttons
+        const btnSubmitAccusation = document.getElementById('btn-submit-accusation');
+        const btnReviewAccusations = document.getElementById('btn-review-accusations');
+
+        // Player Actions Section (Dashboard)
+        const playerDashboardActions = document.getElementById('player-dashboard-actions');
 
         // Accusation Form Elements
         const accusationForm = document.getElementById('accusationForm');
-        const accuserSelect = document.getElementById('accuser');
+        const accuserDisplayName = document.getElementById('accuser-display-name'); // For displaying accuser's name
+        const accuserHiddenId = document.getElementById('accuser-hidden-id'); // Hidden input for accuser ID
         const accusedSelect = document.getElementById('accused');
         const audioFileInput = document.getElementById('audioFile');
         const recordButton = document.getElementById('recordButton');
@@ -287,15 +302,12 @@
         const submitAccusationButton = document.getElementById('submitAccusationButton');
         const accusationStatus = document.getElementById('accusation-status');
 
-        // Admin Actions Section
-        const adminActionsSection = document.getElementById('admin-actions-section');
+        // Admin Actions Section (Dashboard)
+        const adminDashboardActions = document.getElementById('admin-dashboard-actions');
+
+        // Admin Review Page Elements
         const pendingAccusationsList = document.getElementById('pending-accusations-list');
         const accusationsTranscript = document.getElementById('accusations-transcript');
-
-        // Approval Form Elements (Fallback manual input)
-        const approvalForm = document.getElementById('approvalForm');
-        const adminAccusationIdInput = document.getElementById('adminAccusationId');
-        // const adminPlayerSelect = document.getElementById('adminPlayerSelect'); // Removed from HTML, will use currentUserId directly
         const approvalStatus = document.getElementById('approval-status');
 
         let allPlayersData = []; // To store fetched player data
@@ -325,10 +337,11 @@
         // Function to check supported audio MIME types
         function getSupportedMimeType() {
             const types = [
+                'audio/mp4;codecs=aac', // Prioritize AAC for better mobile compatibility
                 'audio/webm;codecs=opus',
                 'audio/webm',
                 'audio/ogg',
-                'audio/mp4'
+                'audio/mp4' // Generic MP4
             ];
             for (const type of types) {
                 if (MediaRecorder.isTypeSupported(type)) {
@@ -340,55 +353,66 @@
             return 'audio/webm'; // Fallback
         }
 
+        // --- View Management ---
+        const allViewContainers = document.querySelectorAll('.view-container');
+
+        function showView(viewId) {
+            allViewContainers.forEach(container => {
+                container.classList.add('hidden');
+            });
+            document.getElementById(viewId).classList.remove('hidden');
+            // Re-fetch data relevant to the view if needed
+            if (viewId === 'admin-review-page') {
+                fetchPendingAccusations();
+            }
+            // Reset forms/states when navigating
+            if (viewId === 'accusation-form-page') {
+                resetAudioState(); // Ensure audio recording state is clean
+                // Re-populate accused dropdown to ensure latest player list
+                populatePlayerDropdown(accusedSelect, allPlayersData.filter(p => p.IsAdmin !== 'TRUE'), 'Select a player');
+            }
+        }
+
         // Function to fetch player data and populate dropdowns
         async function fetchPlayers() {
-            console.log("Frontend: Calling fetchPlayers()..."); // Added log
+            console.log("Frontend: Calling fetchPlayers()...");
             try {
                 const response = await fetch('/.netlify/functions/get-player-data');
-                console.log("Frontend: fetchPlayers() response status:", response.status); // Added log
+                console.log("Frontend: fetchPlayers() response status:", response.status);
                 if (!response.ok) {
                     throw new Error(`HTTP error! status: ${response.status}`);
                 }
                 allPlayersData = await response.json();
-                console.log("Frontend: Fetched All Players:", allPlayersData); // Added log
+                console.log("Frontend: Fetched All Players:", allPlayersData);
 
-                // Populate Accuser and Accused dropdowns
-                populatePlayerDropdown(accuserSelect, allPlayersData, 'Loading your name...'); // Changed default text
-                populatePlayerDropdown(accusedSelect, allPlayersData, 'Select a player');
-                // populatePlayerDropdown(adminPlayerSelect, allPlayersData, 'Select admin name'); // Removed adminPlayerSelect dropdown
-
-                // Auto-select current user in accuser dropdown and check admin status
+                // Auto-select current user and check admin status
                 const currentUser = allPlayersData.find(p => p.PlayerID === currentUserId);
                 if (currentUser) {
-                    accuserSelect.value = currentUser.PlayerID;
-                    // Ensure the option text is also set if not already present
-                    const selectedOption = accuserSelect.querySelector(`option[value="${currentUser.PlayerID}"]`);
-                    if (selectedOption) {
-                        selectedOption.textContent = currentUser.Name || currentUser.PlayerID;
-                    } else {
-                        // If for some reason the option wasn't in the initial list, add it
-                        const option = document.createElement('option');
-                        option.value = currentUser.PlayerID;
-                        option.textContent = currentUser.Name || currentUser.PlayerID;
-                        accuserSelect.appendChild(option);
-                        accuserSelect.value = currentUser.PlayerID;
-                    }
-
-                    isCurrentUserAdmin = (currentUser.IsAdmin === 'TRUE'); // Assuming 'TRUE' string from sheet
-                    console.log(`Frontend: Current user (${currentUser.Name}) is Admin: ${isCurrentUserAdmin}`); // Added log
+                    accuserDisplayName.textContent = currentUser.Name || currentUser.PlayerID;
+                    accuserHiddenId.value = currentUser.PlayerID; // Set hidden input value
+                    
+                    isCurrentUserAdmin = (currentUser.IsAdmin === 'TRUE');
+                    console.log(`Frontend: Current user (${currentUser.Name}) is Admin: ${isCurrentUserAdmin}`);
                 } else {
                     showMessage("Your user ID does not match any player. Please ensure your PlayerID is in the sheet. You cannot perform actions.", 8000);
-                    // If user not found, disable forms or guide them to register/get ID
-                    accusationForm.querySelectorAll('input, button, select').forEach(el => el.disabled = true);
-                    approvalForm.querySelectorAll('input, button, select').forEach(el => el.disabled = true);
-                    playerActionsSection.classList.add('hidden');
-                    adminActionsSection.classList.add('hidden');
-                    console.error("Frontend: Current user ID not found in player data."); // Added log
+                    // If user not found, disable all actions and hide dashboards
+                    playerDashboardActions.classList.add('hidden');
+                    adminDashboardActions.classList.add('hidden');
+                    loadingOverlay.classList.add('hidden'); // Hide loading overlay
+                    gameContainer.classList.remove('hidden'); // Show game container
+                    console.error("Frontend: Current user ID not found in player data.");
+                    return; // Stop further execution if user is not recognized
                 }
 
+                // Populate Accused dropdown (excluding admins)
+                const nonAdminPlayers = allPlayersData.filter(p => p.IsAdmin !== 'TRUE');
+                populatePlayerDropdown(accusedSelect, nonAdminPlayers, 'Select a player');
+
             } catch (error) {
-                console.error("Frontend: Error fetching player data:", error); // Added log
+                console.error("Frontend: Error fetching player data:", error);
                 showMessage("Failed to load player data. Some features may not work.", 5000);
+                loadingOverlay.classList.add('hidden'); // Hide loading overlay
+                gameContainer.classList.remove('hidden'); // Show game container
             }
         }
 
@@ -411,15 +435,15 @@
 
         // Function to fetch game state from a Netlify Function
         async function fetchGameState() {
-            console.log("Frontend: Calling fetchGameState()..."); // Added log
+            console.log("Frontend: Calling fetchGameState()...");
             try {
                 const response = await fetch('/.netlify/functions/get-game-state');
-                console.log("Frontend: fetchGameState() response status:", response.status); // Added log
+                console.log("Frontend: fetchGameState() response status:", response.status);
                 if (!response.ok) {
                     throw new Error(`HTTP error! status: ${response.status}`);
                 }
                 const gameState = await response.json();
-                console.log("Frontend: Fetched Game State:", gameState); // Added log
+                console.log("Frontend: Fetched Game State:", gameState);
 
                 const currentDay = gameState.CurrentDay || 'N/A';
                 const lastAccusedPlayerId = gameState.LastAccusedPlayerID || 'N/A';
@@ -439,70 +463,54 @@
                 lastAccusedPlayerSpan.textContent = getPlayerNameById(lastAccusedPlayerId); // Display name
                 lastTrialResultSpan.textContent = lastTrialResult;
 
-                // Control visibility and enable/disable forms based on admin status and phase
+                // Control visibility of dashboard action buttons based on admin status and phase
                 if (isCurrentUserAdmin) {
-                    playerActionsSection.classList.add('hidden'); // Hide player actions for admin
-                    adminActionsSection.classList.remove('hidden'); // Show admin actions
-
-                    // Admin forms are always enabled regardless of phase for review, but actions might be limited by backend
-                    approvalForm.querySelectorAll('input, button, select').forEach(el => el.disabled = false);
-                    await fetchPendingAccusations(); // Fetch and display pending accusations for admin
-                    console.log("Frontend: Admin view activated."); // Added log
+                    playerDashboardActions.classList.add('hidden'); // Hide player actions for admin
+                    adminDashboardActions.classList.remove('hidden'); // Show admin actions
+                    // Admin actions are generally always enabled for review purposes
+                    console.log("Frontend: Admin dashboard actions activated.");
                 } else {
-                    playerActionsSection.classList.remove('hidden'); // Show player actions for non-admin
-                    adminActionsSection.classList.add('hidden'); // Hide admin actions
+                    playerDashboardActions.classList.remove('hidden'); // Show player actions for non-admin
+                    adminDashboardActions.classList.add('hidden'); // Hide admin actions
 
                     if (currentPhase === 'Day') {
+                        // Disable player action buttons during Day
+                        btnSubmitAccusation.disabled = true;
                         showMessage("It's Day time. Actions are currently disabled.", 3000);
-                        accusationForm.querySelectorAll('input, button, select').forEach(el => el.disabled = true);
-                        recordButton.disabled = true;
-                        stopButton.disabled = true;
-                        resetAudioButton.disabled = true;
-                        audioFileInput.disabled = true; // Ensure file input is also disabled
-                        submitAccusationButton.disabled = true; // Ensure submit is disabled
-                        console.log("Frontend: Player view (Day) activated."); // Added log
+                        console.log("Frontend: Player dashboard actions (Day) activated.");
                     } else { // Night
+                        // Enable player action buttons during Night
+                        btnSubmitAccusation.disabled = false;
                         showMessage("It's Night time. Actions are enabled!", 3000);
-                        accusationForm.querySelectorAll('input, button, select').forEach(el => el.disabled = false);
-                        // Only enable record button if no audio is recorded yet
-                        if (!recordedAudioBlob) {
-                            recordButton.disabled = false;
-                            audioFileInput.disabled = false; // Enable file input only if no recording
-                        } else {
-                            // If there's a recorded blob, disable recording and file input
-                            recordButton.disabled = true;
-                            audioFileInput.disabled = true;
-                        }
-                        // Submit button status depends on whether audio is ready
-                        submitAccusationButton.disabled = !(recordedAudioBlob || audioFileInput.files.length > 0);
-                        console.log("Frontend: Player view (Night) activated."); // Added log
+                        console.log("Frontend: Player dashboard actions (Night) activated.");
                     }
                 }
 
             } catch (error) {
-                console.error("Frontend: Error fetching game state:", error); // Added log
+                console.error("Frontend: Error fetching game state:", error);
                 showMessage("Failed to load game state. Please check your connection or Netlify Functions.", 5000);
             } finally {
                 loadingOverlay.classList.add('hidden'); // Hide loading overlay
                 gameContainer.classList.remove('hidden'); // Show game container
+                showView('dashboard-view'); // Show the dashboard after initial load
             }
         }
 
         // New function to fetch pending accusations for admin review
         async function fetchPendingAccusations() {
-            console.log("Frontend: Calling fetchPendingAccusations()..."); // Added log
+            console.log("Frontend: Calling fetchPendingAccusations()...");
             try {
-                const response = await fetch('/.netlify/functions/get-pending-accusations'); // New function to create
-                console.log("Frontend: fetchPendingAccusations() response status:", response.status); // Added log
+                const response = await fetch('/.netlify/functions/get-pending-accusations');
+                console.log("Frontend: fetchPendingAccusations() response status:", response.status);
                 if (!response.ok) {
                     throw new Error(`HTTP error! status: ${response.status}`);
                 }
                 const pendingAccusations = await response.json();
-                console.log("Frontend: Pending Accusations:", pendingAccusations); // Added log
+                console.log("Frontend: Pending Accusations:", pendingAccusations);
                 renderAccusationsTranscript(pendingAccusations);
 
             } catch (error) {
-                console.error("Frontend: Error fetching pending accusations:", error); // Added log
+                console.error("Frontend: Error fetching pending accusations:", error);
                 showMessage("Failed to load pending accusations for admin review.", 5000);
             }
         }
@@ -544,13 +552,7 @@
                 button.addEventListener('click', async (e) => {
                     const accusationId = e.target.dataset.id;
                     const action = e.target.dataset.action;
-                    // const adminPlayerId = adminPlayerSelect.value; // Removed adminPlayerSelect
                     const adminPlayerId = currentUserId; // Use currentUserId directly
-
-                    // if (!adminPlayerId) { // No longer needed as currentUserId is always available
-                    //     showMessage("Please select your Admin Name to perform this action.", 4000);
-                    //     return;
-                    // }
 
                     if (action === 'approve') {
                         await handleAdminAction(accusationId, adminPlayerId, 'approve');
@@ -719,7 +721,7 @@
             accusationStatus.className = 'mt-3 text-sm text-gray-300 text-center'; // Reset styling
 
             const formData = new FormData();
-            formData.append('accuserPlayerId', accuserSelect.value);
+            formData.append('accuserPlayerId', accuserHiddenId.value); // Use hidden ID
             formData.append('accusedPlayerId', accusedSelect.value);
 
             // Prioritize recorded audio, then selected file
@@ -728,7 +730,7 @@
 
             if (recordedAudioBlob) {
                 audioToUpload = recordedAudioBlob;
-                audioFileName = `accusation_${accuserSelect.value}_${Date.now()}.webm`; // Use .webm for webm type
+                audioFileName = `accusation_${accuserHiddenId.value}_${Date.now()}.webm`; // Use .webm for webm type
                 // If the recorded MIME type is different, adjust the extension
                 if (audioMimeType.includes('mp4')) audioFileName = audioFileName.replace('.webm', '.mp4');
                 else if (audioMimeType.includes('ogg')) audioFileName = audioFileName.replace('.webm', '.ogg');
@@ -773,22 +775,27 @@
         });
 
         // Event Listener for Admin Approval Form (manual input fallback)
+        // This form is now only for manual ID input, not part of the transcript buttons
         approvalForm.addEventListener('submit', async function(e) {
             e.preventDefault();
             const formData = new FormData(this);
             const accusationId = formData.get('accusationId');
-            // const adminPlayerId = formData.get('adminPlayerId'); // Removed from HTML
             const adminPlayerId = currentUserId; // Use currentUserId directly
 
             await handleAdminAction(accusationId, adminPlayerId, 'approve'); // Default to approve for submit button
         });
 
+        // Event listeners for dashboard buttons
+        btnSubmitAccusation.addEventListener('click', () => showView('accusation-form-page'));
+        btnReviewAccusations.addEventListener('click', () => showView('admin-review-page'));
+
+
         // Initialize game state and fetch players when the window loads
         window.onload = async () => {
-            console.log("Frontend: window.onload triggered."); // Added log
-            await fetchPlayers(); // This should be active
-            fetchGameState();
-            console.log("Frontend: Initial data fetching complete."); // Added log
+            console.log("Frontend: window.onload triggered.");
+            await fetchPlayers(); // Fetch players first to determine admin status
+            fetchGameState(); // Then fetch game state and apply role-based visibility
+            console.log("Frontend: Initial data fetching complete.");
         };
 
         // Periodically refresh game state (e.g., every 30 seconds)

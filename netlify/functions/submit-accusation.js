@@ -60,7 +60,7 @@ exports.handler = async (event, context) => {
         busboy.on('file', (fieldname, file, filename, encoding, mimetype) => {
             console.log(`Busboy: File [${fieldname}]: filename=${filename.filename}, encoding=${encoding}, mimetype=${mimetype}`);
             originalFileName = filename.filename;
-            fileMimeType = mimetype || 'application/octet-stream';
+            fileMimeType = mimetype || 'application/octet-stream'; // Fallback to a generic binary type if mimetype is undefined
             const chunks = [];
             file.on('data', (data) => chunks.push(data));
             file.on('end', () => {
@@ -99,24 +99,46 @@ exports.handler = async (event, context) => {
                     return;
                 }
 
-                let fileExtension = 'bin';
+                // --- Improved MIME type and Extension determination ---
+                let determinedMimeType = fileMimeType;
+                let fileExtension = 'bin'; // Default to .bin if no specific audio type is found
+
                 if (fileMimeType.includes('webm')) {
                     fileExtension = 'webm';
+                    determinedMimeType = 'audio/webm';
                 } else if (fileMimeType.includes('mp4')) {
                     fileExtension = 'mp4';
+                    determinedMimeType = 'audio/mp4';
                 } else if (fileMimeType.includes('ogg')) {
                     fileExtension = 'ogg';
+                    determinedMimeType = 'audio/ogg';
                 } else if (fileMimeType.includes('wav')) {
                     fileExtension = 'wav';
-                } else if (fileMimeType.includes('mpeg')) {
+                    determinedMimeType = 'audio/wav';
+                } else if (fileMimeType.includes('mpeg')) { // for mp3
                     fileExtension = 'mp3';
+                    determinedMimeType = 'audio/mpeg';
+                } else {
+                    // Fallback for unknown or generic mimetypes. Try to guess from originalFileName if available
+                    const originalExtMatch = originalFileName.match(/\.([0-9a-z]+)(?:[\?#]|$)/i);
+                    if (originalExtMatch) {
+                        const ext = originalExtMatch[1].toLowerCase();
+                        if (ext === 'mp3') { fileExtension = 'mp3'; determinedMimeType = 'audio/mpeg'; }
+                        else if (ext === 'wav') { fileExtension = 'wav'; determinedMimeType = 'audio/wav'; }
+                        else if (ext === 'ogg') { fileExtension = 'ogg'; determinedMimeType = 'audio/ogg'; }
+                        else if (ext === 'mp4') { fileExtension = 'mp4'; determinedMimeType = 'audio/mp4'; }
+                        else if (ext === 'webm') { fileExtension = 'webm'; determinedMimeType = 'audio/webm'; }
+                    }
+                    console.warn(`MIME type '${fileMimeType}' is not a common audio type. Falling back to guessed extension '${fileExtension}' and MIME '${determinedMimeType}'.`);
                 }
+                // Ensure determinedMimeType is always a base type without codecs
+                determinedMimeType = determinedMimeType.split(';')[0];
 
-                const uploadMimeType = fileMimeType.split(';')[0];
+
                 const gcsFileName = `accusation_${accuserPlayerId}_${Date.now()}.${fileExtension}`;
                 const gcsFilePath = `accusations/${gcsFileName}`; // Store in a subfolder within the bucket
                 
-                console.log(`Google Cloud Storage: Attempting to upload file: ${gcsFilePath} with MIME type: ${uploadMimeType}`);
+                console.log(`GCS Upload Details: Filename=${gcsFileName}, Path=${gcsFilePath}, MIMEType=${determinedMimeType}, OriginalMIME=${fileMimeType}`);
 
                 // Create a file object in the bucket
                 const file = storage.bucket(bucketName).file(gcsFilePath);
@@ -124,7 +146,7 @@ exports.handler = async (event, context) => {
                 // Create a write stream to upload the buffer
                 const writeStream = file.createWriteStream({
                     metadata: {
-                        contentType: uploadMimeType,
+                        contentType: determinedMimeType, // Use the determined MIME type here
                     },
                     resumable: false, // For smaller files, resumable upload is not needed
                 });
