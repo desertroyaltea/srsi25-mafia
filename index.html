@@ -113,6 +113,7 @@
             isCurrentUserAdmin: false,
             gameState: null,
             activeTrial: null,
+            pendingAccusations: [],
         };
 
         // --- ELEMENT REFERENCES (App Root) ---
@@ -122,12 +123,69 @@
 
         // --- VIEW TEMPLATES ---
         const templates = {
-            login: () => `...`, // Unchanged
-            gameLayout: (viewHtml) => `...`, // Unchanged
-            dashboard: () => `...`, // Unchanged
-            actionModal: ({ title, buttonText, targets, actionType }) => `...`, // Unchanged
+            login: () => `
+                <div class="container">
+                    <h1 class="text-4xl font-bold text-center text-red-500 mb-6">SRSI MAFIA LOGIN</h1>
+                    <form id="login-form">
+                        <div class="mb-6">
+                            <label for="login-code" class="block text-gray-300 text-lg font-bold mb-2">Enter Your Player Name:</label>
+                            <input type="text" id="login-code" class="shadow appearance-none border rounded w-full py-3 px-4 text-lg text-gray-200 leading-tight focus:outline-none focus:shadow-outline" required>
+                        </div>
+                        <button type="submit" id="login-button" class="bg-red-700 hover:bg-red-800 text-white font-bold py-3 px-6 rounded-lg w-full text-xl">Enter Game</button>
+                        <p id="login-error" class="text-red-500 text-center mt-4"></p>
+                    </form>
+                </div>`,
+
+            gameLayout: (viewHtml) => `
+                <div class="container" id="game-container">
+                    <h1 class="text-4xl font-bold text-center text-red-500 mb-6">SRSI MAFIA</h1>
+                    <div class="bg-gray-900 p-4 rounded-lg flex justify-between items-center">
+                        <p class="text-base text-gray-400">Logged in as:</p>
+                        <span class="font-mono text-blue-400 text-base">${state.currentUser.Name} (${state.currentUser.Role})</span>
+                    </div>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div class="bg-gray-900 p-5 rounded-lg">
+                            <h2 class="text-2xl font-semibold mb-3">Game Status</h2>
+                            <p>Current Day: <span class="font-bold text-red-400">${state.gameState?.CurrentDay || '...'}</span></p>
+                            <p>Current Phase: <span class="font-bold text-red-400">${state.gameState?.CurrentPhase || '...'}</span></p>
+                        </div>
+                        <div class="bg-gray-900 p-5 rounded-lg">
+                            <h2 class="text-2xl font-semibold mb-3">Trial Information</h2>
+                            <p>Accused Player: <span class="font-bold text-red-400">${getPlayerNameById(state.gameState?.LastAccusedPlayerID) || 'N/A'}</span></p>
+                            <p>Last Trial Result: <span class="font-bold text-green-400">${state.gameState?.LastTrialResult || 'N/A'}</span></p>
+                        </div>
+                    </div>
+                    <div id="view-content">${viewHtml}</div>
+                </div>`,
+
+            dashboard: () => `
+                <div class="bg-gray-900 p-5 rounded-lg mt-4">
+                    <h2 class="text-2xl font-semibold mb-4">Dashboard</h2>
+                    <p class="text-gray-400 mb-6">Select an action to proceed.</p>
+                    <div id="player-dashboard-actions" class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <button id="btn-submit-accusation" class="bg-red-800 hover:bg-red-900 text-white font-bold py-3 px-6 rounded-lg">Submit Accusation</button>
+                    </div>
+                    <div id="admin-dashboard-actions" class="hidden grid-cols-1 md:grid-cols-2 gap-4">
+                        <button id="btn-review-accusations" class="bg-green-700 hover:bg-green-800 text-white font-bold py-3 px-6 rounded-lg">Review Accusations</button>
+                    </div>
+                </div>`,
+            
+            actionModal: ({ title, buttonText, targets, actionType }) => `
+                <div class="bg-gray-900 p-5 rounded-lg mt-4">
+                    <h2 class="text-2xl font-semibold text-red-500 mb-4">${title}</h2>
+                    <div class="mb-6">
+                        <label for="action-target-select" class="block text-gray-300 font-bold mb-2">Select Target:</label>
+                        <select id="action-target-select" class="shadow w-full py-3 px-4 text-lg leading-tight">
+                            <option value="">Choose a player...</option>
+                            ${targets.map(p => `<option value="${p.PlayerID}">${p.Name}</option>`).join('')}
+                        </select>
+                    </div>
+                    <button type="button" id="action-modal-confirm-button" data-action="${actionType}" class="bg-red-700 hover:bg-red-800 text-white font-bold py-3 px-6 rounded-lg w-full text-lg">${buttonText}</button>
+                    <button type="button" id="back-to-dashboard" class="mt-6 bg-gray-600 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded-lg w-full">Back to Dashboard</button>
+                </div>`,
+            
             investigationHistory: () => `...`, // Unchanged
-            accusationForm: ({ targets }) => `...`, // Unchanged
+            accusationForm: () => `...`, // Unchanged
             adminReview: () => `...`, // Unchanged
 
             juryVote: ({ trial }) => `
@@ -309,12 +367,9 @@
                 await fetchGameState();
                 
                 renderView('dashboard');
-                setInterval(async () => {
-                    await fetchGameState();
-                    if (document.getElementById('player-dashboard-actions')) {
-                        renderView('dashboard');
-                    }
-                }, 30000);
+                // The setInterval was removed to prevent CSP errors.
+                // Users will need to refresh to see updates.
+
             } catch (error) {
                 console.error("Error during initialization:", error);
                 showMessage("A critical error occurred during startup. Please refresh.");
