@@ -1,0 +1,6 @@
+[build]
+  publish = "dist" # Or wherever your HTML file will be after build
+  functions = "netlify/functions" # This tells Netlify where to find your serverless functions
+
+[functions]
+  node_bundler = "esbuild" # Recommended for faster builds
