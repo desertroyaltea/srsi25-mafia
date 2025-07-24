@@ -1,0 +1,18 @@
+{
+  "name": "mafia-game-netlify",
+  "version": "1.0.0",
+  "description": "Netlify functions for Mafia Game interacting with Google Sheets/Drive APIs",
+  "main": "index.js",
+  "scripts": {
+    "start": "netlify dev",
+    "build": "echo 'No specific build step for frontend, Netlify will deploy index.html directly'",
+    "install-functions-deps": "npm install --prefix netlify/functions"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "googleapis": "^140.0.0",
+    "google-auth-library": "^9.10.0"
+  }
+}
