@@ -235,7 +235,7 @@
             <button type="button" onclick="showView('dashboard-view')" class="mt-6 bg-gray-600 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded-lg w-full">Back to Dashboard</button>
         </div>
         
-        <!-- NEW: Reusable Action Modal -->
+        <!-- Reusable Action Modal -->
         <div id="action-modal-view" class="view-container bg-gray-900 p-5 rounded-lg shadow-lg mt-4 border border-gray-800">
             <h2 id="action-modal-title" class="text-2xl font-semibold text-red-500 mb-4">Perform Action</h2>
             <form id="action-modal-form">
@@ -370,7 +370,11 @@
 
         actionModalForm.addEventListener('submit', async (e) => {
             e.preventDefault();
-            const targetPlayerId = actionTargetSelect.value;
+            
+            // FIX: Use FormData to reliably get the selected value
+            const formData = new FormData(e.target);
+            const targetPlayerId = formData.get('targetPlayerId');
+
             if (!targetPlayerId) {
                 showMessage("Please select a target player.", 3000);
                 return;
