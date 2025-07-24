@@ -113,6 +113,10 @@
             isCurrentUserAdmin: false,
             gameState: null,
             pendingAccusations: [],
+            mediaRecorder: null,
+            audioChunks: [],
+            recordedAudioBlob: null,
+            audioMimeType: 'audio/webm',
         };
 
         // --- ELEMENT REFERENCES (App Root) ---
@@ -183,8 +187,59 @@
                     <button type="button" id="back-to-dashboard" class="mt-6 bg-gray-600 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded-lg w-full">Back to Dashboard</button>
                 </div>`,
             
-            investigationHistory: () => `...`, // Unchanged
-            accusationForm: () => `...`, // Unchanged
+            investigationHistory: () => {
+                const history = state.currentUser.InvestigationHistory || '';
+                const entries = history.split(',').filter(e => e);
+                return `
+                <div class="bg-gray-900 p-5 rounded-lg mt-4">
+                    <h2 class="text-2xl font-semibold text-yellow-500 mb-4">Investigation History</h2>
+                    ${history ? `
+                    <ul class="list-disc list-inside space-y-2">
+                        ${entries.map(entry => {
+                            const [targetName, result] = entry.split(':');
+                            const resultText = result === 'YES' ? 'MAFIA' : 'NOT MAFIA';
+                            const resultColor = result === 'YES' ? 'text-red-500' : 'text-green-500';
+                            return `<li>${targetName}: <span class="font-bold ${resultColor}">${resultText}</span></li>`;
+                        }).join('')}
+                    </ul>
+                    ` : '<p class="text-gray-400">You have not investigated anyone yet.</p>'}
+                    <button type="button" id="back-to-dashboard" class="mt-6 bg-gray-600 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded-lg w-full">Back to Dashboard</button>
+                </div>`;
+            },
+
+            accusationForm: ({ targets }) => `
+                <div class="bg-gray-900 p-5 rounded-lg mt-4">
+                    <h2 class="text-2xl font-semibold text-red-500 mb-3">Submit Accusation</h2>
+                    <form id="accusation-form">
+                        <div class="mb-4">
+                            <label class="block text-gray-300 font-bold mb-2">Accuser:</label>
+                            <p class="text-lg text-blue-400 font-semibold">${state.currentUser.Name}</p>
+                        </div>
+                        <div class="mb-4">
+                            <label for="accused-select" class="block text-gray-300 font-bold mb-2">Accused Player:</label>
+                            <select id="accused-select" class="shadow w-full py-3 px-4 text-lg leading-tight" required>
+                                <option value="">Select a player...</option>
+                                ${targets.map(p => `<option value="${p.PlayerID}">${p.Name}</option>`).join('')}
+                            </select>
+                        </div>
+                        <div class="mb-4">
+                            <label class="block text-gray-300 font-bold mb-2">Accusation Audio:</label>
+                            <div class="flex gap-2">
+                                <button type="button" id="record-button" class="flex-1 bg-red-700 hover:bg-red-800 text-white font-bold py-2 px-4 rounded-lg">Start Recording</button>
+                                <button type="button" id="stop-button" class="flex-1 bg-gray-600 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded-lg" disabled>Stop Recording</button>
+                            </div>
+                            <p id="recording-indicator" class="text-red-500 text-center mt-2 hidden">Recording...</p>
+                            <div id="audio-playback-container" class="mt-2 hidden">
+                                <audio id="audio-playback" controls class="w-full"></audio>
+                            </div>
+                            <p class="text-center text-gray-400 my-2">OR</p>
+                            <input type="file" id="audio-file-input" accept="audio/*" class="w-full">
+                        </div>
+                        <button type="submit" id="submit-accusation-button" class="bg-red-700 hover:bg-red-800 text-white font-bold py-3 px-6 rounded-lg w-full text-lg">Submit Accusation</button>
+                    </form>
+                    <button type="button" id="back-to-dashboard" class="mt-6 bg-gray-600 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded-lg w-full">Back to Dashboard</button>
+                </div>`,
+
             adminReview: () => `...`, // Unchanged
         };
 
@@ -194,48 +249,75 @@
             switch(viewName) {
                 case 'login':
                     appRoot.innerHTML = templates.login();
+                    document.getElementById('login-form').addEventListener('submit', handleLogin);
                     break;
                 case 'dashboard':
                     viewHtml = templates.dashboard();
                     appRoot.innerHTML = templates.gameLayout(viewHtml);
+                    initDashboardView();
                     break;
                 case 'actionModal':
                     viewHtml = templates.actionModal(data);
                     appRoot.innerHTML = templates.gameLayout(viewHtml);
+                    initActionModalView(data.actionType);
                     break;
                 case 'accusationForm':
-                    viewHtml = templates.accusationForm();
+                    viewHtml = templates.accusationForm(data);
                     appRoot.innerHTML = templates.gameLayout(viewHtml);
+                    initAccusationView();
                     break;
                 case 'adminReview':
                     viewHtml = templates.adminReview();
                     appRoot.innerHTML = templates.gameLayout(viewHtml);
+                    initAdminReviewView();
                     break;
                 case 'investigationHistory':
                     viewHtml = templates.investigationHistory();
                     appRoot.innerHTML = templates.gameLayout(viewHtml);
+                    document.getElementById('back-to-dashboard').addEventListener('click', () => renderView('dashboard'));
                     break;
             }
         }
         
-        appRoot.addEventListener('click', async (e) => {
-            const target = e.target;
-            if (target.id === 'login-button') { e.preventDefault(); handleLogin(); }
-            if (target.id === 'btn-submit-accusation') renderView('accusationForm');
-            if (target.id === 'btn-review-accusations') {
+        // --- VIEW INITIALIZERS ---
+        function initDashboardView() {
+            updateDashboardActions(state.gameState?.CurrentPhase || 'Day');
+            document.getElementById('btn-submit-accusation').addEventListener('click', () => {
+                 const targets = state.allPlayers.filter(p => p.Status && p.Status.toLowerCase() === 'alive' && p.PlayerID !== state.currentUserId);
+                renderView('accusationForm', { targets });
+            });
+            document.getElementById('btn-review-accusations').addEventListener('click', async () => {
                 loadingOverlay.style.display = 'flex';
                 await fetchPendingAccusations();
                 loadingOverlay.style.display = 'none';
                 renderView('adminReview');
-            }
-            if (target.id === 'action-modal-confirm-button') handleActionConfirm(target.dataset.action);
-            if (target.id === 'back-to-dashboard') renderView('dashboard');
-            if (target.classList.contains('btn-approve')) handleAdminAction(target.dataset.id, 'approve');
-            if (target.classList.contains('btn-deny')) handleAdminAction(target.dataset.id, 'deny');
-            if (target.id === 'btn-view-history') renderView('investigationHistory');
-        });
+            });
+        }
 
-        async function handleLogin() {
+        function initActionModalView(actionType) {
+            document.getElementById('action-modal-confirm-button').addEventListener('click', () => handleActionConfirm(actionType));
+            document.getElementById('back-to-dashboard').addEventListener('click', () => renderView('dashboard'));
+        }
+        
+        function initAccusationView() {
+            document.getElementById('back-to-dashboard').addEventListener('click', () => renderView('dashboard'));
+            document.getElementById('accusation-form').addEventListener('submit', handleAccusationSubmit);
+            document.getElementById('record-button').addEventListener('click', startRecording);
+            document.getElementById('stop-button').addEventListener('click', stopRecording);
+            
+            const types = ['audio/webm;codecs=opus', 'audio/webm', 'audio/mp3', 'audio/mpeg'];
+            state.audioMimeType = types.find(type => MediaRecorder.isTypeSupported(type)) || 'audio/webm';
+        }
+
+        function initAdminReviewView() {
+            document.getElementById('back-to-dashboard').addEventListener('click', () => renderView('dashboard'));
+            document.querySelectorAll('.btn-approve').forEach(btn => btn.addEventListener('click', (e) => handleAdminAction(e.target.dataset.id, 'approve')));
+            document.querySelectorAll('.btn-deny').forEach(btn => btn.addEventListener('click', (e) => handleAdminAction(e.target.dataset.id, 'deny')));
+        }
+
+        // --- EVENT HANDLERS ---
+        async function handleLogin(e) {
+            e.preventDefault();
             const codeInput = document.getElementById('login-code');
             const loginError = document.getElementById('login-error');
             if (!codeInput || !loginError) return;
@@ -289,6 +371,48 @@
             if (actionType === 'check' && result) {
                 const targetName = getPlayerNameById(targetPlayerId);
                 showMessage(`Investigation Result: Your target, ${targetName}, is ${result.isMafiaResult === 'YES' ? 'MAFIA' : 'NOT MAFIA'}.`, 10000);
+            }
+        }
+
+        async function handleAccusationSubmit(e) {
+            e.preventDefault();
+            const accusedPlayerId = document.getElementById('accused-select').value;
+            const audioFileInput = document.getElementById('audio-file-input');
+            
+            if (!accusedPlayerId) return showMessage("Please select a player to accuse.");
+
+            let audioToUpload = state.recordedAudioBlob;
+            let audioFileName = '';
+
+            if (state.recordedAudioBlob) {
+                const extension = state.audioMimeType.includes('webm') ? 'webm' : 'mp3';
+                audioFileName = `accusation_${state.currentUserId}_${Date.now()}.${extension}`;
+            } else if (audioFileInput.files.length > 0) {
+                audioToUpload = audioFileInput.files[0];
+                audioFileName = audioToUpload.name;
+            } else {
+                return showMessage("Please record or select an audio file.");
+            }
+            
+            const formData = new FormData();
+            formData.append('accuserPlayerId', state.currentUserId);
+            formData.append('accusedPlayerId', accusedPlayerId);
+            formData.append('audioFile', audioToUpload, audioFileName);
+
+            loadingOverlay.style.display = 'flex';
+            try {
+                const response = await fetch('/.netlify/functions/submit-accusation', {
+                    method: 'POST',
+                    body: formData
+                });
+                const result = await response.json();
+                if (!response.ok) throw new Error(result.error || 'Upload failed');
+                showMessage("Accusation submitted successfully!");
+                renderView('dashboard');
+            } catch (error) {
+                showMessage(`Error: ${error.message}`);
+            } finally {
+                loadingOverlay.style.display = 'none';
             }
         }
         
