@@ -571,6 +571,37 @@
                     break;
             }
         }
+        
+        async function startRecording() {
+            if (!navigator.mediaDevices) return showMessage("Audio recording not supported.");
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                state.mediaRecorder = new MediaRecorder(stream, { mimeType: state.audioMimeType });
+                state.audioChunks = [];
+                state.mediaRecorder.ondataavailable = e => state.audioChunks.push(e.data);
+                state.mediaRecorder.onstop = () => {
+                    state.recordedAudioBlob = new Blob(state.audioChunks, { type: state.audioMimeType });
+                    const audioUrl = URL.createObjectURL(state.recordedAudioBlob);
+                    document.getElementById('audio-playback').src = audioUrl;
+                    document.getElementById('audio-playback-container').classList.remove('hidden');
+                };
+                state.mediaRecorder.start();
+                document.getElementById('record-button').disabled = true;
+                document.getElementById('stop-button').disabled = false;
+                document.getElementById('recording-indicator').classList.remove('hidden');
+            } catch (err) {
+                showMessage("Microphone access denied.");
+            }
+        }
+
+        function stopRecording() {
+            if (state.mediaRecorder) {
+                state.mediaRecorder.stop();
+                document.getElementById('record-button').disabled = false;
+                document.getElementById('stop-button').disabled = true;
+                document.getElementById('recording-indicator').classList.add('hidden');
+            }
+        }
 
         // --- INITIALIZATION ---
         async function initializeGame(userId) {
