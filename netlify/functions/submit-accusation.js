@@ -47,14 +47,15 @@ exports.handler = async (event, context) => {
         const busboy = Busboy({ headers: event.headers });
         let fileBuffer = null;
         let originalFileName = '';
-        let fileMimeType = '';
+        let fileMimeType = ''; // This is the variable that was undefined
         let fields = {};
 
         busboy.on('file', (fieldname, file, filename, encoding, mimetype) => {
             console.log(`Busboy: File [${fieldname}]: filename=${filename.filename}, encoding=${encoding}, mimetype=${mimetype}`);
             // Only process the first file, expecting audio
             originalFileName = filename.filename;
-            fileMimeType = mimetype;
+            // Assign mimetype, providing a fallback if it's undefined or empty
+            fileMimeType = mimetype || 'application/octet-stream'; // Fallback to a generic binary type
             const chunks = [];
             file.on('data', (data) => chunks.push(data));
             file.on('end', () => {
@@ -93,9 +94,11 @@ exports.handler = async (event, context) => {
                     return;
                 }
 
-                // Determine file extension from MIME type if not provided by originalFileName
-                let fileExtension = 'webm'; // Default for MediaRecorder output
-                if (fileMimeType.includes('mp4')) {
+                // Determine file extension from MIME type or a robust default
+                let fileExtension = 'bin'; // Default if MIME type is truly unknown
+                if (fileMimeType.includes('webm')) {
+                    fileExtension = 'webm';
+                } else if (fileMimeType.includes('mp4')) {
                     fileExtension = 'mp4';
                 } else if (fileMimeType.includes('ogg')) {
                     fileExtension = 'ogg';
