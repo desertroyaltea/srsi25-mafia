@@ -18,7 +18,7 @@
             padding: 20px;
             box-sizing: border-box;
             /* Blood stains background - REPLACE THIS URL WITH YOUR OWN! */
-            background-image: url('https://www.freepik.com/free-photos-vectors/bloody-background'); /* Placeholder */
+            background-image: url('https://placehold.co/1920x1080/000000/FF0000?text=BLOOD+STAINS+HERE'); /* Placeholder */
             background-size: cover; /* Cover the entire background */
             background-repeat: no-repeat;
             background-position: center center;
@@ -234,19 +234,15 @@
             </div>
 
             <!-- Admin Accusation Approval/Denial Form (for manual ID input if needed) -->
-            <h3 class="text-xl font-semibold text-green-500 mb-3">Approve/Deny by ID (Fallback)</h3>
-            <p class="text-sm text-gray-500 mb-4">Use the transcript above for easier review. This section is for direct ID input if necessary.</p>
+            <!-- This section is now purely illustrative, as actions are handled by transcript buttons -->
+            <h3 class="text-xl font-semibold text-green-500 mb-3">Manual Review (Advanced)</h3>
+            <p class="text-sm text-gray-500 mb-4">This section is for direct ID input if specific manual review is needed. Use the transcript above for general review.</p>
             <form id="approvalForm">
                 <div class="mb-4">
                     <label for="adminAccusationId" class="block text-gray-300 text-base font-bold mb-2">Accusation ID:</label>
                     <input type="text" id="adminAccusationId" name="accusationId" class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline bg-gray-200" placeholder="e.g., ACC_1700000000000" required>
                 </div>
-                <div class="mb-4">
-                    <label for="adminPlayerSelect" class="block text-gray-300 text-base font-bold mb-2">Admin Name:</label>
-                    <select id="adminPlayerSelect" name="adminPlayerId" class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline bg-gray-200" required>
-                        <option value="">Select admin name</option>
-                    </select>
-                </div>
+                <!-- Admin Name dropdown is removed here as it's automatically determined -->
                 <div class="flex flex-col sm:flex-row gap-4">
                     <button type="submit" data-action="approve" class="bg-green-700 hover:bg-green-800 text-white font-bold py-3 px-6 rounded-lg focus:outline-none focus:shadow-outline transition duration-300 ease-in-out transform hover:scale-105 w-full sm:w-1/2 text-lg">Approve Accusation</button>
                     <button type="button" data-action="deny" class="bg-red-700 hover:bg-red-800 text-white font-bold py-3 px-6 rounded-lg focus:outline-none focus:shadow-outline transition duration-300 ease-in-out transform hover:scale-105 w-full sm:w-1/2 text-lg">Deny Accusation</button>
@@ -267,7 +263,7 @@
         const currentDaySpan = document.getElementById('current-day');
         const currentPhaseSpan = document.getElementById('current-phase');
         const lastAccusedPlayerSpan = document.getElementById('last-accused-player');
-        const lastTrialResultSpan = document.getElementById('last-trial-result');
+        const lastTrialResultSpan = document = document.getElementById('last-trial-result');
         const messageBox = document.getElementById('message-box');
 
         // Player Actions Section
@@ -296,7 +292,7 @@
         // Approval Form Elements (Fallback manual input)
         const approvalForm = document.getElementById('approvalForm');
         const adminAccusationIdInput = document.getElementById('adminAccusationId');
-        const adminPlayerSelect = document.getElementById('adminPlayerSelect');
+        // const adminPlayerSelect = document.getElementById('adminPlayerSelect'); // Removed from HTML, will use currentUserId directly
         const approvalStatus = document.getElementById('approval-status');
 
         let allPlayersData = []; // To store fetched player data
@@ -354,7 +350,7 @@
                 // Populate Accuser and Accused dropdowns
                 populatePlayerDropdown(accuserSelect, allPlayersData, 'Loading your name...'); // Changed default text
                 populatePlayerDropdown(accusedSelect, allPlayersData, 'Select a player');
-                populatePlayerDropdown(adminPlayerSelect, allPlayersData, 'Select admin name');
+                // populatePlayerDropdown(adminPlayerSelect, allPlayersData, 'Select admin name'); // Removed adminPlayerSelect dropdown
 
                 // Auto-select current user in accuser dropdown and check admin status
                 const currentUser = allPlayersData.find(p => p.PlayerID === currentUserId);
@@ -533,12 +529,13 @@
                 button.addEventListener('click', async (e) => {
                     const accusationId = e.target.dataset.id;
                     const action = e.target.dataset.action;
-                    const adminPlayerId = adminPlayerSelect.value; // Get admin ID from dropdown
+                    // const adminPlayerId = adminPlayerSelect.value; // Removed adminPlayerSelect
+                    const adminPlayerId = currentUserId; // Use currentUserId directly
 
-                    if (!adminPlayerId) {
-                        showMessage("Please select your Admin Name to perform this action.", 4000);
-                        return;
-                    }
+                    // if (!adminPlayerId) { // No longer needed as currentUserId is always available
+                    //     showMessage("Please select your Admin Name to perform this action.", 4000);
+                    //     return;
+                    // }
 
                     if (action === 'approve') {
                         await handleAdminAction(accusationId, adminPlayerId, 'approve');
@@ -765,7 +762,9 @@
             e.preventDefault();
             const formData = new FormData(this);
             const accusationId = formData.get('accusationId');
-            const adminPlayerId = formData.get('adminPlayerId');
+            // const adminPlayerId = formData.get('adminPlayerId'); // Removed from HTML
+            const adminPlayerId = currentUserId; // Use currentUserId directly
+
             await handleAdminAction(accusationId, adminPlayerId, 'approve'); // Default to approve for submit button
         });
 
