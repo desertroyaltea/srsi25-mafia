@@ -398,9 +398,8 @@
                     // If user not found, disable all actions and hide dashboards
                     playerDashboardActions.classList.add('hidden');
                     adminDashboardActions.classList.add('hidden');
-                    loadingOverlay.classList.add('hidden'); // Hide loading overlay
-                    gameContainer.classList.remove('hidden'); // Show game container
                     console.error("Frontend: Current user ID not found in player data.");
+                    // Do not hide loading overlay here, let the finally block handle it
                     return; // Stop further execution if user is not recognized
                 }
 
@@ -411,8 +410,9 @@
             } catch (error) {
                 console.error("Frontend: Error fetching player data:", error);
                 showMessage("Failed to load player data. Some features may not work.", 5000);
-                loadingOverlay.classList.add('hidden'); // Hide loading overlay
-                gameContainer.classList.remove('hidden'); // Show game container
+            } finally { // Ensure loading overlay is hidden even on error
+                loadingOverlay.classList.add('hidden');
+                gameContainer.classList.remove('hidden');
             }
         }
 
@@ -489,9 +489,9 @@
             } catch (error) {
                 console.error("Frontend: Error fetching game state:", error);
                 showMessage("Failed to load game state. Please check your connection or Netlify Functions.", 5000);
-            } finally {
-                loadingOverlay.classList.add('hidden'); // Hide loading overlay
-                gameContainer.classList.remove('hidden'); // Show game container
+            } finally { // Ensure loading overlay is hidden even on error
+                loadingOverlay.classList.add('hidden');
+                gameContainer.classList.remove('hidden');
                 showView('dashboard-view'); // Show the dashboard after initial load
             }
         }
@@ -793,9 +793,23 @@
         // Initialize game state and fetch players when the window loads
         window.onload = async () => {
             console.log("Frontend: window.onload triggered.");
-            await fetchPlayers(); // Fetch players first to determine admin status
-            fetchGameState(); // Then fetch game state and apply role-based visibility
-            console.log("Frontend: Initial data fetching complete.");
+            // Ensure loading overlay is shown at the very beginning
+            loadingOverlay.classList.remove('hidden');
+            gameContainer.classList.add('hidden');
+
+            try {
+                await fetchPlayers(); // Fetch players first to determine admin status
+                await fetchGameState(); // Then fetch game state and apply role-based visibility
+                console.log("Frontend: Initial data fetching complete.");
+            } catch (error) {
+                console.error("Frontend: Critical error during initial load:", error);
+                showMessage("Failed to load game. Please refresh or contact support.", 10000);
+            } finally {
+                // Ensure loading overlay is hidden and game container is shown in all cases
+                loadingOverlay.classList.add('hidden');
+                gameContainer.classList.remove('hidden');
+                showView('dashboard-view'); // Show the dashboard after initial load
+            }
         };
 
         // Periodically refresh game state (e.g., every 30 seconds)
