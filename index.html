@@ -176,7 +176,7 @@
                         <label for="action-target-select" class="block text-gray-300 font-bold mb-2">Select Target:</label>
                         <select id="action-target-select" class="shadow w-full py-3 px-4 text-lg leading-tight">
                             <option value="">Choose a player...</option>
-                            ${targets.map(p => `<option value="${p.PlayerID}">${p.Name}</option>`).join('')}
+                            ${targets.map(p => `<option value="${p.PlayerID}">${p.PlayerID}</option>`).join('')}
                         </select>
                     </div>
                     <button type="button" id="action-modal-confirm-button" data-action="${actionType}" class="bg-red-700 hover:bg-red-800 text-white font-bold py-3 px-6 rounded-lg w-full text-lg">${buttonText}</button>
@@ -261,7 +261,6 @@
             const confirmButton = document.getElementById('action-modal-confirm-button');
             
             confirmButton.addEventListener('click', async () => {
-                // DEFINITIVE FIX: Get the select element *inside* the click handler
                 const targetSelect = document.getElementById('action-target-select');
                 const targetPlayerId = targetSelect.value;
                 
