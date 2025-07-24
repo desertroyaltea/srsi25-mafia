@@ -230,54 +230,72 @@
                 </div>`,
         };
 
-        // --- RENDER ENGINE & EVENT HANDLING ---
+        // --- RENDER ENGINE ---
         function renderView(viewName, data = {}) {
             let viewHtml;
             switch(viewName) {
                 case 'login':
                     appRoot.innerHTML = templates.login();
+                    document.getElementById('login-form').addEventListener('submit', handleLogin);
                     break;
                 case 'dashboard':
                     viewHtml = templates.dashboard();
                     appRoot.innerHTML = templates.gameLayout(viewHtml);
+                    initDashboardView();
                     break;
                 case 'actionModal':
                     viewHtml = templates.actionModal(data);
                     appRoot.innerHTML = templates.gameLayout(viewHtml);
+                    initActionModalView(data.actionType);
                     break;
                 case 'accusationForm':
                     viewHtml = templates.accusationForm();
                     appRoot.innerHTML = templates.gameLayout(viewHtml);
+                    initAccusationView();
                     break;
                 case 'adminReview':
                     viewHtml = templates.adminReview();
                     appRoot.innerHTML = templates.gameLayout(viewHtml);
+                    initAdminReviewView();
                     break;
                 case 'investigationHistory':
                     viewHtml = templates.investigationHistory();
                     appRoot.innerHTML = templates.gameLayout(viewHtml);
+                    document.getElementById('back-to-dashboard').addEventListener('click', () => renderView('dashboard'));
                     break;
             }
         }
         
-        appRoot.addEventListener('click', async (e) => {
-            const target = e.target;
-            if (target.id === 'login-button') { e.preventDefault(); handleLogin(); }
-            if (target.id === 'btn-submit-accusation') renderView('accusationForm');
-            if (target.id === 'btn-review-accusations') {
+        // --- VIEW INITIALIZERS ---
+        function initDashboardView() {
+            updateDashboardActions(state.gameState?.CurrentPhase || 'Day');
+            document.getElementById('btn-submit-accusation').addEventListener('click', () => renderView('accusationForm'));
+            document.getElementById('btn-review-accusations').addEventListener('click', async () => {
                 loadingOverlay.style.display = 'flex';
                 await fetchPendingAccusations();
                 loadingOverlay.style.display = 'none';
                 renderView('adminReview');
-            }
-            if (target.id === 'action-modal-confirm-button') handleActionConfirm(target.dataset.action);
-            if (target.id === 'back-to-dashboard') renderView('dashboard');
-            if (target.classList.contains('btn-approve')) handleAdminAction(target.dataset.id, 'approve');
-            if (target.classList.contains('btn-deny')) handleAdminAction(target.dataset.id, 'deny');
-            if (target.id === 'btn-view-history') renderView('investigationHistory');
-        });
+            });
+        }
 
-        async function handleLogin() {
+        function initActionModalView(actionType) {
+            document.getElementById('action-modal-confirm-button').addEventListener('click', () => handleActionConfirm(actionType));
+            document.getElementById('back-to-dashboard').addEventListener('click', () => renderView('dashboard'));
+        }
+        
+        function initAccusationView() {
+            document.getElementById('back-to-dashboard').addEventListener('click', () => renderView('dashboard'));
+        }
+
+        function initAdminReviewView() {
+            document.getElementById('back-to-dashboard').addEventListener('click', () => renderView('dashboard'));
+            document.querySelectorAll('.btn-approve').forEach(btn => btn.addEventListener('click', (e) => handleAdminAction(e.target.dataset.id, 'approve')));
+            document.querySelectorAll('.btn-deny').forEach(btn => btn.addEventListener('click', (e) => handleAdminAction(e.target.dataset.id, 'deny')));
+        }
+
+        // --- EVENT HANDLERS ---
+        async function handleLogin(e) {
+            e.preventDefault();
             const codeInput = document.getElementById('login-code');
             const loginError = document.getElementById('login-error');
             if (!codeInput || !loginError) return;
@@ -410,7 +428,6 @@
                 const response = await fetch('/.netlify/functions/get-game-state');
                 if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
                 state.gameState = await response.json();
-                // ADDED LOGGING
                 console.log("DEBUG: Fetched Game State:", state.gameState);
             } catch (error) {
                 showMessage("Failed to load game state.", 5000);
@@ -423,7 +440,6 @@
             const adminActions = document.getElementById('admin-dashboard-actions');
             if (!playerActions || !adminActions) return;
 
-            // ADDED LOGGING
             console.log("--- Running updateDashboardActions ---");
             console.log(`DEBUG: Received currentPhase: '${currentPhase}'`);
 
@@ -528,8 +544,7 @@
             renderView('dashboard');
             setInterval(async () => {
                 await fetchGameState();
-                // Re-render dashboard to reflect phase changes
-                if (document.getElementById('dashboard-view')) {
+                if (document.getElementById('player-dashboard-actions') || document.getElementById('admin-dashboard-actions')) {
                     renderView('dashboard');
                 }
             }, 30000);
