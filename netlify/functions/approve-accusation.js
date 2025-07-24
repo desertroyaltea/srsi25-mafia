@@ -46,7 +46,6 @@ exports.handler = async (event, context) => {
         const headers = allAccusations[0];
         const accusationRows = allAccusations.slice(1);
 
-        // Dynamically find column indices
         const idCol = headers.indexOf('AccusationID');
         const statusCol = headers.indexOf('AdminApprovalStatus');
         const timeCol = headers.indexOf('AdminApprovalTime');
@@ -74,19 +73,24 @@ exports.handler = async (event, context) => {
         }
         console.log(`approve-accusation: Found accusation at row ${rowIndexToUpdate}.`);
 
-        // 2. Update Accusations sheet
-        const updateRange = `Accusations!${String.fromCharCode(65 + statusCol)}${rowIndexToUpdate}:${String.fromCharCode(65 + trialCol)}${rowIndexToUpdate}`;
+        // 2. Modify the row data in memory
+        accusationData[statusCol] = 'Approved';
+        accusationData[timeCol] = new Date().toISOString();
+        accusationData[trialCol] = 'TRUE';
+
+        // 3. Update the entire row in the Accusations sheet
+        const updateRange = `Accusations!A${rowIndexToUpdate}:H${rowIndexToUpdate}`;
         console.log(`approve-accusation: Updating Accusations sheet at range: ${updateRange}`);
         await sheets.spreadsheets.values.update({
             spreadsheetId: sheetId,
             range: updateRange,
             valueInputOption: 'USER_ENTERED',
             resource: {
-                values: [['Approved', new Date().toISOString(), 'TRUE']],
+                values: [accusationData], // Write the entire modified row back
             },
         });
 
-        // 3. Update Game_State
+        // 4. Update Game_State
         const accusedPlayerId = accusationData[accusedIdCol];
         const gameStateAccusedPlayerRange = 'Game_State!E2'; // Column E for LastAccusedPlayerID
         console.log(`approve-accusation: Updating Game_State at ${gameStateAccusedPlayerRange} with PlayerID ${accusedPlayerId}.`);
@@ -97,7 +101,7 @@ exports.handler = async (event, context) => {
             resource: { values: [[accusedPlayerId]] },
         });
 
-        // 4. Add new entry to Trials sheet
+        // 5. Add new entry to Trials sheet
         const trialId = `TRL_${Date.now()}`;
         const trialValues = [
             trialId,
