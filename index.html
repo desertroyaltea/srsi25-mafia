@@ -230,20 +230,37 @@
             const codeInput = document.getElementById('login-code');
             const loginError = document.getElementById('login-error');
             if (!codeInput || !loginError) return;
+            
             const nameInput = codeInput.value.trim();
+            console.log(`--- LOGIN ATTEMPT ---`);
+            console.log(`User entered name: "${nameInput}"`);
+            
             if (!nameInput) return;
 
             loginError.textContent = '';
             loadingOverlay.style.display = 'flex';
+            
             await fetchPlayers();
+            console.log("Fetched players list:", state.allPlayers);
             
-            // FIX: Trim whitespace from the sheet data before comparing
-            const player = state.allPlayers.find(p => p.Name && p.Name.trim().toLowerCase() === nameInput.toLowerCase());
+            const lowercasedNameInput = nameInput.toLowerCase();
             
+            console.log("--- STARTING SEARCH ---");
+            const player = state.allPlayers.find(p => {
+                const sheetName = p.Name ? p.Name.trim().toLowerCase() : '';
+                console.log(`Comparing: (Input) "${lowercasedNameInput}" === (Sheet) "${sheetName}" -> ${sheetName === lowercasedNameInput}`);
+                return sheetName === lowercasedNameInput;
+            });
+            
+            console.log("--- SEARCH COMPLETE ---");
+            console.log("Found player object:", player);
+
             if (player) {
+                console.log(`SUCCESS: Found matching player ID: ${player.PlayerID}`);
                 localStorage.setItem('mafiaGameUserId', player.PlayerID);
                 await initializeGame(player.PlayerID);
             } else {
+                console.log("FAILURE: No matching player found.");
                 loadingOverlay.style.display = 'none';
                 loginError.textContent = 'Invalid Player Name. Please try again.';
             }
