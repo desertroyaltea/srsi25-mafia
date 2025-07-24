@@ -1,62 +1,81 @@
-// netlify/functions/get-game-state.js
+    // netlify/functions/get-game-state.js
 
-// This version tries to log even before parsing credentials, and handles potential parsing errors.
+    const { google } = require('googleapis');
+    const { JWT } = require('google-auth-library');
 
-let credentials;
-let sheetId;
+    const credentials = JSON.parse(process.env.GOOGLE_SERVICE_ACCOUNT_CREDENTIALS);
+    const sheetId = process.env.GOOGLE_SHEET_ID;
 
-try {
-    console.log('--- get-game-state.js: Attempting initial setup ---');
-    // Attempt to parse credentials. This is the most common point of failure for empty logs.
-    credentials = JSON.parse(process.env.GOOGLE_SERVICE_ACCOUNT_CREDENTIALS);
-    sheetId = process.env.GOOGLE_SHEET_ID;
-    console.log('--- get-game-state.js: Credentials parsed successfully ---');
-    console.log(`Test: GOOGLE_SHEET_ID is: ${sheetId || 'NOT_SET'}`);
+    const auth = new JWT({
+        email: credentials.client_email,
+        key: credentials.private_key,
+        scopes: ['https://www.googleapis.com/auth/spreadsheets.readonly'] // Read-only access to sheets
+    });
 
-} catch (e) {
-    console.error('--- get-game-state.js: CRITICAL ERROR during initial setup (JSON.parse or env access) ---', e);
-    // If parsing fails, set dummy credentials so the handler can still return an error
-    credentials = { client_email: 'error@example.com', private_key: 'dummy' };
-    sheetId = 'ERROR_LOADING';
-}
+    const sheets = google.sheets({ version: 'v4', auth });
 
-// Now, define the handler function
-exports.handler = async (event, context) => {
-    try {
-        console.log('--- get-game-state.js: Handler invoked ---');
-        
-        if (sheetId === 'ERROR_LOADING') {
-            console.error('--- get-game-state.js: Handler detected initial setup error ---');
+    exports.handler = async (event, context) => {
+        try {
+            if (!sheetId) {
+                console.error('Configuration Error: Google Sheet ID is not configured.');
+                return {
+                    statusCode: 500,
+                    body: JSON.stringify({ error: 'Server configuration error: Google Sheet ID missing.' }),
+                };
+            }
+
+            const range = 'Game_State!A1:G2'; // Reads columns A to G from the Game_State tab
+
+            console.log(`Attempting to fetch data from Sheet ID: ${sheetId}, Range: ${range}`);
+            const response = await sheets.spreadsheets.values.get({
+                spreadsheetId: sheetId,
+                range: range,
+            });
+
+            const values = response.data.values;
+            console.log('Raw values from sheet (Game_State):', values);
+
+            if (!values || values.length < 2) {
+                console.log('No game state data or only headers found. Returning 404.');
+                return {
+                    statusCode: 404,
+                    body: JSON.stringify({ message: 'Game state data not found or sheet is empty.' }),
+                };
+            }
+
+            const headers = values[0];
+            const gameStateData = values[1];
+
+            const gameState = {};
+            headers.forEach((header, index) => {
+                const cleanHeader = header.replace(/[^a-zA-Z0-9]/g, '');
+                gameState[cleanHeader] = gameStateData[index];
+            });
+
+            console.log('Parsed Game State:', gameState);
+
+            return {
+                statusCode: 200,
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Access-Control-Allow-Origin': '*',
+                },
+                body: JSON.stringify(gameState),
+            };
+
+        } catch (error) {
+            console.error('Server Error: Failed to fetch game state:', error);
+            let errorMessage = 'Failed to fetch game state.';
+            if (error.response && error.response.data && error.response.data.error) {
+                errorMessage = `Google API Error: ${error.response.data.error.message || error.message}`;
+                console.error('Google API Error Details:', error.response.data.error);
+            } else if (error.message) {
+                errorMessage = `Internal Server Error: ${error.message}`;
+            }
             return {
                 statusCode: 500,
-                body: JSON.stringify({ error: 'Function failed to load environment variables correctly. Check Netlify logs for critical errors.' }),
+                body: JSON.stringify({ error: errorMessage }),
             };
         }
-
-        // --- Original minimal logic (will be re-added later if this works) ---
-        // const { google } = require('googleapis');
-        // const { JWT } = require('google-auth-library');
-        // const auth = new JWT({ email: credentials.client_email, key: credentials.private_key, scopes: ['https://www.googleapis.com/auth/spreadsheets.readonly'] });
-        // const sheets = google.sheets({ version: 'v4', auth });
-        // const response = await sheets.spreadsheets.values.get({ spreadsheetId: sheetId, range: 'Game_State!A1:G2' });
-        // const values = response.data.values;
-        // console.log('Raw values from sheet (Game_State):', values);
-        // --- End original minimal logic ---
-
-        return {
-            statusCode: 200,
-            headers: {
-                'Content-Type': 'application/json',
-                'Access-Control-Allow-Origin': '*',
-            },
-            body: JSON.stringify({ message: 'Function response. Check Netlify logs for execution details.' }),
-        };
-
-    } catch (error) {
-        console.error('--- get-game-state.js: UNEXPECTED ERROR during handler execution ---', error);
-        return {
-            statusCode: 500,
-            body: JSON.stringify({ error: 'Function failed during execution. Check Netlify logs.' }),
-        };
-    }
-};
+    };
+    
