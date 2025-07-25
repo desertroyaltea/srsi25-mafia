@@ -240,6 +240,27 @@ const state = { allPlayers: [], currentUserId: null, currentUser: null, isCurren
             </div>
         `,
 
+// NEW DEAD PAGE TEMPLATE
+            deadPage: () => `
+                <div class="bg-gray-900 p-5 rounded-lg mt-4 text-center">
+                    <h2 class="text-4xl font-bold text-red-700 mb-6">YOU ARE DEAD.</h2>
+                    <p class="text-xl text-gray-300 mb-4">
+                        Your journey in the SRSI Mafia game has come to an end.
+                        The shadows have claimed you.
+                    </p>
+                    <p class="text-2xl font-bold text-red-500 mb-6">
+                        Rest in Pieces.
+                    </p>
+                    <p class="text-lg text-gray-400">
+                        You can no longer participate in game actions.
+                        Wait for the final verdict of the living.
+                    </p>
+                    <button type="button" id="logout-button" class="mt-8 bg-gray-600 hover:bg-gray-700 text-white font-bold py-3 px-6 rounded-lg w-full md:w-1/2 text-xl mx-auto block">
+                        Logout
+                    </button>
+                </div>
+            `,
+
 // NEW TRIAL PAGE TEMPLATE
             trialPage: ({ trial }) => `
                 <div class="bg-gray-900 p-5 rounded-lg mt-4">
@@ -341,10 +362,16 @@ const state = { allPlayers: [], currentUserId: null, currentUser: null, isCurren
             document.getElementById('login-error').textContent = "Your player data seems outdated. Please log in again.";
             return;
         }
-        state.isCurrentUserAdmin = state.currentUser.IsAdmin === 'TRUE';
-        await fetchGameState();
-        renderView('dashboard');
-        updateDashboardActions(state.gameState?.CurrentPhase || 'Day');
+state.isCurrentUserAdmin = state.currentUser.IsAdmin === 'TRUE';
+            await fetchGameState();
+
+            // NEW: Check if the current user is dead
+            if (state.currentUser.Status && state.currentUser.Status.toLowerCase() === 'dead') {
+                renderView('deadPage'); // Show the dead page
+            } else {
+                renderView('dashboard'); // Otherwise, show the dashboard
+                updateDashboardActions(state.gameState?.CurrentPhase || 'Day');
+            }
     }
 
     function getPlayerNameById(playerId) {
