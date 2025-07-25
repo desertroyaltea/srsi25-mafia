@@ -105,23 +105,45 @@ exports.handler = async (event, context) => {
                     NOTGUILTY: parseInt(trial[notGuiltyCol] || '0'),
                     rowIndex: i + 2 // Store original row index for potential updates later
                 };
-                break; // Stop after finding the first active trial
             }
         }
 
-        if (currentTrialData) {
-            console.log("get-current-trial: Returning active trial data:", currentTrialData); // LOG 15
+// CRITICAL CHANGE: Return all active trials, not just the first one
+        const activeTrials = [];
+        for (let i = 0; i < trialRows.length; i++) {
+            const trial = trialRows[i];
+            const currentStatus = trial[statusCol];
+            console.log(`get-current-trial: Checking row ${i + 2}. Status found: '${currentStatus}'. Expected: 'Active'`);
+
+            if (currentStatus === 'Active') {
+                console.log(`get-current-trial: Found active trial at row ${i + 2}.`);
+                activeTrials.push({
+                    TrialID: trial[trialIdCol],
+                    AccusedPlayerID: trial[accusedPlayerIdCol],
+                    AccusationAudioLink: trial[audioLinkCol],
+                    TrialStartTime: trial[trialStartTimeCol],
+                    VotingDeadline: trial[votingDeadlineCol],
+                    Status: trial[statusCol],
+                    GUILTY: parseInt(trial[guiltyCol] || '0'),
+                    NOTGUILTY: parseInt(trial[notGuiltyCol] || '0'),
+                    rowIndex: i + 2 // Store original row index for potential updates later
+                });
+            }
+        }
+
+        if (activeTrials.length > 0) {
+            console.log(`get-current-trial: Returning ${activeTrials.length} active trials.`);
             return {
                 statusCode: 200,
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ message: 'Active trial found.', currentTrial: currentTrialData }),
+                body: JSON.stringify({ message: 'Active trials found.', activeTrials: activeTrials }), // Changed currentTrial to activeTrials
             };
         } else {
-            console.log("get-current-trial: No active trial found after checking all rows."); // LOG 16
+            console.log("get-current-trial: No active trials found after checking all rows.");
             return {
                 statusCode: 200,
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ message: 'No active trial found.', currentTrial: null }),
+                body: JSON.stringify({ message: 'No active trials found.', activeTrials: [] }), // Changed currentTrial to activeTrials
             };
         }
 

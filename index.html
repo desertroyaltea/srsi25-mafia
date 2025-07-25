@@ -592,19 +592,48 @@ state.isCurrentUserAdmin = state.currentUser.IsAdmin === 'TRUE';
     }
       
     // --- Trial Functions ---
+// --- Trial Functions ---
 async function fetchCurrentTrial() {
     loadingOverlay.style.display = 'flex';
     try {
-        const response = await fetch('/.netlify/functions/get-current-trial');
-        if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
-        const result = await response.json();
-        state.currentTrial = result.currentTrial; // Store the fetched trial data
-        if (!state.currentTrial) {
-            showMessage(result.message || 'No active trial found.');
+        // 1. Fetch all active trials
+        const allTrialsResponse = await fetch('/.netlify/functions/get-current-trial'); // This now returns ALL active trials
+        if (!allTrialsResponse.ok) throw new Error(`HTTP error! status: ${allTrialsResponse.status}`);
+        const allTrialsResult = await allTrialsResponse.json();
+        const allActiveTrials = allTrialsResult.activeTrials || [];
+        console.log(`fetchCurrentTrial: Found ${allActiveTrials.length} active trials.`);
+
+        if (allActiveTrials.length === 0) {
+            state.currentTrial = null;
+            showMessage('No active trials found at this time.');
+            return;
         }
+
+        // 2. Fetch user's past votes
+        const userVotesResponse = await fetch(`/.netlify/functions/get-user-trial-votes?voterPlayerId=${state.currentUserId}`);
+        if (!userVotesResponse.ok) throw new Error(`HTTP error! status: ${userVotesResponse.status}`);
+        const userVotesResult = await userVotesResponse.json();
+        const votedTrialIds = new Set(userVotesResult.userVotes.map(vote => vote.TrialID));
+        console.log(`fetchCurrentTrial: User has voted on ${votedTrialIds.size} trials.`);
+
+        // 3. Find the first active trial the user has NOT voted on
+        let nextTrial = null;
+        for (const trial of allActiveTrials) {
+            if (!votedTrialIds.has(trial.TrialID)) {
+                nextTrial = trial;
+                break; // Found the next unvoted trial
+            }
+        }
+
+        state.currentTrial = nextTrial; // Store the next trial or null
+
+        if (!state.currentTrial) {
+            showMessage('You have voted on all active trials! Returning to dashboard.');
+        }
+
     } catch (error) {
-        console.error("Error fetching current trial:", error);
-        showMessage("Failed to load trial data.");
+        console.error("Error fetching current trial or user votes:", error);
+        showMessage("Failed to load trial data or user votes.");
         state.currentTrial = null;
     } finally {
         loadingOverlay.style.display = 'none';
@@ -842,21 +871,33 @@ async function fetchCurrentTrial() {
                 await handleDenyAccusation(accusationId);
             }
         
-       } else if (e.target.id === 'btn-vote-guilty') { // NEW: GUILTY vote button
+} else if (e.target.id === 'btn-vote-guilty') { // GUILTY vote button
                 const trialId = e.target.dataset.trialId;
                 const votingPower = state.currentUser.CurrentVotingPower;
                 if (trialId && votingPower !== undefined) {
                     await performFetchAction('/.netlify/functions/submit-jury-vote', { trialId, voterPlayerId: state.currentUserId, voteType: 'GUILTY', votingPower });
-                    renderView('dashboard'); // Return to dashboard after voting
+                    // After voting, try to load the next trial
+                    await fetchCurrentTrial();
+                    if (state.currentTrial) {
+                        renderView('trialPage', { trial: state.currentTrial }); // Show next trial
+                    } else {
+                        renderView('dashboard'); // No more trials, go to dashboard
+                    }
                 } else {
                     showMessage('Missing trial ID or voting power to submit vote.');
                 }
-            } else if (e.target.id === 'btn-vote-not-guilty') { // NEW: NOT GUILTY vote button
+            } else if (e.target.id === 'btn-vote-not-guilty') { // NOT GUILTY vote button
                 const trialId = e.target.dataset.trialId;
                 const votingPower = state.currentUser.CurrentVotingPower;
                 if (trialId && votingPower !== undefined) {
                     await performFetchAction('/.netlify/functions/submit-jury-vote', { trialId, voterPlayerId: state.currentUserId, voteType: 'NOTGUILTY', votingPower });
-                    renderView('dashboard'); // Return to dashboard after voting
+                    // After voting, try to load the next trial
+                    await fetchCurrentTrial();
+                    if (state.currentTrial) {
+                        renderView('trialPage', { trial: state.currentTrial }); // Show next trial
+                    } else {
+                        renderView('dashboard'); // No more trials, go to dashboard
+                    }
                 } else {
                     showMessage('Missing trial ID or voting power to submit vote.');
                 }
