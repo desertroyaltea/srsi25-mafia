@@ -303,6 +303,19 @@ gameLayout: (viewHtml) => `
                 </div>
             `,
 
+// NEW CHANGE ROLE MODAL TEMPLATE
+            changeRoleModal: () => `
+                <div class="bg-gray-900 p-5 rounded-lg mt-4">
+                    <h2 class="text-2xl font-semibold mb-4 text-green-400">Change Your Role</h2>
+                    <p class="text-gray-300 mb-6">Choose your new role:</p>
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        <button type="button" class="btn-select-new-role bg-red-700 hover:bg-red-800 text-white font-bold py-3 px-6 rounded-lg text-xl" data-new-role="Mafia">Mafia</button>
+                        <button type="button" class="btn-select-new-role bg-blue-700 hover:bg-blue-800 text-white font-bold py-3 px-6 rounded-lg text-xl" data-new-role="Detective">Detective</button>
+                        <button type="button" class="btn-select-new-role bg-yellow-700 hover:bg-yellow-800 text-white font-bold py-3 px-6 rounded-lg text-xl" data-new-role="Doctor">Doctor</button>
+                    </div>
+                    <button type="button" id="back-to-dashboard" class="mt-6 bg-gray-600 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded-lg w-full">Cancel</button>
+                </div>
+            `,
 
 // NEW INVESTIGATION RESULT TEMPLATE
             investigationResult: ({ targetName, isMafiaResult }) => `
@@ -813,10 +826,11 @@ createButton('btn-view-history', 'Investigation History', 'bg-purple-700 hover:b
                 if (state.currentUser.VillagerCanIncreaseVote !== 'TRUE') return showMessage("You have not unlocked this ability or have already used it.");
                 performFetchAction('/.netlify/functions/increase-vote-power', { villagerPlayerId: state.currentUserId });
             });
-            createButton('btn-change-role', 'Change Role', 'bg-green-900', () => {
+createButton('btn-change-role', 'Change Role', 'bg-green-900', () => {
                 if (!isNight) return showMessage("You can only use this ability at night.");
                 if (state.currentUser.VillagerCanChangeRole !== 'TRUE') return showMessage("You have not unlocked this ability or have already used it.");
-                performFetchAction('/.netlify/functions/change-role', { villagerPlayerId: state.currentUserId });
+                // CRITICAL CHANGE: Render the new modal for role selection
+                renderView('changeRoleModal');
             });
         }
 
@@ -959,7 +973,15 @@ createButton('btn-view-history', 'Investigation History', 'bg-purple-700 hover:b
             if (accusationId) {
                 await handleDenyAccusation(accusationId);
             }
-        
+        else if (e.target.classList.contains('btn-select-new-role')) { // NEW: Handle role selection
+                const newRole = e.target.dataset.newRole;
+                if (newRole) {
+                    await performFetchAction('/.netlify/functions/change-role', { villagerPlayerId: state.currentUserId, newRole: newRole });
+                    renderView('dashboard'); // Return to dashboard after role change
+                } else {
+                    showMessage('No role selected.');
+                }
+            }
 } else if (e.target.id === 'btn-vote-guilty') { // GUILTY vote button
                 const trialId = e.target.dataset.trialId;
                 const votingPower = state.currentUser.CurrentVotingPower;

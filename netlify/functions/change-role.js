@@ -24,7 +24,7 @@ exports.handler = async (event, context) => {
     }
 
     try {
-        const { villagerPlayerId } = JSON.parse(event.body);
+const { villagerPlayerId, newRole } = JSON.parse(event.body); // NEW: Receive newRole
         if (!villagerPlayerId) {
             return { statusCode: 400, body: JSON.stringify({ error: 'Missing villagerPlayerId.' }) };
         }
@@ -60,12 +60,12 @@ exports.handler = async (event, context) => {
             return { statusCode: 404, body: JSON.stringify({ error: 'Player not found.' }) };
         }
 
-        // 3. Determine the new role randomly
-        const possibleRoles = ['Mafia', 'Doctor', 'Detective'];
-        const newRole = possibleRoles[Math.floor(Math.random() * possibleRoles.length)];
 
-        console.log(`Villager ${villagerPlayerId} is changing their role to ${newRole}.`);
-
+if (!newRole || !['Mafia', 'Doctor', 'Detective'].includes(newRole)) {
+            console.log(`change-role: Invalid newRole provided: ${newRole}`);
+            return { statusCode: 400, body: JSON.stringify({ error: 'Invalid new role selected.' }) };
+        }
+        console.log(`Villager ${villagerPlayerId} is changing their role to ${newRole}.`);
         // 4. Prepare batch update to change role and remove ability
         const requests = [
             { // Update Role
