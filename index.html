@@ -193,17 +193,62 @@
             }
         }
 
-        appRoot.addEventListener('submit', (e) => {
-            if (e.target.id === 'login-form') {
-                e.preventDefault();
-                handleLogin();
-            }
-        });
-        
-        appRoot.addEventListener('click', (e) => {
-            // This will handle all button clicks
-        });
+// Existing appRoot.addEventListener for submit
+appRoot.addEventListener('submit', async (e) => { // Added 'async' here
+    e.preventDefault(); // Prevent default form submission for all forms
+    if (e.target.id === 'login-form') {
+        handleLogin();
+    } else if (e.target.id === 'action-form') {
+        const actionType = e.target.dataset.actionType;
+        const targetPlayerId = document.getElementById('target-player').value;
 
+        if (!targetPlayerId) {
+            showMessage("Please select a target player.");
+            return;
+        }
+
+        let endpoint;
+        let payload;
+
+        // Determine the correct Netlify Function endpoint and payload based on actionType
+        switch (actionType) {
+            case 'kill':
+                endpoint = '/.netlify/functions/kill-player';
+                payload = { mafiaPlayerId: state.currentUserId, targetPlayerId: targetPlayerId };
+                break;
+            case 'protect':
+                endpoint = '/.netlify/functions/protect-player';
+                payload = { doctorPlayerId: state.currentUserId, targetPlayerId: targetPlayerId };
+                break;
+            case 'check':
+                endpoint = '/.netlify/functions/check-mafia'; // Assuming this is correct for Detective
+                payload = { detectivePlayerId: state.currentUserId, targetPlayerId: targetPlayerId };
+                break;
+            case 'shoot':
+                endpoint = '/.netlify/functions/shoot-player'; // Assuming this is correct for Sheriff
+                payload = { sheriffPlayerId: state.currentUserId, targetPlayerId: targetPlayerId };
+                break;
+            // Add more cases here for other actions if they use the actionModal in the future
+            default:
+                showMessage('Unknown action type for submission.');
+                console.error('Unknown actionType:', actionType);
+                return;
+        }
+
+        if (endpoint) {
+            await performFetchAction(endpoint, payload);
+            renderView('dashboard'); // Go back to dashboard after action attempt
+        }
+    }
+});
+
+// Existing appRoot.addEventListener for click
+appRoot.addEventListener('click', async (e) => { // Added 'async' here
+    if (e.target.id === 'back-to-dashboard') {
+        renderView('dashboard');
+    }
+    // Add more click handlers here if needed for other dynamically created buttons
+});
         async function handleLogin() {
             const nameInput = document.getElementById('login-code').value.trim();
             const loginError = document.getElementById('login-error');
