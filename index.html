@@ -286,6 +286,23 @@ gameLayout: (viewHtml) => `
                 </div>
             `,
 
+// NEW INVESTIGATION HISTORY TEMPLATE
+            investigationHistory: ({ history }) => `
+                <div class="bg-gray-900 p-5 rounded-lg mt-4">
+                    <h2 class="text-2xl font-semibold mb-4 text-purple-400">Investigation History</h2>
+                    ${history && history.length > 0 ? `
+                        <ul class="list-disc list-inside space-y-2">
+                            ${history.split(',').map(entry => {
+                                const [playerId, isMafia] = entry.split(':');
+                                const playerName = getPlayerNameById(playerId);
+                                return `<li>${playerName} (${playerId}): ${isMafia === 'YES' ? 'Is Mafia' : 'Not Mafia'}</li>`;
+                            }).join('')}
+                        </ul>
+                    ` : '<p class="text-gray-400">No investigations logged yet.</p>'}
+                    <button type="button" id="back-to-dashboard" class="mt-6 bg-gray-600 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded-lg w-full">Back to Dashboard</button>
+                </div>
+            `,
+
         revealedTeammates: ({ role, teammates }) => `
             <div class="bg-gray-900 p-5 rounded-lg mt-4">
                 <h2 class="text-2xl font-semibold text-cyan-400 mb-4">Your ${role} Team</h2>
@@ -744,8 +761,17 @@ async function fetchCurrentTrial() {
                 renderView('actionModal', { title: 'Choose a Player to Investigate', buttonText: 'Confirm Investigation', targets, actionType: 'check' });
             });
             createButton('btn-reveal-detective', 'Reveal a Detective', 'bg-yellow-900', () => showMessage("This ability is not yet implemented."));
-            createButton('btn-view-history', 'Investigation History', 'bg-purple-700 hover:bg-purple-800', () => renderView('investigationHistory'));
-        }
+createButton('btn-view-history', 'Investigation History', 'bg-purple-700 hover:bg-purple-800', async () => {
+                // Fetch the history for the current detective
+                const response = await fetch(`/.netlify/functions/get-investigation-history?playerId=${state.currentUserId}`);
+                if (!response.ok) {
+                    showMessage("Failed to load investigation history.");
+                    console.error("Error fetching investigation history:", await response.text());
+                    return;
+                }
+                const result = await response.json();
+                renderView('investigationHistory', { history: result.history });
+            });        }
 
         // --- VILLAGER ---
         if (role === 'villager') {
