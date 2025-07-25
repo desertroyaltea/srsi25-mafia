@@ -110,7 +110,51 @@ exports.handler = async (event, context) => {
                 });
 
                 await gcsFile.makePublic();
-                const gcsPublicUrl = `https://storage.googleapis.com/${bucketName}/${gcsFilePath}`;
+                const originalGcsUrl = `https://storage.googleapis.com/${bucketName}/${gcsFilePath}`;
+                console.log(`submit-accusation: Original file uploaded. Public URL: ${originalGcsUrl}`);
+
+                // --- NEW: Trigger Transcoding Function ---
+                let finalAudioUrl = originalGcsUrl; // Default to original if transcoding fails or isn't needed
+                try {
+                    console.log("submit-accusation: Triggering audio transcoding...");
+                    const transcodeResponse = await fetch('/.netlify/functions/transcode-audio', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            originalGcsUrl: originalGcsUrl,
+                            targetFormat: 'mp4' // Request MP4 for broad compatibility
+                        }),
+                    });
+
+                    const transcodeResult = await transcodeResponse.json();
+
+                    if (transcodeResponse.ok && transcodeResult.transcodedGcsUrl) {
+                        finalAudioUrl = transcodeResult.transcodedGcsUrl;
+                        console.log(`submit-accusation: Audio transcoded successfully. Final URL: ${finalAudioUrl}`);
+                    } else {
+                        console.error(`submit-accusation: Transcoding failed or returned no URL: ${transcodeResult.message || JSON.stringify(transcodeResult)}`);
+                        // Fallback: Use original URL if transcoding fails
+                        console.warn("submit-accusation: Falling back to original audio URL due to transcoding failure.");
+                    }
+                } catch (transcodeError) {
+                    console.error("submit-accusation: Error calling transcode-audio function:", transcodeError);
+                    console.warn("submit-accusation: Falling back to original audio URL due to transcoding function call error.");
+                }
+                // --- END NEW: Trigger Transcoding Function ---
+
+// Add entry to Accusations sheet with the FINAL audio URL
+ accusationId = `ACC_${Date.now()}`; // NO 'const'
+ submissionTime = new Date().toISOString(); // NO 'const'
+ values = [ // NO 'const'
+ accusationId,
+ accuserPlayerId,
+ accusedPlayerId,
+ finalAudioUrl, // Use the transcoded URL here
+ submissionTime,
+ 'Pending',
+ '',
+ 'FALSE'
+ ];
                 console.log(`File uploaded. Public URL: ${gcsPublicUrl}`);
 
                 // Add entry to Accusations sheet
