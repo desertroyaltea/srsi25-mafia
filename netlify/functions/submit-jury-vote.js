@@ -71,12 +71,13 @@ const playersResponse = await sheets.spreadsheets.values.get({ spreadsheetId: sh
         const trialsResponse = await sheets.spreadsheets.values.get({ spreadsheetId: sheetId, range: 'Trials!A:Z' });
         const trialHeaders = trialsResponse.data.values[0];
         const trials = trialsResponse.data.values.slice(1);
-        const trialIdCol = trialHeaders.indexOf('TrialID');
-        const guiltyCol = trialHeaders.indexOf('GUILTY');
-        const notGuiltyCol = trialHeaders.indexOf('NOTGUILTY'); // This should be column 8 (I) if hardcoded in get-current-trial
+const trialIdCol = trialHeaders.indexOf('TrialID');
+        const guiltyCol = 7; // Assuming GUILTY is always column H (0-indexed)
+        const notGuiltyCol = 8; // Assuming NOTGUILTY is always column I (0-indexed) // This should be column 8 (I) if hardcoded in get-current-trial
 
         // Ensure columns exist
-        if ([trialIdCol, guiltyCol, notGuiltyCol].includes(-1)) {
+ // Removed guiltyCol and notGuiltyCol from the -1 check as their indices are now hardcoded.
+        if ([trialIdCol].includes(-1)) {
             throw new Error('One or more required columns (TrialID, GUILTY, NOTGUILTY) not found in Trials sheet.');
         }
 
