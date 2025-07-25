@@ -225,24 +225,29 @@
             loginError.textContent = '';
             loadingOverlay.style.display = 'flex';
 
-            try {
-                const response = await fetch('/.netlify/functions/login-user', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ name: nameInput })
-                });
+            // Reverted Logic: Fetch all players first
+            await fetchPlayers();
 
-                const result = await response.json();
-                if (!response.ok) {
-                    throw new Error(result.error || 'Login failed.');
-                }
-
-                localStorage.setItem('mafiaGameUserId', result.playerId);
-                await initializeGame(result.playerId);
-
-            } catch (error) {
+            if (state.allPlayers.length === 0) {
                 loadingOverlay.style.display = 'none';
-                loginError.textContent = error.message;
+                loginError.textContent = 'Could not load player list from the server. Check Netlify function logs.';
+                return;
+            }
+
+            const player = state.allPlayers.find(p => p.Name && p.Name.trim().toLowerCase() === nameInput.toLowerCase());
+            
+            if (player) {
+                localStorage.setItem('mafiaGameUserId', player.PlayerID);
+                // No need to call initializeGame, we already have the data
+                state.currentUserId = player.PlayerID;
+                state.currentUser = player;
+                state.isCurrentUserAdmin = player.IsAdmin === 'TRUE';
+                await fetchGameState();
+                renderView('dashboard');
+                loadingOverlay.style.display = 'none';
+            } else {
+                loadingOverlay.style.display = 'none';
+                loginError.textContent = 'Invalid Player Name. Please try again.';
             }
         }
         async function handleActionConfirm(actionType) { /* ... Unchanged ... */ }
@@ -361,14 +366,7 @@
             loadingOverlay.style.display = 'flex';
             try {
                 state.currentUserId = userId;
-                await fetchPlayers();
-                
-                if (state.allPlayers.length === 0) {
-                    renderView('login');
-                    document.getElementById('login-error').textContent = "Could not load player list from the server.";
-                    return;
-                }
-
+                // fetchPlayers() is now called before initializeGame, so we just need to find the user
                 state.currentUser = state.allPlayers.find(p => p.PlayerID === state.currentUserId);
                 
                 if (!state.currentUser) {
@@ -392,7 +390,16 @@
         window.onload = async () => {
             const savedUserId = localStorage.getItem('mafiaGameUserId');
             if (savedUserId) {
-                await initializeGame(savedUserId);
+                // If a user is already saved, we need to fetch all data to initialize
+                loadingOverlay.style.display = 'flex';
+                await fetchPlayers();
+                if (state.allPlayers.length > 0) {
+                    await initializeGame(savedUserId);
+                } else {
+                    loadingOverlay.style.display = 'none';
+                    renderView('login');
+                    document.getElementById('login-error').textContent = "Could not load player list from the server.";
+                }
             } else {
                 loadingOverlay.style.display = 'none';
                 renderView('login');
