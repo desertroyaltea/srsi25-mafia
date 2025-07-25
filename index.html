@@ -292,6 +292,42 @@ appRoot.addEventListener('click', async (e) => { // Added 'async' here
                 state.allPlayers = [];
             }
         }
+// Add this new function somewhere in your <script type="module"> block,
+// for example, right after your showMessage function.
+
+async function performFetchAction(endpoint, payload) {
+    loadingOverlay.style.display = 'flex'; // Show loading spinner
+    try {
+        const response = await fetch(endpoint, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(payload),
+        });
+
+        const result = await response.json(); // Assuming all your Netlify functions return JSON
+
+        if (response.ok) {
+            showMessage(result.message || 'Action performed successfully!');
+            // After any action, it's good practice to re-fetch player data and game state
+            // to ensure the UI reflects the latest changes from the sheet.
+            await fetchPlayers(true); // Force refresh players
+            await fetchGameState();
+            initializeGame(state.currentUserId); // Re-initialize to update dashboard
+        } else {
+            // If the response is not OK, but we still got a JSON message
+            throw new Error(result.message || `Error: ${response.status} ${response.statusText}`);
+        }
+    } catch (error) {
+        console.error("Error performing action:", error);
+        showMessage(`Failed to perform action: ${error.message}`);
+    } finally {
+        loadingOverlay.style.display = 'none'; // Hide loading spinner
+        // Hide message box after a few seconds
+        setTimeout(() => { messageBox.style.display = 'none'; }, 5000);
+    }
+}
 
         async function initializeGame(userId) {
             state.currentUserId = userId;
