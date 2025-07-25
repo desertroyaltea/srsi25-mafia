@@ -344,32 +344,38 @@ gameLayout: (viewHtml) => `
         }
     }
 
-    async function handleLogin() {
-        const nameInput = document.getElementById('login-code').value.trim();
-        const loginError = document.getElementById('login-error');
-        if (!nameInput) return;
-
-        loginError.textContent = '';
-        loadingOverlay.style.display = 'flex';
-        
-        await fetchPlayers();
-
-        if (state.allPlayers.length === 0) {
-            loadingOverlay.style.display = 'none';
-            loginError.textContent = 'Could not load player list from the server. Check Netlify function logs.';
+async function handleLogin() {
+        const passcodeInput = document.getElementById('passcode-input').value.trim(); // Only get passcode
+        const loginError = document.getElementById('login-error');
+        if (!passcodeInput) { // Only check passcode input
+            loginError.textContent = 'Please enter your passcode.';
             return;
         }
 
-        const player = state.allPlayers.find(p => p.Name && p.Name.trim().toLowerCase() === nameInput.toLowerCase());
-        
-        if (player) {
-            localStorage.setItem('mafiaGameUserId', player.PlayerID);
-            await initializeGame(player.PlayerID);
-        } else {
-            loadingOverlay.style.display = 'none';
-            loginError.textContent = 'Invalid Player Name. Please try again.';
-        }
-    }
+        loginError.textContent = '';
+        loadingOverlay.style.display = 'flex';
+        
+        await fetchPlayers(); // This fetches all players, including their passcodes
+
+        if (state.allPlayers.length === 0) {
+            loadingOverlay.style.display = 'none';
+            loginError.textContent = 'Could not load player list from the server. Check Netlify function logs.';
+            return;
+        }
+
+        // Find the player by passcode only
+        const player = state.allPlayers.find(p => 
+            p.Passcode && p.Passcode.trim() === passcodeInput // Check passcode only
+        );
+        
+        if (player) {
+            localStorage.setItem('mafiaGameUserId', player.PlayerID);
+            await initializeGame(player.PlayerID);
+        } else {
+            loadingOverlay.style.display = 'none';
+            loginError.textContent = 'Invalid Passcode. Please try again.'; // Simplified error message
+        }
+    }
 
     async function fetchPlayers(forceRefresh = false) {
         if (state.allPlayers.length > 0 && !forceRefresh) return;
