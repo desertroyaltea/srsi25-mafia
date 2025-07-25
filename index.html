@@ -399,27 +399,41 @@ const state = { allPlayers: [], currentUserId: null, currentUser: null, isCurren
         }
     }
 
-    // --- Audio Recording Functions ---
+// --- Audio Recording Functions ---
     async function startRecording() {
         console.log("Attempting to start recording...");
         try {
             const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-            // Attempt to use a more compatible mimeType for iOS, with fallbacks
-        let options = { mimeType: 'audio/mp4' }; // First attempt: MP4
-        if (!MediaRecorder.isTypeSupported(options.mimeType)) {
-            options = { mimeType: 'audio/webm;codecs=opus' }; // Fallback 1: WebM (for Android/Desktop)
-            if (!MediaRecorder.isTypeSupported(options.mimeType)) {
-                options = { mimeType: 'audio/wav' }; // Fallback 2: WAV (broadest, but larger files)
-                if (!MediaRecorder.isTypeSupported(options.mimeType)) {
-                    console.error('No supported audio mimeType found for MediaRecorder.');
-                    showMessage('Your browser does not support recording audio in any known format.');
-                    stream.getTracks().forEach(track => track.stop()); // Stop stream if no support
-                    return; // Exit function if no supported type
+            let options = null; // Declare options here
+            let selectedMimeType = null; // Store the selected MIME type
+
+            const possibleMimeTypes = [
+                'audio/wav', // Highest priority for universal playback
+                'audio/mp4', // Next priority, common for iOS but codec can vary
+                'audio/webm;codecs=opus', // Standard WebM (Opus codec)
+                'audio/webm' // Generic WebM (might use different codec)
+            ];
+
+            console.log("startRecording: Checking supported MIME types...");
+            for (const mimeType of possibleMimeTypes) {
+                const isSupported = MediaRecorder.isTypeSupported(mimeType);
+                console.log(`startRecording: ${mimeType} support: ${isSupported}`);
+                if (isSupported) {
+                    options = { mimeType: mimeType };
+                    selectedMimeType = mimeType; // Store the actual selected MIME type
+                    break;
                 }
             }
-        }
-        mediaRecorder = new MediaRecorder(stream, options); // Use the determined options
-        console.log(`MediaRecorder using mimeType: ${options.mimeType}`); // Log the chosen MIME type
+
+            if (!options) {
+                console.error('startRecording: No supported audio mimeType found for MediaRecorder.');
+                showMessage('Your browser does not support recording audio in any known format.');
+                stream.getTracks().forEach(track => track.stop());
+                return;
+            }
+            
+            mediaRecorder = new MediaRecorder(stream, options);
+            console.log(`startRecording: MediaRecorder initialized with mimeType: ${options.mimeType}`);
 
             audioChunks = [];
             mediaRecorder.ondataavailable = event => {
@@ -427,7 +441,8 @@ const state = { allPlayers: [], currentUserId: null, currentUser: null, isCurren
             };
 
             mediaRecorder.onstop = () => {
-                recordedAudioBlob = new Blob(audioChunks, { type: 'audio/webm;codecs=opus' });
+                // IMPORTANT: Use the selectedMimeType for the Blob
+                recordedAudioBlob = new Blob(audioChunks, { type: selectedMimeType });
                 audioPlayer = document.getElementById('audio-playback');
                 audioPlayer.src = URL.createObjectURL(recordedAudioBlob);
                 audioPlayer.load();
@@ -465,7 +480,7 @@ const state = { allPlayers: [], currentUserId: null, currentUser: null, isCurren
         }
     }
 
-    // --- Accusation Form Submission Function ---
+// --- Accusation Form Submission Function ---
     async function submitAccusation(accusedPlayerId, audioBlob) {
         if (!accusedPlayerId) {
             showMessage("Please select an accused player.");
@@ -481,7 +496,20 @@ const state = { allPlayers: [], currentUserId: null, currentUser: null, isCurren
             const formData = new FormData();
             formData.append('accuserPlayerId', state.currentUserId);
             formData.append('accusedPlayerId', accusedPlayerId);
-            formData.append('audioFile', audioBlob, `accusation_${state.currentUserId}_${Date.now()}.webm`);
+
+            // This is the block you asked about, and it IS needed here in index.html
+            let fileExtension = 'bin'; // Default fallback if type is unknown
+            if (audioBlob && audioBlob.type) {
+                if (audioBlob.type.includes('mp4')) {
+                    fileExtension = 'mp4';
+                } else if (audioBlob.type.includes('wav')) {
+                    fileExtension = 'wav';
+                } else if (audioBlob.type.includes('webm')) {
+                    fileExtension = 'webm';
+                }
+            }
+            formData.append('audioFile', audioBlob, `accusation_${state.currentUserId}_${Date.now()}.${fileExtension}`);
+            // End of the block you asked about
 
             const response = await fetch('/.netlify/functions/submit-accusation', {
                 method: 'POST',

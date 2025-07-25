@@ -72,28 +72,26 @@ exports.handler = async (event, context) => {
                     });
                 }
 
-                // --- Improved MIME type and Extension determination ---
-                let determinedMimeType = fileMimeType.split(';')[0]; // Clean up MIME type
-                let fileExtension = 'bin'; // Default
+                // --- Determine file extension and MIME type for GCS upload ---
+                let determinedMimeType = fileMimeType.split(';')[0]; // Clean up MIME type (e.g., audio/webm)
+                let fileExtension = 'bin'; // Default fallback
 
+                // Extract extension from originalFileName if present
                 const extensionMatch = originalFileName.match(/\.([0-9a-z]+)$/i);
                 if (extensionMatch) {
                     fileExtension = extensionMatch[1].toLowerCase();
-                }
-                
-                // Refine MIME type based on common extensions for better compatibility
-                if (fileExtension === 'm4a' || fileExtension === 'mp4') {
-                    determinedMimeType = 'audio/mp4';
-                } else if (fileExtension === 'webm') {
-                    determinedMimeType = 'audio/webm';
-                } else if (fileExtension === 'mp3' || fileExtension === 'mpeg') {
-                    determinedMimeType = 'audio/mpeg';
+                } else {
+                    // Fallback to determine extension from MIME type if not in filename
+                    if (determinedMimeType.includes('mp4')) fileExtension = 'mp4';
+                    else if (determinedMimeType.includes('wav')) fileExtension = 'wav';
+                    else if (determinedMimeType.includes('webm')) fileExtension = 'webm';
+                    else if (determinedMimeType.includes('mpeg')) fileExtension = 'mp3';
                 }
 
                 const gcsFileName = `accusation_${accuserPlayerId}_${Date.now()}.${fileExtension}`;
                 const gcsFilePath = `accusations/${gcsFileName}`;
                 
-                console.log(`GCS Upload: Filename=${gcsFileName}, MIMEType=${determinedMimeType}`);
+                console.log(`submit-accusation: GCS Upload: Filename=${gcsFileName}, MIMEType=${determinedMimeType}`);
 
                 const gcsFile = storage.bucket(bucketName).file(gcsFilePath);
                 const writeStream = gcsFile.createWriteStream({
@@ -113,11 +111,11 @@ exports.handler = async (event, context) => {
                 const originalGcsUrl = `https://storage.googleapis.com/${bucketName}/${gcsFilePath}`;
                 console.log(`submit-accusation: Original file uploaded. Public URL: ${originalGcsUrl}`);
 
-                // --- NEW: Trigger Transcoding Function ---
+                // --- Trigger Transcoding Function ---
                 let finalAudioUrl = originalGcsUrl; // Default to original if transcoding fails or isn't needed
                 try {
                     console.log("submit-accusation: Triggering audio transcoding...");
-                    const transcodeResponse = await fetch('/.netlify/functions/transcode-audio', {
+                    const transcodeResponse = await fetch('https://' + event.headers.host + '/.netlify/functions/transcode-audio', { // Use full URL for internal function call
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({
@@ -133,38 +131,22 @@ exports.handler = async (event, context) => {
                         console.log(`submit-accusation: Audio transcoded successfully. Final URL: ${finalAudioUrl}`);
                     } else {
                         console.error(`submit-accusation: Transcoding failed or returned no URL: ${transcodeResult.message || JSON.stringify(transcodeResult)}`);
-                        // Fallback: Use original URL if transcoding fails
                         console.warn("submit-accusation: Falling back to original audio URL due to transcoding failure.");
                     }
                 } catch (transcodeError) {
                     console.error("submit-accusation: Error calling transcode-audio function:", transcodeError);
                     console.warn("submit-accusation: Falling back to original audio URL due to transcoding function call error.");
                 }
-                // --- END NEW: Trigger Transcoding Function ---
+                // --- END Trigger Transcoding Function ---
 
-// Add entry to Accusations sheet with the FINAL audio URL
- accusationId = `ACC_${Date.now()}`; // NO 'const'
- submissionTime = new Date().toISOString(); // NO 'const'
- values = [ // NO 'const'
- accusationId,
- accuserPlayerId,
- accusedPlayerId,
- finalAudioUrl, // Use the transcoded URL here
- submissionTime,
- 'Pending',
- '',
- 'FALSE'
- ];
-                console.log(`File uploaded. Public URL: ${gcsPublicUrl}`);
-
-                // Add entry to Accusations sheet
-                const accusationId = `ACC_${Date.now()}`;
-                const submissionTime = new Date().toISOString();
-                const values = [
+                // Add entry to Accusations sheet with the FINAL audio URL
+                const accusationId = `ACC_${Date.now()}`; // Declare here, use below
+                const submissionTime = new Date().toISOString(); // Declare here, use below
+                const values = [ // Declare here, use below
                     accusationId,
                     accuserPlayerId,
                     accusedPlayerId,
-                    gcsPublicUrl,
+                    finalAudioUrl, // Use the transcoded URL here
                     submissionTime,
                     'Pending',
                     '',
@@ -188,7 +170,7 @@ exports.handler = async (event, context) => {
                 });
 
             } catch (error) {
-                console.error('Server Error:', error);
+                console.error('submit-accusation: Server Error:', error);
                 resolve({
                     statusCode: 500,
                     body: JSON.stringify({ error: 'Failed to submit accusation.', details: error.message }),
@@ -196,6 +178,14 @@ exports.handler = async (event, context) => {
             }
         });
 
-        busboy.end(Buffer.from(event.body, event.isBase64Encoded ? 'base64' : 'utf8'));
+        // This part handles streaming the event body to busboy
+        // Netlify functions provide event.body as a string, potentially base64 encoded
+        // busboy needs a stream or buffer.
+        // We'll create a readable stream from the event body.
+        const bodyStream = new Readable();
+        bodyStream.push(Buffer.from(event.body, event.isBase64Encoded ? 'base64' : 'utf8'));
+        bodyStream.push(null); // No more data
+
+        bodyStream.pipe(busboy); // Pipe the stream to busboy
     });
 };
