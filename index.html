@@ -103,7 +103,7 @@
     <div id="message-box" class="message-box"></div>
 
     <script type="module">
-        const state = { allPlayers: [], currentUserId: null, currentUser: null, isCurrentUserAdmin: false, gameState: null };
+        const state = { allPlayers: [], currentUserId: null, currentUser: null, isCurrentUserAdmin: false, gameState: null, pendingAccusations: [] };
         const appRoot = document.getElementById('app-root');
         const messageBox = document.getElementById('message-box');
         const loadingOverlay = document.getElementById('loading-overlay');
@@ -150,6 +150,19 @@
                     <div id="admin-dashboard-actions" class="hidden grid-cols-1 md:grid-cols-2 gap-4">
                         <button id="btn-review-accusations" class="bg-green-700 hover:bg-green-800 text-white font-bold py-3 px-6 rounded-lg">Review Accusations</button>
                     </div>
+                </div>`,
+            actionModal: ({ title, buttonText, targets, actionType }) => `
+                <div class="bg-gray-900 p-5 rounded-lg mt-4">
+                    <h2 class="text-2xl font-semibold text-red-500 mb-4">${title}</h2>
+                    <div class="mb-6">
+                        <label for="action-target-select" class="block text-gray-300 font-bold mb-2">Select Target:</label>
+                        <select id="action-target-select" class="shadow w-full py-3 px-4 text-lg leading-tight">
+                            <option value="">Choose a player...</option>
+                            ${targets.map(p => `<option value="${p.PlayerID}">${p.Name}</option>`).join('')}
+                        </select>
+                    </div>
+                    <button type="button" id="action-modal-confirm-button" data-action="${actionType}" class="bg-red-700 hover:bg-red-800 text-white font-bold py-3 px-6 rounded-lg w-full text-lg">${buttonText}</button>
+                    <button type="button" id="back-to-dashboard" class="mt-6 bg-gray-600 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded-lg w-full">Back to Dashboard</button>
                 </div>`,
         };
 
@@ -228,6 +241,7 @@
             state.isCurrentUserAdmin = state.currentUser.IsAdmin === 'TRUE';
             await fetchGameState();
             renderView('dashboard');
+            updateDashboardActions(state.gameState?.CurrentPhase || 'Day');
         }
 
         function getPlayerNameById(playerId) {
@@ -255,8 +269,7 @@
         function updateDashboardActions(currentPhase) {
             const playerActions = document.getElementById('player-dashboard-actions');
             if (!playerActions) return;
-            // Clear existing buttons
-            playerActions.innerHTML = '';
+            playerActions.innerHTML = ''; // Clear existing buttons
 
             const isNight = currentPhase && currentPhase.toLowerCase() !== 'day';
 
@@ -269,7 +282,6 @@
                 playerActions.appendChild(button);
             };
 
-            // Always show Submit Accusation, but disable it during the day
             const accBtn = document.createElement('button');
             accBtn.id = 'btn-submit-accusation';
             accBtn.textContent = 'Submit Accusation';
@@ -277,7 +289,14 @@
             accBtn.disabled = !isNight;
             playerActions.appendChild(accBtn);
             
-            // ... The rest of the button creation logic will go here
+            // Re-add all other button creation logic here
+            const role = state.currentUser.Role.toLowerCase();
+            
+            // Always-on buttons
+            if (role === 'detective') {
+                createButton('btn-view-history', 'View Investigation History', 'bg-purple-700 hover:bg-purple-800', () => renderView('investigationHistory'));
+            }
+            // ... and so on for other roles and abilities
         }
 
         window.onload = async () => {
