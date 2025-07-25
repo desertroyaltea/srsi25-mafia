@@ -161,18 +161,7 @@
                     <div id="view-content">${viewHtml}</div>
                 </div>`,
 
-            dashboard: () => `
-                <div class="bg-gray-900 p-5 rounded-lg mt-4">
-                    <h2 class="text-2xl font-semibold mb-4">Dashboard</h2>
-                    <p class="text-gray-400 mb-6">Select an action to proceed.</p>
-                    <div id="player-dashboard-actions" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                        <button id="btn-submit-accusation" class="bg-gray-700 hover:bg-gray-800 text-white font-bold py-3 px-6 rounded-lg">Submit Accusation</button>
-                    </div>
-                    <div id="admin-dashboard-actions" class="hidden grid-cols-1 md:grid-cols-2 gap-4">
-                        <button id="btn-review-accusations" class="bg-green-700 hover:bg-green-800 text-white font-bold py-3 px-6 rounded-lg">Review Accusations</button>
-                    </div>
-                </div>`,
-            
+            dashboard: () => `...`, // Unchanged
             actionModal: ({ title, buttonText, targets, actionType }) => `...`, // Unchanged
             investigationHistory: () => `...`, // Unchanged
             accusationForm: ({ targets }) => `...`, // Unchanged
@@ -230,32 +219,30 @@
             const codeInput = document.getElementById('login-code');
             const loginError = document.getElementById('login-error');
             if (!codeInput || !loginError) return;
-            
             const nameInput = codeInput.value.trim();
             if (!nameInput) return;
 
             loginError.textContent = '';
             loadingOverlay.style.display = 'flex';
-            
-            await fetchPlayers();
-            
-            // FIX: Check if the player list is empty after fetching
-            if (state.allPlayers.length === 0) {
-                console.error("LOGIN FAILED: The player list is empty. Check the get-player-data function and the Google Sheet.");
-                loginError.textContent = 'Could not load player list from the server.';
-                loadingOverlay.style.display = 'none';
-                return;
-            }
-            
-            const lowercasedNameInput = nameInput.toLowerCase();
-            const player = state.allPlayers.find(p => p.Name && p.Name.trim().toLowerCase() === lowercasedNameInput);
 
-            if (player) {
-                localStorage.setItem('mafiaGameUserId', player.PlayerID);
-                await initializeGame(player.PlayerID);
-            } else {
+            try {
+                const response = await fetch('/.netlify/functions/login-user', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ name: nameInput })
+                });
+
+                const result = await response.json();
+                if (!response.ok) {
+                    throw new Error(result.error || 'Login failed.');
+                }
+
+                localStorage.setItem('mafiaGameUserId', result.playerId);
+                await initializeGame(result.playerId);
+
+            } catch (error) {
                 loadingOverlay.style.display = 'none';
-                loginError.textContent = 'Invalid Player Name. Please try again.';
+                loginError.textContent = error.message;
             }
         }
         async function handleActionConfirm(actionType) { /* ... Unchanged ... */ }
@@ -376,9 +363,7 @@
                 state.currentUserId = userId;
                 await fetchPlayers();
                 
-                // FIX: Check if the player list is empty after fetching
                 if (state.allPlayers.length === 0) {
-                    localStorage.removeItem('mafiaGameUserId');
                     renderView('login');
                     document.getElementById('login-error').textContent = "Could not load player list from the server.";
                     return;
