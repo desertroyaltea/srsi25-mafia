@@ -23,7 +23,7 @@ exports.handler = async (event, context) => {
     try {
         const sheets = await getSheetsService();
 
-        const range = 'Players!A:X'; // Read all columns up to the new NightVoteUsed column
+        const range = 'Players!A:X'; // Read all necessary columns
         console.log(`get-player-data: Fetching range "${range}"`);
 
         const response = await sheets.spreadsheets.values.get({
@@ -37,19 +37,26 @@ exports.handler = async (event, context) => {
             console.error('get-player-data: No data found in Players sheet or only headers are present.');
             return {
                 statusCode: 200,
-                body: JSON.stringify([]), // Return empty array if no players
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify([]),
             };
         }
 
         const headers = values[0];
-        const playerData = values.slice(1).map(row => {
+        const dataRows = values.slice(1);
+
+        // A more robust way to parse the data
+        const playerData = dataRows.map(row => {
             const player = {};
-            headers.forEach((header, index) => {
-                const cleanHeader = header.replace(/[^a-zA-Z0-9]/g, '');
-                player[cleanHeader] = row[index] || null; // Use null for empty cells
-            });
+            // Only process rows that have a PlayerID in the first column
+            if (row[0]) { 
+                headers.forEach((header, index) => {
+                    const cleanHeader = header.replace(/[^a-zA-Z0-9]/g, '');
+                    player[cleanHeader] = row[index] || null;
+                });
+            }
             return player;
-        });
+        }).filter(player => player.PlayerID); // Filter out any empty objects
 
         console.log(`get-player-data: Successfully parsed ${playerData.length} players.`);
 
