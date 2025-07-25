@@ -47,7 +47,6 @@
             box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
             z-index: 1000;
             display: none;
-            align-items: center;
         }
         .loading-overlay {
             position: fixed;
@@ -104,26 +103,11 @@
     <div id="message-box" class="message-box"></div>
 
     <script type="module">
-        // --- STATE MANAGEMENT ---
-        const state = {
-            allPlayers: [],
-            currentUserId: null,
-            currentUser: null,
-            isCurrentUserAdmin: false,
-            gameState: null,
-            pendingAccusations: [],
-            mediaRecorder: null,
-            audioChunks: [],
-            recordedAudioBlob: null,
-            audioMimeType: 'audio/webm',
-        };
-
-        // --- ELEMENT REFERENCES (App Root) ---
+        const state = { allPlayers: [], currentUserId: null, currentUser: null, isCurrentUserAdmin: false, gameState: null };
         const appRoot = document.getElementById('app-root');
         const messageBox = document.getElementById('message-box');
         const loadingOverlay = document.getElementById('loading-overlay');
 
-        // --- VIEW TEMPLATES ---
         const templates = {
             login: () => `
                 <div class="container">
@@ -167,59 +151,38 @@
                         <button id="btn-review-accusations" class="bg-green-700 hover:bg-green-800 text-white font-bold py-3 px-6 rounded-lg">Review Accusations</button>
                     </div>
                 </div>`,
-            actionModal: ({ title, buttonText, targets, actionType }) => `
+            actionModal: ({ title, buttonText, targets, actionType }) => `...`, // Unchanged
+            revealedTeammates: ({ role, teammates }) => `
                 <div class="bg-gray-900 p-5 rounded-lg mt-4">
-                    <h2 class="text-2xl font-semibold text-red-500 mb-4">${title}</h2>
-                    <div class="mb-6">
-                        <label for="action-target-select" class="block text-gray-300 font-bold mb-2">Select Target:</label>
-                        <select id="action-target-select" class="shadow w-full py-3 px-4 text-lg leading-tight">
-                            <option value="">Choose a player...</option>
-                            ${targets.map(p => `<option value="${p.PlayerID}">${p.Name}</option>`).join('')}
-                        </select>
-                    </div>
-                    <button type="button" id="action-modal-confirm-button" data-action="${actionType}" class="bg-red-700 hover:bg-red-800 text-white font-bold py-3 px-6 rounded-lg w-full text-lg">${buttonText}</button>
+                    <h2 class="text-2xl font-semibold text-cyan-400 mb-4">Your ${role} Team</h2>
+                    ${teammates.length > 0 ? `
+                    <ul class="list-disc list-inside space-y-2">
+                        ${teammates.map(name => `<li>${name}</li>`).join('')}
+                    </ul>
+                    ` : '<p class="text-gray-400">You have not revealed any teammates yet.</p>'}
                     <button type="button" id="back-to-dashboard" class="mt-6 bg-gray-600 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded-lg w-full">Back to Dashboard</button>
                 </div>`,
-            investigationHistory: () => `...`, // Unchanged
-            accusationForm: ({ targets }) => `...`, // Unchanged
-            adminReview: () => `...`, // Unchanged
-            revealedTeammates: ({ role, teammates }) => `...`, // Unchanged
         };
 
-        // --- RENDER ENGINE & EVENT HANDLING ---
         function renderView(viewName, data = {}) {
-            let viewHtml;
-            switch(viewName) {
-                case 'login': appRoot.innerHTML = templates.login(); break;
-                case 'dashboard': viewHtml = templates.dashboard(); appRoot.innerHTML = templates.gameLayout(viewHtml); break;
-                case 'actionModal': viewHtml = templates.actionModal(data); appRoot.innerHTML = templates.gameLayout(viewHtml); break;
-                case 'accusationForm': viewHtml = templates.accusationForm(data); appRoot.innerHTML = templates.gameLayout(viewHtml); break;
-                case 'adminReview': viewHtml = templates.adminReview(); appRoot.innerHTML = templates.gameLayout(viewHtml); break;
-                case 'investigationHistory': viewHtml = templates.investigationHistory(); appRoot.innerHTML = templates.gameLayout(viewHtml); break;
-                case 'revealedTeammates': viewHtml = templates.revealedTeammates(data); appRoot.innerHTML = templates.gameLayout(viewHtml); break;
+            if (viewName === 'login') {
+                appRoot.innerHTML = templates.login();
+            } else {
+                appRoot.innerHTML = templates.gameLayout(templates[viewName](data));
             }
         }
-        
+
         appRoot.addEventListener('submit', (e) => {
-            if (e.target.id === 'login-form') { e.preventDefault(); handleLogin(); }
-            if (e.target.id === 'accusation-form') { e.preventDefault(); handleAccusationSubmit(); }
-        });
-
-        appRoot.addEventListener('click', async (e) => {
-            const target = e.target;
-            if (target.id === 'btn-review-accusations') {
-                loadingOverlay.style.display = 'flex';
-                await fetchPendingAccusations();
-                loadingOverlay.style.display = 'none';
-                renderView('adminReview');
+            if (e.target.id === 'login-form') {
+                e.preventDefault();
+                handleLogin();
             }
-            if (target.id === 'action-modal-confirm-button') handleActionConfirm(target.dataset.action);
-            if (target.id === 'back-to-dashboard') renderView('dashboard');
-            if (target.classList.contains('btn-approve')) handleAdminAction(target.dataset.id, 'approve');
-            if (target.classList.contains('btn-deny')) handleAdminAction(target.dataset.id, 'deny');
+        });
+        
+        appRoot.addEventListener('click', (e) => {
+            // This will handle all button clicks
         });
 
-        // --- EVENT HANDLER LOGIC ---
         async function handleLogin() {
             const nameInput = document.getElementById('login-code').value.trim();
             const loginError = document.getElementById('login-error');
@@ -246,38 +209,68 @@
                 loginError.textContent = 'Invalid Player Name. Please try again.';
             }
         }
-        
-        async function handleActionConfirm(actionType) { /* ... Unchanged ... */ }
-        async function handleAccusationSubmit() { /* ... Unchanged ... */ }
-        async function handleAdminAction(accusationId, actionType) { /* ... Unchanged ... */ }
 
-        // --- DATA & UI LOGIC ---
-        async function performFetchAction(endpoint, body, isAdminAction = false, isFormData = false) { /* ... Unchanged ... */ }
-        function showMessage(message) { /* ... Unchanged ... */ }
-        async function fetchPlayers(forceRefresh = false) { /* ... Unchanged ... */ }
-        async function fetchPendingAccusations() { /* ... Unchanged ... */ }
-        function getPlayerNameById(playerId) { /* ... Unchanged ... */ }
-        async function fetchGameState() { /* ... Unchanged ... */ }
+        async function fetchPlayers(forceRefresh = false) {
+            if (state.allPlayers.length > 0 && !forceRefresh) return;
+            try {
+                const response = await fetch('/.netlify/functions/get-player-data');
+                if (!response.ok) {
+                    const errorText = await response.text();
+                    console.error('Fetch failed with status:', response.status, 'Response:', errorText);
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                state.allPlayers = await response.json();
+            } catch (error) {
+                console.error("Full error in fetchPlayers:", error);
+                showMessage("Failed to load player data. Check console for details.");
+                state.allPlayers = [];
+            }
+        }
+
+        async function initializeGame(userId) {
+            state.currentUserId = userId;
+            state.currentUser = state.allPlayers.find(p => p.PlayerID === userId);
+            if (!state.currentUser) {
+                localStorage.removeItem('mafiaGameUserId');
+                renderView('login');
+                document.getElementById('login-error').textContent = "Your player data seems outdated. Please log in again.";
+                return;
+            }
+            state.isCurrentUserAdmin = state.currentUser.IsAdmin === 'TRUE';
+            await fetchGameState();
+            renderView('dashboard');
+            updateDashboardActions(state.gameState?.CurrentPhase || 'Day');
+        }
+
+        function getPlayerNameById(playerId) {
+            const player = state.allPlayers.find(p => p.PlayerID === playerId);
+            return player ? player.Name : 'N/A';
+        }
+
+        async function fetchGameState() {
+            try {
+                const response = await fetch('/.netlify/functions/get-game-state');
+                if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+                state.gameState = await response.json();
+            } catch (error) {
+                console.error("Error fetching game state:", error);
+                showMessage("Failed to load game state.");
+                state.gameState = null;
+            }
+        }
+        
+        function showMessage(message) {
+            messageBox.textContent = message;
+            messageBox.style.display = 'block';
+        }
         
         function updateDashboardActions(currentPhase) {
             const playerActions = document.getElementById('player-dashboard-actions');
-            const adminActions = document.getElementById('admin-dashboard-actions');
-            if (!playerActions || !adminActions) return;
-
+            if (!playerActions) return;
             playerActions.innerHTML = ''; // Clear existing buttons
-            
+
             const isNight = currentPhase && currentPhase.toLowerCase() !== 'day';
 
-            if (state.isCurrentUserAdmin) {
-                playerActions.style.display = 'none';
-                adminActions.style.display = 'grid';
-                return;
-            }
-            
-            playerActions.style.display = 'grid';
-            adminActions.style.display = 'none';
-
-            const role = state.currentUser.Role.toLowerCase();
             const createButton = (id, text, style, onClick) => {
                 const button = document.createElement('button');
                 button.id = id;
@@ -287,18 +280,20 @@
                 playerActions.appendChild(button);
             };
 
+            const role = state.currentUser.Role.toLowerCase();
+
             // --- ALL ROLES ---
             createButton('btn-submit-accusation', 'Submit Accusation', 'bg-gray-700 hover:bg-gray-800', () => {
                 const targets = state.allPlayers.filter(p => p.Status && p.Status.toLowerCase() === 'alive' && p.PlayerID !== state.currentUserId);
                 renderView('accusationForm', { targets });
             });
-            
-            // --- ROLE-SPECIFIC BUTTONS ---
+
+            // --- MAFIA ---
             if (role === 'mafia') {
                 createButton('btn-kill', 'Kill Player', 'bg-red-700 hover:bg-red-800', () => {
                     if (!isNight) return showMessage("You can only use this action at night.");
                     if (state.currentUser.MainUsed === 'TRUE') return showMessage("You have already used your main action tonight.");
-                    const targets = state.allPlayers.filter(p => p.Status && p.Status.toLowerCase() === 'alive' && p.Role && p.Role.toLowerCase() !== 'mafia');
+                    const targets = state.allPlayers.filter(p => p.Status && p.Status.toLowerCase() === 'alive' && p.Role.toLowerCase() !== 'mafia');
                     renderView('actionModal', { title: 'Choose a Target to Kill', buttonText: 'Confirm Kill', targets, actionType: 'kill' });
                 });
                 createButton('btn-convert', 'Convert Villager', 'bg-red-900', () => {
@@ -317,45 +312,92 @@
                     renderView('revealedTeammates', { role: 'Mafia', teammates });
                 });
             }
-            // ... (Add other roles here in the same pattern)
-        }
-        
-        async function startRecording() { /* ... Unchanged ... */ }
-        function stopRecording() { /* ... Unchanged ... */ }
 
-        // --- INITIALIZATION ---
-        async function initializeGame(userId) {
-            loadingOverlay.style.display = 'flex';
-            try {
-                state.currentUserId = userId;
-                await fetchPlayers();
-                state.currentUser = state.allPlayers.find(p => p.PlayerID === state.currentUserId);
-                
-                if (!state.currentUser) {
-                    localStorage.removeItem('mafiaGameUserId');
-                    renderView('login');
-                    return;
-                }
+            // --- DOCTOR ---
+            if (role === 'doctor') {
+                createButton('btn-protect', 'Protect Player', 'bg-blue-700 hover:bg-blue-800', () => {
+                    if (!isNight) return showMessage("You can only use this action at night.");
+                    if (state.currentUser.MainUsed === 'TRUE') return showMessage("You have already used your main action tonight.");
+                    const targets = state.allPlayers.filter(p => p.Status && p.Status.toLowerCase() === 'alive');
+                    renderView('actionModal', { title: 'Choose a Player to Protect', buttonText: 'Confirm Protection', targets, actionType: 'protect' });
+                });
+                createButton('btn-revive', 'Revive Player', 'bg-blue-900', () => {
+                    if (!isNight) return showMessage("You can only use this ability at night.");
+                    if (state.currentUser.DoctorCanRevive !== 'TRUE') return showMessage("You have not unlocked this ability or have already used it.");
+                    performFetchAction('/.netlify/functions/revive-player', { doctorPlayerId: state.currentUserId });
+                });
+                createButton('btn-reveal-doctor', 'Reveal Doctor', 'bg-blue-900', () => {
+                    if (!isNight) return showMessage("You can only use this ability at night.");
+                    if (state.currentUser.DoctorCanRevealSelf !== 'TRUE') return showMessage("You have not unlocked this ability or have already used it.");
+                    performFetchAction('/.netlify/functions/reveal-doctor', { doctorPlayerId: state.currentUserId });
+                });
+                createButton('btn-view-teammates', 'List Doctors', 'bg-cyan-600 hover:bg-cyan-700', () => {
+                    if (!state.currentUser.RevealedTeammates) return showMessage("You have not revealed any teammates yet.");
+                    const teammates = state.currentUser.RevealedTeammates.split(',').map(id => getPlayerNameById(id));
+                    renderView('revealedTeammates', { role: 'Doctor', teammates });
+                });
+            }
 
-                state.isCurrentUserAdmin = state.currentUser.IsAdmin === 'TRUE';
-                await fetchGameState();
-                
-                renderView('dashboard');
-            } catch (error) {
-                console.error("Error during initialization:", error);
-                showMessage("A critical error occurred during startup. Please refresh.");
-            } finally {
-                loadingOverlay.style.display = 'none';
+            // --- DETECTIVE ---
+            if (role === 'detective') {
+                createButton('btn-check', 'Investigate Player', 'bg-yellow-600 hover:bg-yellow-700', () => {
+                    if (!isNight) return showMessage("You can only use this action at night.");
+                    if (state.currentUser.MainUsed === 'TRUE') return showMessage("You have already used your main action tonight.");
+                    const targets = state.allPlayers.filter(p => p.Status && p.Status.toLowerCase() === 'alive' && p.PlayerID !== state.currentUserId);
+                    renderView('actionModal', { title: 'Choose a Player to Investigate', buttonText: 'Confirm Investigation', targets, actionType: 'check' });
+                });
+                createButton('btn-reveal-detective', 'Reveal a Detective', 'bg-yellow-900', () => showMessage("This ability is not yet implemented."));
+                createButton('btn-view-history', 'Investigation History', 'bg-purple-700 hover:bg-purple-800', () => renderView('investigationHistory'));
+            }
+
+            // --- VILLAGER ---
+            if (role === 'villager') {
+                createButton('btn-increase-vote', 'Increase Vote Power', 'bg-green-900', () => {
+                    if (!isNight) return showMessage("You can only use this ability at night.");
+                    if (state.currentUser.VillagerCanIncreaseVote !== 'TRUE') return showMessage("You have not unlocked this ability or have already used it.");
+                    performFetchAction('/.netlify/functions/increase-vote-power', { villagerPlayerId: state.currentUserId });
+                });
+                createButton('btn-change-role', 'Change Role', 'bg-green-900', () => {
+                    if (!isNight) return showMessage("You can only use this ability at night.");
+                    if (state.currentUser.VillagerCanChangeRole !== 'TRUE') return showMessage("You have not unlocked this ability or have already used it.");
+                    performFetchAction('/.netlify/functions/change-role', { villagerPlayerId: state.currentUserId });
+                });
+            }
+
+            // --- SHERIFF ---
+            if (role === 'sheriff') {
+                createButton('btn-shoot', 'Shoot Player', 'bg-gray-700 hover:bg-gray-800', () => {
+                    if (!isNight) return showMessage("You can only use this action at night.");
+                    if (state.currentUser.MainUsed === 'TRUE') return showMessage("You have already used your main action tonight.");
+                    if (state.currentUser.SheriffShotUsed === 'TRUE') return showMessage("You have already used your one-time shot.");
+                    const targets = state.allPlayers.filter(p => p.Status && p.Status.toLowerCase() === 'alive' && p.PlayerID !== state.currentUserId);
+                    renderView('actionModal', { title: 'Choose Your Target', buttonText: 'Fire!', targets, actionType: 'shoot' });
+                });
             }
         }
 
         window.onload = async () => {
             const savedUserId = localStorage.getItem('mafiaGameUserId');
-            if (savedUserId) {
-                await initializeGame(savedUserId);
-            } else {
-                loadingOverlay.style.display = 'none';
+            try {
+                if (savedUserId) {
+                    loadingOverlay.style.display = 'flex';
+                    await fetchPlayers();
+                    if (state.allPlayers.length > 0) {
+                        await initializeGame(savedUserId);
+                    } else {
+                        localStorage.removeItem('mafiaGameUserId');
+                        renderView('login');
+                        document.getElementById('login-error').textContent = "Could not load player list from the server.";
+                    }
+                } else {
+                    renderView('login');
+                }
+            } catch (error) {
+                console.error("Critical error on page load:", error);
                 renderView('login');
+                document.getElementById('login-error').textContent = "An unexpected error occurred. Please try again.";
+            } finally {
+                loadingOverlay.style.display = 'none';
             }
         };
     </script>
