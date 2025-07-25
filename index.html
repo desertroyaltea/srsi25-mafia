@@ -103,7 +103,7 @@
     <div id="message-box" class="message-box"></div>
 
 <script type="module">
-    const state = { allPlayers: [], currentUserId: null, currentUser: null, isCurrentUserAdmin: false, gameState: null, pendingAccusations: [] };
+const state = { allPlayers: [], currentUserId: null, currentUser: null, isCurrentUserAdmin: false, gameState: null, pendingAccusations: [], currentTrial: null };    
     const appRoot = document.getElementById('app-root');
     const messageBox = document.getElementById('message-box');
     const loadingOverlay = document.getElementById('loading-overlay');
@@ -239,6 +239,35 @@
                 <button type="button" id="back-to-dashboard" class="mt-6 bg-gray-600 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded-lg w-full">Back to Dashboard</button>
             </div>
         `,
+
+// NEW TRIAL PAGE TEMPLATE
+            trialPage: ({ trial }) => `
+                <div class="bg-gray-900 p-5 rounded-lg mt-4">
+                    <h2 class="text-3xl font-bold text-red-400 mb-4 text-center">The Trial</h2>
+                    ${trial ? `
+                        <div class="space-y-4">
+                            <p class="text-lg text-gray-300"><strong>Accused:</strong> ${getPlayerNameById(trial.AccusedPlayerID)}</p>
+                            <div class="mt-3 mb-4">
+                                <label class="block text-gray-400 text-sm font-bold mb-2">Accusation Audio:</label>
+                                <audio controls class="w-full">
+                                    <source src="${trial.AccusationAudioLink}" type="audio/webm">
+                                    <source src="${trial.AccusationAudioLink}" type="audio/mp4">
+                                    Your browser does not support the audio element.
+                                </audio>
+                            </div>
+                            <p class="text-sm text-gray-400">Trial started: ${new Date(trial.TrialStartTime).toLocaleString()}</p>
+                            <p class="text-sm text-gray-400">Voting deadline: ${new Date(trial.VotingDeadline).toLocaleString()}</p>
+                            <p class="text-sm text-gray-400">Your current voting power: <span class="font-bold text-blue-400">${state.currentUser.CurrentVotingPower || 1}</span></p>
+                        </div>
+                        <div class="flex flex-col md:flex-row gap-4 mt-6">
+                            <button type="button" id="btn-vote-guilty" class="bg-red-700 hover:bg-red-800 text-white font-bold py-3 px-6 rounded-lg w-full md:w-1/2 text-xl" data-trial-id="${trial.TrialID}">GUILTY</button>
+                            <button type="button" id="btn-vote-not-guilty" class="bg-blue-700 hover:bg-blue-800 text-white font-bold py-3 px-6 rounded-lg w-full md:w-1/2 text-xl" data-trial-id="${trial.TrialID}">NOT GUILTY</button>
+                        </div>
+                    ` : '<p class="text-gray-400 text-center">No active trial to display.</p>'}
+                    <button type="button" id="back-to-dashboard" class="mt-6 bg-gray-600 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded-lg w-full">Back to Dashboard</button>
+                </div>
+            `,
+
         revealedTeammates: ({ role, teammates }) => `
             <div class="bg-gray-900 p-5 rounded-lg mt-4">
                 <h2 class="text-2xl font-semibold text-cyan-400 mb-4">Your ${role} Team</h2>
@@ -494,7 +523,27 @@
         await fetchPendingAccusations();
         renderView('adminReview', { pendingAccusations: state.pendingAccusations });
     }
-        
+      
+    // --- Trial Functions ---
+async function fetchCurrentTrial() {
+    loadingOverlay.style.display = 'flex';
+    try {
+        const response = await fetch('/.netlify/functions/get-current-trial');
+        if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+        const result = await response.json();
+        state.currentTrial = result.currentTrial; // Store the fetched trial data
+        if (!state.currentTrial) {
+            showMessage(result.message || 'No active trial found.');
+        }
+    } catch (error) {
+        console.error("Error fetching current trial:", error);
+        showMessage("Failed to load trial data.");
+        state.currentTrial = null;
+    } finally {
+        loadingOverlay.style.display = 'none';
+    }
+}
+
     function updateDashboardActions(currentPhase) {
         const playerActions = document.getElementById('player-dashboard-actions');
         if (!playerActions) return;
@@ -521,6 +570,18 @@
             );
             renderView('accusationForm', { targets });
         });
+
+// --- TRIAL BUTTON (for non-admins) ---
+            if (!state.isCurrentUserAdmin) {
+                createButton('btn-the-trial', 'The Trial', 'bg-purple-700 hover:bg-purple-800', async () => {
+                    await fetchCurrentTrial(); // Fetch trial data before rendering
+                    if (state.currentTrial) {
+                        renderView('trialPage', { trial: state.currentTrial });
+                    } else {
+                        showMessage('No active trial found at this time.');
+                    }
+                });
+            }
 
         // --- MAFIA ---
         if (role === 'mafia') {
@@ -713,7 +774,27 @@
             if (accusationId) {
                 await handleDenyAccusation(accusationId);
             }
-        }
+        
+       } else if (e.target.id === 'btn-vote-guilty') { // NEW: GUILTY vote button
+                const trialId = e.target.dataset.trialId;
+                const votingPower = state.currentUser.CurrentVotingPower;
+                if (trialId && votingPower !== undefined) {
+                    await performFetchAction('/.netlify/functions/submit-jury-vote', { trialId, voterPlayerId: state.currentUserId, voteType: 'GUILTY', votingPower });
+                    renderView('dashboard'); // Return to dashboard after voting
+                } else {
+                    showMessage('Missing trial ID or voting power to submit vote.');
+                }
+            } else if (e.target.id === 'btn-vote-not-guilty') { // NEW: NOT GUILTY vote button
+                const trialId = e.target.dataset.trialId;
+                const votingPower = state.currentUser.CurrentVotingPower;
+                if (trialId && votingPower !== undefined) {
+                    await performFetchAction('/.netlify/functions/submit-jury-vote', { trialId, voterPlayerId: state.currentUserId, voteType: 'NOTGUILTY', votingPower });
+                    renderView('dashboard'); // Return to dashboard after voting
+                } else {
+                    showMessage('Missing trial ID or voting power to submit vote.');
+                }
+            }
+        
     });
 </script>
 </body>
