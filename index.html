@@ -103,8 +103,7 @@
     <div id="message-box" class="message-box"></div>
 
     <script type="module">
-        const state = { allPlayers: [], currentUserId: null, currentUser: null, isCurrentUserAdmin: false, gameState: null };
-        const appRoot = document.getElementById('app-root');
+const state = { allPlayers: [], currentUserId: null, currentUser: null, isCurrentUserAdmin: false, gameState: null, pendingAccusations: [] };        const appRoot = document.getElementById('app-root');
         const messageBox = document.getElementById('message-box');
         const loadingOverlay = document.getElementById('loading-overlay');
         // NEW GLOBAL VARIABLES FOR AUDIO RECORDING START HERE
@@ -153,7 +152,7 @@
                     <h2 class="text-2xl font-semibold mb-4">Dashboard</h2>
                     <p class="text-gray-400 mb-6">Select an action to proceed.</p>
                     <div id="player-dashboard-actions" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4"></div>
-                    <div id="admin-dashboard-actions" class="hidden grid-cols-1 md:grid-cols-2 gap-4">
+<div id="admin-dashboard-actions" class="grid-cols-1 md:grid-cols-2 gap-4 ${state.isCurrentUserAdmin ? 'grid' : 'hidden'}">
                         <button id="btn-review-accusations" class="bg-green-700 hover:bg-green-800 text-white font-bold py-3 px-6 rounded-lg">Review Accusations</button>
                     </div>
                 </div>`,
@@ -223,6 +222,38 @@
                     <button type="button" id="back-to-dashboard" class="mt-6 bg-gray-600 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded-lg w-full">Back to Dashboard</button>
                 </div>`,
         };
+
+        // NEW ADMIN REVIEW TEMPLATE
+            adminReview: ({ pendingAccusations }) => `
+                <div class="bg-gray-900 p-5 rounded-lg mt-4">
+                    <h2 class="text-2xl font-semibold mb-4 text-red-400">Admin Review: Pending Accusations</h2>
+                    ${pendingAccusations.length > 0 ? `
+                        <div class="space-y-6">
+                            ${pendingAccusations.map(acc => `
+                                <div class="bg-gray-800 p-4 rounded-lg border border-gray-700">
+                                    <p class="text-gray-300"><strong>Accusation ID:</strong> ${acc.AccusationID}</p>
+                                    <p class="text-gray-300"><strong>Accuser:</strong> ${getPlayerNameById(acc.AccuserPlayerID)}</p>
+                                    <p class="text-gray-300"><strong>Accused:</strong> ${getPlayerNameById(acc.AccusedPlayerID)}</p>
+                                    <p class="text-gray-300"><strong>Submitted:</strong> ${new Date(acc.SubmissionTime).toLocaleString()}</p>
+                                    <div class="mt-3 mb-4">
+                                        <label class="block text-gray-400 text-sm font-bold mb-2">Audio:</label>
+                                        <audio controls class="w-full">
+                                            <source src="${acc.AudioDriveLink}" type="audio/webm">
+                                            <source src="${acc.AudioDriveLink}" type="audio/mp4">
+                                            Your browser does not support the audio element.
+                                        </audio>
+                                    </div>
+                                    <div class="flex flex-col md:flex-row gap-2">
+                                        <button type="button" class="btn-approve-accusation bg-green-700 hover:bg-green-800 text-white font-bold py-2 px-4 rounded-lg w-full" data-accusation-id="${acc.AccusationID}">Approve</button>
+                                        <button type="button" class="btn-deny-accusation bg-red-700 hover:bg-red-800 text-white font-bold py-2 px-4 rounded-lg w-full" data-accusation-id="${acc.AccusationID}">Deny</button>
+                                    </div>
+                                </div>
+                            `).join('')}
+                        </div>
+                    ` : '<p class="text-gray-400">No pending accusations to review.</p>'}
+                    <button type="button" id="back-to-dashboard" class="mt-6 bg-gray-600 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded-lg w-full">Back to Dashboard</button>
+                </div>
+            `,
 
         function renderView(viewName, data = {}) {
             if (viewName === 'login') {
@@ -420,6 +451,36 @@
                 if (audioPlayer) audioPlayer.src = ''; // Clear audio preview
             }
         }
+
+        // --- Admin Review Functions ---
+async function fetchPendingAccusations() {
+    loadingOverlay.style.display = 'flex';
+    try {
+        const response = await fetch('/.netlify/functions/get-pending-accusations');
+        if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+        state.pendingAccusations = await response.json();
+    } catch (error) {
+        console.error("Error fetching pending accusations:", error);
+        showMessage("Failed to load pending accusations.");
+        state.pendingAccusations = [];
+    } finally {
+        loadingOverlay.style.display = 'none';
+    }
+}
+
+async function handleApproveAccusation(accusationId) {
+    await performFetchAction('/.netlify/functions/approve-accusation', { accusationId, adminPlayerId: state.currentUserId });
+    // Re-fetch pending accusations and re-render the admin review page after action
+    await fetchPendingAccusations();
+    renderView('adminReview', { pendingAccusations: state.pendingAccusations });
+}
+
+async function handleDenyAccusation(accusationId) {
+    await performFetchAction('/.netlify/functions/deny-accusation', { accusationId, adminPlayerId: state.currentUserId });
+    // Re-fetch pending accusations and re-render the admin review page after action
+    await fetchPendingAccusations();
+    renderView('adminReview', { pendingAccusations: state.pendingAccusations });
+}
 
         function updateDashboardActions(currentPhase) {
             const playerActions = document.getElementById('player-dashboard-actions');
@@ -621,15 +682,27 @@
         });
 
         // This block replaced your previous appRoot.addEventListener('click', ...)
-        appRoot.addEventListener('click', async (e) => {
+appRoot.addEventListener('click', async (e) => {
             if (e.target.id === 'back-to-dashboard') {
                 renderView('dashboard');
             } else if (e.target.id === 'start-recording') {
                 await startRecording();
             } else if (e.target.id === 'stop-recording') {
                 stopRecording();
+            } else if (e.target.id === 'btn-review-accusations') { // NEW: Admin Review button
+                await fetchPendingAccusations(); // Fetch data before rendering
+                renderView('adminReview', { pendingAccusations: state.pendingAccusations });
+            } else if (e.target.classList.contains('btn-approve-accusation')) { // NEW: Approve button
+                const accusationId = e.target.dataset.accusationId;
+                if (accusationId) {
+                    await handleApproveAccusation(accusationId);
+                }
+            } else if (e.target.classList.contains('btn-deny-accusation')) { // NEW: Deny button
+                const accusationId = e.target.dataset.accusationId;
+                if (accusationId) {
+                    await handleDenyAccusation(accusationId);
+                }
             }
-            // "Play Recording" button listener removed as per request
         });
     </script>
 </body>
