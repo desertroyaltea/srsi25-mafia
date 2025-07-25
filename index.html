@@ -91,6 +91,13 @@
             border: 1px solid #555555;
             color: #e2e8f0;
         }
+        .recording-indicator {
+            animation: pulse 1.5s ease-in-out infinite;
+        }
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
     </style>
 </head>
 <body>
@@ -151,7 +158,7 @@ const templates = {
             <h2 class="text-2xl font-semibold mb-4">Dashboard</h2>
             <p class="text-gray-400 mb-6">Select an action to proceed.</p>
             <div id="player-dashboard-actions" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4"></div>
-            <div id="admin-dashboard-actions" class="hidden grid-cols-1 md:grid-cols-2 gap-4">
+            <div id="admin-dashboard-actions" class="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <button id="btn-review-accusations" class="bg-green-700 hover:bg-green-800 text-white font-bold py-3 px-6 rounded-lg">Review Accusations</button>
             </div>
         </div>`,
@@ -177,7 +184,7 @@ const templates = {
             </form>
         </div>
     `,
-    // THIS IS THE NEW ACCUSATION FORM TEMPLATE - IT HAS BEEN ADDED HERE
+    // IMPROVED ACCUSATION FORM TEMPLATE WITH FIXED LABELS AND BETTER UX
     accusationForm: ({ targets }) => `
         <div class="bg-gray-900 p-5 rounded-lg mt-4">
             <h2 class="text-2xl font-semibold mb-4 text-red-400">Submit Accusation</h2>
@@ -197,11 +204,14 @@ const templates = {
                 <div class="mb-6">
                     <label class="block text-gray-300 text-lg font-bold mb-2">Record Accusation:</label>
                     <div class="flex flex-wrap items-center gap-4 mb-4">
-                        <button type="button" id="start-recording" class="bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-4 rounded-lg">Start Recording</button>
-                        <button type="button" id="stop-recording" class="bg-gray-600 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded-lg" disabled>Stop Recording</button>
-                        <button type="button" id="play-recording" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg" disabled>Play Recording</button>
+                        <button type="button" id="start-recording" class="bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-4 rounded-lg">🎤 Start Recording</button>
+                        <button type="button" id="stop-recording" class="bg-gray-600 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded-lg" disabled>⏹️ Stop Recording</button>
+                        <span id="recording-status" class="text-gray-400 text-sm"></span>
                     </div>
-                    <audio id="audio-playback" controls class="w-full hidden"></audio>
+                    <div id="audio-preview-container" class="hidden">
+                        <p class="text-gray-300 text-sm mb-2">Preview your recording:</p>
+                        <audio id="audio-playback" controls class="w-full mb-4"></audio>
+                    </div>
                 </div>
 
                 <div class="flex flex-col md:flex-row gap-4">
@@ -229,64 +239,257 @@ const templates = {
             } else {
                 appRoot.innerHTML = templates.gameLayout(templates[viewName](data));
             }
+            
+            // Setup event listeners after rendering
+            setupEventListeners();
         }
 
-// Existing appRoot.addEventListener for submit
-appRoot.addEventListener('submit', async (e) => { // Added 'async' here
-    e.preventDefault(); // Prevent default form submission for all forms
-    if (e.target.id === 'login-form') {
-        handleLogin();
-    } else if (e.target.id === 'action-form') {
-        const actionType = e.target.dataset.actionType;
-        const targetPlayerId = document.getElementById('target-player').value;
+        // CENTRALIZED EVENT LISTENER SETUP
+        function setupEventListeners() {
+            // Setup audio recording listeners if accusation form is rendered
+            if (document.getElementById('start-recording')) {
+                document.getElementById('start-recording').addEventListener('click', startRecording);
+                document.getElementById('stop-recording').addEventListener('click', stopRecording);
+            }
 
-        if (!targetPlayerId) {
-            showMessage("Please select a target player.");
-            return;
+            // Setup accusation form submission
+            if (document.getElementById('accusation-submission-form')) {
+                document.getElementById('accusation-submission-form').addEventListener('submit', handleAccusationSubmission);
+            }
         }
 
-        let endpoint;
-        let payload;
+        // IMPROVED AUDIO RECORDING FUNCTIONS
+        async function startRecording() {
+            try {
+                console.log('Requesting microphone access...');
+                const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                console.log('Microphone access granted');
+                
+                mediaRecorder = new MediaRecorder(stream, { mimeType: 'audio/webm;codecs=opus' });
 
-        // Determine the correct Netlify Function endpoint and payload based on actionType
-        switch (actionType) {
-            case 'kill':
-                endpoint = '/.netlify/functions/kill-player';
-                payload = { mafiaPlayerId: state.currentUserId, targetPlayerId: targetPlayerId };
-                break;
-            case 'protect':
-                endpoint = '/.netlify/functions/protect-player';
-                payload = { doctorPlayerId: state.currentUserId, targetPlayerId: targetPlayerId };
-                break;
-            case 'check':
-                endpoint = '/.netlify/functions/check-mafia'; // Assuming this is correct for Detective
-                payload = { detectivePlayerId: state.currentUserId, targetPlayerId: targetPlayerId };
-                break;
-            case 'shoot':
-                endpoint = '/.netlify/functions/shoot-player'; // Assuming this is correct for Sheriff
-                payload = { sheriffPlayerId: state.currentUserId, targetPlayerId: targetPlayerId };
-                break;
-            // Add more cases here for other actions if they use the actionModal in the future
-            default:
-                showMessage('Unknown action type for submission.');
-                console.error('Unknown actionType:', actionType);
+                audioChunks = [];
+                mediaRecorder.ondataavailable = event => {
+                    if (event.data.size > 0) {
+                        audioChunks.push(event.data);
+                    }
+                };
+
+                mediaRecorder.onstop = () => {
+                    console.log('Recording stopped, processing audio...');
+                    recordedAudioBlob = new Blob(audioChunks, { type: 'audio/webm;codecs=opus' });
+                    
+                    // Show audio preview immediately
+                    const audioPreviewContainer = document.getElementById('audio-preview-container');
+                    const audioPlayer = document.getElementById('audio-playback');
+                    
+                    if (audioPlayer && audioPreviewContainer) {
+                        audioPlayer.src = URL.createObjectURL(recordedAudioBlob);
+                        audioPlayer.load();
+                        audioPreviewContainer.classList.remove('hidden');
+                    }
+
+                    // Enable submit button
+                    const submitBtn = document.getElementById('submit-accusation-btn');
+                    if (submitBtn) {
+                        submitBtn.disabled = false;
+                    }
+
+                    // Stop all tracks to release microphone
+                    stream.getTracks().forEach(track => track.stop());
+                    
+                    // Update UI
+                    updateRecordingUI('stopped');
+                    showMessage('Recording completed! Preview available below.');
+                };
+
+                mediaRecorder.onerror = (event) => {
+                    console.error('MediaRecorder error:', event.error);
+                    showMessage('Recording error: ' + event.error.message);
+                    updateRecordingUI('error');
+                };
+
+                mediaRecorder.start();
+                updateRecordingUI('recording');
+                showMessage('Recording started... Click "Stop Recording" when finished.');
+                
+            } catch (err) {
+                console.error('Error accessing microphone:', err);
+                showMessage('Could not access microphone. Please ensure it is connected and permissions are granted.');
+                updateRecordingUI('error');
+            }
+        }
+
+        function stopRecording() {
+            if (mediaRecorder && mediaRecorder.state === 'recording') {
+                mediaRecorder.stop();
+                console.log('Stop recording requested');
+            } else {
+                console.warn('MediaRecorder not in recording state:', mediaRecorder?.state);
+                showMessage('No active recording to stop.');
+            }
+        }
+
+        function updateRecordingUI(state) {
+            const startBtn = document.getElementById('start-recording');
+            const stopBtn = document.getElementById('stop-recording');
+            const statusSpan = document.getElementById('recording-status');
+            
+            if (!startBtn || !stopBtn || !statusSpan) return;
+
+            switch (state) {
+                case 'recording':
+                    startBtn.disabled = true;
+                    startBtn.classList.add('recording-indicator');
+                    stopBtn.disabled = false;
+                    statusSpan.textContent = '🔴 Recording in progress...';
+                    statusSpan.className = 'text-red-400 text-sm recording-indicator';
+                    break;
+                case 'stopped':
+                    startBtn.disabled = false;
+                    startBtn.classList.remove('recording-indicator');
+                    stopBtn.disabled = true;
+                    statusSpan.textContent = '✅ Recording completed';
+                    statusSpan.className = 'text-green-400 text-sm';
+                    break;
+                case 'error':
+                    startBtn.disabled = false;
+                    startBtn.classList.remove('recording-indicator');
+                    stopBtn.disabled = true;
+                    statusSpan.textContent = '❌ Recording failed';
+                    statusSpan.className = 'text-red-400 text-sm';
+                    break;
+                default:
+                    startBtn.disabled = false;
+                    startBtn.classList.remove('recording-indicator');
+                    stopBtn.disabled = true;
+                    statusSpan.textContent = '';
+                    break;
+            }
+        }
+
+        // ACCUSATION FORM SUBMISSION HANDLER
+        async function handleAccusationSubmission(e) {
+            e.preventDefault();
+            
+            const accusedPlayerId = document.getElementById('accused-player-select').value;
+            
+            if (!accusedPlayerId) {
+                showMessage("Please select an accused player.");
                 return;
+            }
+            
+            if (!recordedAudioBlob) {
+                showMessage("Please record an audio accusation first.");
+                return;
+            }
+            
+            await submitAccusation(accusedPlayerId, recordedAudioBlob);
         }
 
-        if (endpoint) {
-            await performFetchAction(endpoint, payload);
-            renderView('dashboard'); // Go back to dashboard after action attempt
-        }
-    }
-});
+        // ACCUSATION SUBMISSION FUNCTION
+        async function submitAccusation(accusedPlayerId, audioBlob) {
+            loadingOverlay.style.display = 'flex';
+            try {
+                const formData = new FormData();
+                formData.append('accuserPlayerId', state.currentUserId);
+                formData.append('accusedPlayerId', accusedPlayerId);
+                formData.append('audioFile', audioBlob, `accusation_${state.currentUserId}_${Date.now()}.webm`);
 
-// Existing appRoot.addEventListener for click
-appRoot.addEventListener('click', async (e) => { // Added 'async' here
-    if (e.target.id === 'back-to-dashboard') {
-        renderView('dashboard');
-    }
-    // Add more click handlers here if needed for other dynamically created buttons
-});
+                const response = await fetch('/.netlify/functions/submit-accusation', {
+                    method: 'POST',
+                    body: formData,
+                });
+
+                const result = await response.json();
+
+                if (response.ok) {
+                    showMessage(result.message || 'Accusation submitted successfully!');
+                    await fetchPlayers(true);
+                    await fetchGameState();
+                    renderView('dashboard');
+                } else {
+                    throw new Error(result.message || `Error: ${response.status} ${response.statusText}`);
+                }
+            } catch (error) {
+                console.error("Error submitting accusation:", error);
+                showMessage(`Failed to submit accusation: ${error.message}`);
+            } finally {
+                loadingOverlay.style.display = 'none';
+                setTimeout(() => { messageBox.style.display = 'none'; }, 5000);
+                // Reset audio state
+                resetAudioState();
+            }
+        }
+
+        function resetAudioState() {
+            mediaRecorder = null;
+            audioChunks = [];
+            recordedAudioBlob = null;
+            const audioPlayer = document.getElementById('audio-playback');
+            if (audioPlayer) {
+                audioPlayer.src = '';
+                audioPlayer.load();
+            }
+            const audioPreviewContainer = document.getElementById('audio-preview-container');
+            if (audioPreviewContainer) {
+                audioPreviewContainer.classList.add('hidden');
+            }
+            updateRecordingUI('default');
+        }
+
+        // EXISTING EVENT LISTENERS (keeping the old structure for other forms)
+        appRoot.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            if (e.target.id === 'login-form') {
+                handleLogin();
+            } else if (e.target.id === 'action-form') {
+                const actionType = e.target.dataset.actionType;
+                const targetPlayerId = document.getElementById('target-player').value;
+
+                if (!targetPlayerId) {
+                    showMessage("Please select a target player.");
+                    return;
+                }
+
+                let endpoint;
+                let payload;
+
+                switch (actionType) {
+                    case 'kill':
+                        endpoint = '/.netlify/functions/kill-player';
+                        payload = { mafiaPlayerId: state.currentUserId, targetPlayerId: targetPlayerId };
+                        break;
+                    case 'protect':
+                        endpoint = '/.netlify/functions/protect-player';
+                        payload = { doctorPlayerId: state.currentUserId, targetPlayerId: targetPlayerId };
+                        break;
+                    case 'check':
+                        endpoint = '/.netlify/functions/check-mafia';
+                        payload = { detectivePlayerId: state.currentUserId, targetPlayerId: targetPlayerId };
+                        break;
+                    case 'shoot':
+                        endpoint = '/.netlify/functions/shoot-player';
+                        payload = { sheriffPlayerId: state.currentUserId, targetPlayerId: targetPlayerId };
+                        break;
+                    default:
+                        showMessage('Unknown action type for submission.');
+                        console.error('Unknown actionType:', actionType);
+                        return;
+                }
+
+                if (endpoint) {
+                    await performFetchAction(endpoint, payload);
+                    renderView('dashboard');
+                }
+            }
+        });
+
+        appRoot.addEventListener('click', async (e) => {
+            if (e.target.id === 'back-to-dashboard') {
+                renderView('dashboard');
+            }
+        });
+
         async function handleLogin() {
             const nameInput = document.getElementById('login-code').value.trim();
             const loginError = document.getElementById('login-error');
@@ -330,42 +533,36 @@ appRoot.addEventListener('click', async (e) => { // Added 'async' here
                 state.allPlayers = [];
             }
         }
-// Add this new function somewhere in your <script type="module"> block,
-// for example, right after your showMessage function.
 
-async function performFetchAction(endpoint, payload) {
-    loadingOverlay.style.display = 'flex'; // Show loading spinner
-    try {
-        const response = await fetch(endpoint, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify(payload),
-        });
+        async function performFetchAction(endpoint, payload) {
+            loadingOverlay.style.display = 'flex';
+            try {
+                const response = await fetch(endpoint, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify(payload),
+                });
 
-        const result = await response.json(); // Assuming all your Netlify functions return JSON
+                const result = await response.json();
 
-        if (response.ok) {
-            showMessage(result.message || 'Action performed successfully!');
-            // After any action, it's good practice to re-fetch player data and game state
-            // to ensure the UI reflects the latest changes from the sheet.
-            await fetchPlayers(true); // Force refresh players
-            await fetchGameState();
-            initializeGame(state.currentUserId); // Re-initialize to update dashboard
-        } else {
-            // If the response is not OK, but we still got a JSON message
-            throw new Error(result.message || `Error: ${response.status} ${response.statusText}`);
+                if (response.ok) {
+                    showMessage(result.message || 'Action performed successfully!');
+                    await fetchPlayers(true);
+                    await fetchGameState();
+                    initializeGame(state.currentUserId);
+                } else {
+                    throw new Error(result.message || `Error: ${response.status} ${response.statusText}`);
+                }
+            } catch (error) {
+                console.error("Error performing action:", error);
+                showMessage(`Failed to perform action: ${error.message}`);
+            } finally {
+                loadingOverlay.style.display = 'none';
+                setTimeout(() => { messageBox.style.display = 'none'; }, 5000);
+            }
         }
-    } catch (error) {
-        console.error("Error performing action:", error);
-        showMessage(`Failed to perform action: ${error.message}`);
-    } finally {
-        loadingOverlay.style.display = 'none'; // Hide loading spinner
-        // Hide message box after a few seconds
-        setTimeout(() => { messageBox.style.display = 'none'; }, 5000);
-    }
-}
 
         async function initializeGame(userId) {
             state.currentUserId = userId;
@@ -403,260 +600,54 @@ async function performFetchAction(endpoint, payload) {
             messageBox.textContent = message;
             messageBox.style.display = 'block';
         }
-// --- Audio Recording Functions ---
-async function startRecording() {
-    try {
-        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-        mediaRecorder = new MediaRecorder(stream, { mimeType: 'audio/webm;codecs=opus' });
-
-        audioChunks = [];
-        mediaRecorder.ondataavailable = event => {
-            audioChunks.push(event.data);
-        };
-
-        mediaRecorder.onstop = () => {
-            recordedAudioBlob = new Blob(audioChunks, { type: 'audio/webm;codecs=opus' });
-            audioPlayer = document.getElementById('audio-playback');
-            audioPlayer.src = URL.createObjectURL(recordedAudioBlob);
-            audioPlayer.load();
-
-            document.getElementById('play-recording').disabled = false;
-            document.getElementById('submit-accusation-btn').disabled = false;
-
-            stream.getTracks().forEach(track => track.stop());
-        };
-
-        mediaRecorder.start();
-        document.getElementById('start-recording').disabled = true;
-        document.getElementById('stop-recording').disabled = false;
-        document.getElementById('play-recording').disabled = true;
-        document.getElementById('submit-accusation-btn').disabled = true;
-        document.getElementById('audio-playback').classList.add('hidden');
-        showMessage('Recording started...');
-    } catch (err) {
-        console.error('Error accessing microphone:', err);
-        showMessage('Could not access microphone. Please ensure it is connected and permissions are granted.');
-    }
-}
-
-function stopRecording() {
-    if (mediaRecorder && mediaRecorder.state === 'recording') {
-        mediaRecorder.stop();
-        document.getElementById('start-recording').disabled = false;
-        document.getElementById('stop-recording').disabled = true;
-        document.getElementById('audio-playback').classList.remove('hidden'); // Show player after stopping
-        showMessage('Recording stopped. Preview available.');
-    }
-}
-
-function playRecording() {
-    if (audioPlayer && recordedAudioBlob) {
-        audioPlayer.play();
-    } else {
-        showMessage('No recording to play.');
-    }
-}
-
-// --- Accusation Form Submission Function ---
-async function submitAccusation(accusedPlayerId, audioBlob) {
-    if (!accusedPlayerId || !audioBlob) {
-        showMessage("Please select an accused player and record an audio accusation.");
-        return;
-    }
-
-    loadingOverlay.style.display = 'flex';
-    try {
-        // Use FormData to send the audio file along with other data
-        const formData = new FormData();
-        formData.append('accuserPlayerId', state.currentUserId);
-        formData.append('accusedPlayerId', accusedPlayerId);
-        // Rename audio file to .mp4 or appropriate extension for your backend (even if it's webm internally)
-        // You mentioned MP4, but MediaRecorder typically outputs WebM. Let's send as webm for now,
-        // and if your backend truly needs MP4, we'll need a conversion step (more complex).
-        // If your backend handles webm well, this is fine.
-        formData.append('audioFile', audioBlob, `accusation_${state.currentUserId}_${Date.now()}.webm`);
-
-
-        const response = await fetch('/.netlify/functions/submit-accusation', {
-            method: 'POST',
-            body: formData, // Sending FormData, so no 'Content-Type' header needed (browser sets it)
-        });
-
-        const result = await response.json(); // Assuming your Netlify function returns JSON
-
-        if (response.ok) {
-            showMessage(result.message || 'Accusation submitted successfully!');
-            // After successful submission, refresh data and return to dashboard
-            await fetchPlayers(true);
-            await fetchGameState();
-            renderView('dashboard');
-        } else {
-            throw new Error(result.message || `Error: ${response.status} ${response.statusText}`);
-        }
-    } catch (error) {
-        console.error("Error submitting accusation:", error);
-        showMessage(`Failed to submit accusation: ${error.message}`);
-    } finally {
-        loadingOverlay.style.display = 'none';
-        setTimeout(() => { messageBox.style.display = 'none'; }, 5000);
-        // Reset audio state after submission attempt
-        mediaRecorder = null;
-        audioChunks = [];
-        recordedAudioBlob = null;
-        if (audioPlayer) audioPlayer.src = '';
-    }
-}
         
-function updateDashboardActions(currentPhase) {
-        const playerActions = document.getElementById('player-dashboard-actions');
-        if (!playerActions) return;
-        playerActions.innerHTML = ''; // Clear existing buttons
+        function updateDashboardActions(currentPhase) {
+            const playerActions = document.getElementById('player-dashboard-actions');
+            const adminActions = document.getElementById('admin-dashboard-actions');
+            
+            if (!playerActions) return;
+            playerActions.innerHTML = '';
 
-        const isNight = currentPhase && currentPhase.toLowerCase() !== 'day';
-
-        const createButton = (id, text, style, onClick) => {
-            const button = document.createElement('button');
-            button.id = id;
-            button.textContent = text;
-            button.className = `${style} text-white font-bold py-3 px-6 rounded-lg transition`;
-            button.onclick = onClick;
-            playerActions.appendChild(button);
-        };
-
-        const role = state.currentUser.Role.toLowerCase();
-
-        // --- ALL ROLES ---
-        createButton('btn-submit-accusation', 'Submit Accusation', 'bg-gray-700 hover:bg-gray-800', () => {
-            const targets = state.allPlayers.filter(p =>
-                p.Status && typeof p.Status === 'string' && p.Status.toLowerCase() === 'alive' &&
-                p.PlayerID !== state.currentUserId
-            );
-            renderView('accusationForm', { targets });
-        });
-
-        // --- MAFIA ---
-        if (role === 'mafia') {
-            createButton('btn-kill', 'Kill Player', 'bg-red-700 hover:bg-red-800', () => {
-                if (!isNight) return showMessage("You can only use this action at night.");
-                if (state.currentUser.MainUsed === 'TRUE') return showMessage("You have already used your main action tonight.");
-                const targets = state.allPlayers.filter(p =>
-                    p.Status && typeof p.Status === 'string' && p.Status.toLowerCase() === 'alive' &&
-                    p.Role && typeof p.Role === 'string' && p.Role.toLowerCase() !== 'mafia'
-                );
-                renderView('actionModal', { title: 'Choose a Target to Kill', buttonText: 'Confirm Kill', targets, actionType: 'kill' });
-            });
-            createButton('btn-convert', 'Convert Villager', 'bg-red-900', () => {
-                if (!isNight) return showMessage("You can only use this ability at night.");
-                if (state.currentUser.MafiaCanConvert !== 'TRUE') return showMessage("You have not unlocked this ability or have already used it.");
-                // This calls performFetchAction which you mentioned isn't fully defined yet.
-                // It will be the next step to address this.
-                performFetchAction('/.netlify/functions/convert-villager', { mafiaPlayerId: state.currentUserId });
-            });
-            createButton('btn-reveal-mafia', 'Reveal Mafia', 'bg-red-900', () => {
-                if (!isNight) return showMessage("You can only use this ability at night.");
-                if (state.currentUser.MafiaCanRevealSelf !== 'TRUE') return showMessage("You have not unlocked this ability or have already used it.");
-                performFetchAction('/.netlify/functions/reveal-mafia', { mafiaPlayerId: state.currentUserId });
-            });
-            createButton('btn-view-teammates', 'List Mafia', 'bg-cyan-600 hover:bg-cyan-700', () => {
-                if (!state.currentUser.RevealedTeammates) return showMessage("You have not revealed any teammates yet.");
-                const teammates = state.currentUser.RevealedTeammates.split(',').map(id => getPlayerNameById(id));
-                renderView('revealedTeammates', { role: 'Mafia', teammates });
-            });
-        }
-
-        // --- DOCTOR ---
-        if (role === 'doctor') {
-            createButton('btn-protect', 'Protect Player', 'bg-blue-700 hover:bg-blue-800', () => {
-                if (!isNight) return showMessage("You can only use this action at night.");
-                if (state.currentUser.MainUsed === 'TRUE') return showMessage("You have already used your main action tonight.");
-                const targets = state.allPlayers.filter(p => p.Status && typeof p.Status === 'string' && p.Status.toLowerCase() === 'alive');
-                renderView('actionModal', { title: 'Choose a Player to Protect', buttonText: 'Confirm Protection', targets, actionType: 'protect' });
-            });
-            createButton('btn-revive', 'Revive Player', 'bg-blue-900', () => {
-                if (!isNight) return showMessage("You can only use this ability at night.");
-                if (state.currentUser.DoctorCanRevive !== 'TRUE') return showMessage("You have not unlocked this ability or have already used it.");
-                performFetchAction('/.netlify/functions/revive-player', { doctorPlayerId: state.currentUserId });
-            });
-            createButton('btn-reveal-doctor', 'Reveal Doctor', 'bg-blue-900', () => {
-                if (!isNight) return showMessage("You can only use this ability at night.");
-                if (state.currentUser.DoctorCanRevealSelf !== 'TRUE') return showMessage("You have not unlocked this ability or have already used it.");
-                performFetchAction('/.netlify/functions/reveal-doctor', { doctorPlayerId: state.currentUserId });
-            });
-            createButton('btn-view-teammates', 'List Doctors', 'bg-cyan-600 hover:bg-cyan-700', () => {
-                if (!state.currentUser.RevealedTeammates) return showMessage("You have not revealed any teammates yet.");
-                const teammates = state.currentUser.RevealedTeammates.split(',').map(id => getPlayerNameById(id));
-                renderView('revealedTeammates', { role: 'Doctor', teammates });
-            });
-        }
-
-        // --- DETECTIVE ---
-        if (role === 'detective') {
-            createButton('btn-check', 'Investigate Player', 'bg-yellow-600 hover:bg-yellow-700', () => {
-                if (!isNight) return showMessage("You can only use this action at night.");
-                if (state.currentUser.MainUsed === 'TRUE') return showMessage("You have already used your main action tonight.");
-                const targets = state.allPlayers.filter(p =>
-                    p.Status && typeof p.Status === 'string' && p.Status.toLowerCase() === 'alive' &&
-                    p.PlayerID !== state.currentUserId
-                );
-                renderView('actionModal', { title: 'Choose a Player to Investigate', buttonText: 'Confirm Investigation', targets, actionType: 'check' });
-            });
-            createButton('btn-reveal-detective', 'Reveal a Detective', 'bg-yellow-900', () => showMessage("This ability is not yet implemented."));
-            createButton('btn-view-history', 'Investigation History', 'bg-purple-700 hover:bg-purple-800', () => renderView('investigationHistory'));
-        }
-
-        // --- VILLAGER ---
-        if (role === 'villager') {
-            createButton('btn-increase-vote', 'Increase Vote Power', 'bg-green-900', () => {
-                if (!isNight) return showMessage("You can only use this ability at night.");
-                if (state.currentUser.VillagerCanIncreaseVote !== 'TRUE') return showMessage("You have not unlocked this ability or have already used it.");
-                performFetchAction('/.netlify/functions/increase-vote-power', { villagerPlayerId: state.currentUserId });
-            });
-            createButton('btn-change-role', 'Change Role', 'bg-green-900', () => {
-                if (!isNight) return showMessage("You can only use this ability at night.");
-                if (state.currentUser.VillagerCanChangeRole !== 'TRUE') return showMessage("You have not unlocked this ability or have already used it.");
-                performFetchAction('/.netlify/functions/change-role', { villagerPlayerId: state.currentUserId });
-            });
-        }
-
-        // --- SHERIFF ---
-        if (role === 'sheriff') {
-            createButton('btn-shoot', 'Shoot Player', 'bg-gray-700 hover:bg-gray-800', () => {
-                if (!isNight) return showMessage("You can only use this action at night.");
-                if (state.currentUser.MainUsed === 'TRUE') return showMessage("You have already used your main action tonight.");
-                if (state.currentUser.SheriffShotUsed === 'TRUE') return showMessage("You have already used your one-time shot.");
-                const targets = state.allPlayers.filter(p =>
-                    p.Status && typeof p.Status === 'string' && p.Status.toLowerCase() === 'alive' &&
-                    p.PlayerID !== state.currentUserId
-                );
-                renderView('actionModal', { title: 'Choose Your Target', buttonText: 'Fire!', targets, actionType: 'shoot' });
-            });
-        }
-    }
-
-        window.onload = async () => {
-            const savedUserId = localStorage.getItem('mafiaGameUserId');
-            try {
-                if (savedUserId) {
-                    loadingOverlay.style.display = 'flex';
-                    await fetchPlayers();
-                    if (state.allPlayers.length > 0) {
-                        await initializeGame(savedUserId);
-                    } else {
-                        localStorage.removeItem('mafiaGameUserId');
-                        renderView('login');
-                        document.getElementById('login-error').textContent = "Could not load player list from the server.";
-                    }
+            // Show/hide admin actions based on admin status
+            if (adminActions) {
+                if (state.isCurrentUserAdmin) {
+                    adminActions.classList.remove('hidden');
+                    adminActions.classList.add('grid');
                 } else {
-                    renderView('login');
+                    adminActions.classList.add('hidden');
+                    adminActions.classList.remove('grid');
                 }
-            } catch (error) {
-                console.error("Critical error on page load:", error);
-                renderView('login');
-                document.getElementById('login-error').textContent = "An unexpected error occurred. Please try again.";
-            } finally {
-                loadingOverlay.style.display = 'none';
             }
-        };
-    </script>
-</body>
-</html>
+
+            const isNight = currentPhase && currentPhase.toLowerCase() !== 'day';
+
+            const createButton = (id, text, style, onClick) => {
+                const button = document.createElement('button');
+                button.id = id;
+                button.textContent = text;
+                button.className = `${style} text-white font-bold py-3 px-6 rounded-lg transition`;
+                button.onclick = onClick;
+                playerActions.appendChild(button);
+            };
+
+            const role = state.currentUser.Role.toLowerCase();
+
+            // ALL ROLES - Submit Accusation
+            createButton('btn-submit-accusation', 'Submit Accusation', 'bg-gray-700 hover:bg-gray-800', () => {
+                const targets = state.allPlayers.filter(p =>
+                    p.Status && typeof p.Status === 'string' && p.Status.toLowerCase() === 'alive' &&
+                    p.PlayerID !== state.currentUserId
+                );
+                renderView('accusationForm', { targets });
+            });
+
+            // MAFIA ACTIONS
+            if (role === 'mafia') {
+                createButton('btn-kill', 'Kill Player', 'bg-red-700 hover:bg-red-800', () => {
+                    if (!isNight) return showMessage("You can only use this action at night.");
+                    if (state.currentUser.MainUsed === 'TRUE') return showMessage("You have already used your main action tonight.");
+                    const targets = state.allPlayers.filter(p =>
+                        p.Status && typeof p.Status === 'string' && p.Status.toLowerCase() === 'alive' &&
+                        p.Role && typeof p.Role === 'string' && p.Role.toLowerCase() !== 'mafia'
+                    );
+                    renderView('actionModal', { title: 'Choose a Target to Kill', buttonText: 'Confirm Kill', targets, actionType:
