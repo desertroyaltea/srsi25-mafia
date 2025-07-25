@@ -142,7 +142,15 @@
                     </div>
                     <div id="view-content">${viewHtml}</div>
                 </div>`,
-            dashboard: () => `...`, // Unchanged
+            dashboard: () => `
+                <div class="bg-gray-900 p-5 rounded-lg mt-4">
+                    <h2 class="text-2xl font-semibold mb-4">Dashboard</h2>
+                    <p class="text-gray-400 mb-6">Select an action to proceed.</p>
+                    <div id="player-dashboard-actions" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4"></div>
+                    <div id="admin-dashboard-actions" class="hidden grid-cols-1 md:grid-cols-2 gap-4">
+                        <button id="btn-review-accusations" class="bg-green-700 hover:bg-green-800 text-white font-bold py-3 px-6 rounded-lg">Review Accusations</button>
+                    </div>
+                </div>`,
         };
 
         function renderView(viewName, data = {}) {
@@ -151,7 +159,6 @@
             } else {
                 appRoot.innerHTML = templates.gameLayout(templates[viewName](data));
             }
-            // The attachEventListeners function is no longer needed
         }
 
         appRoot.addEventListener('submit', (e) => {
@@ -159,12 +166,10 @@
                 e.preventDefault();
                 handleLogin();
             }
-            // ... other form submissions
         });
         
         appRoot.addEventListener('click', (e) => {
             // This will handle all button clicks
-            // ... logic for other buttons will go here
         });
 
         async function handleLogin() {
@@ -215,7 +220,6 @@
             state.currentUserId = userId;
             state.currentUser = state.allPlayers.find(p => p.PlayerID === userId);
             if (!state.currentUser) {
-                // Handle case where user ID from storage is not in the player list
                 localStorage.removeItem('mafiaGameUserId');
                 renderView('login');
                 document.getElementById('login-error').textContent = "Your player data seems outdated. Please log in again.";
@@ -232,12 +236,48 @@
         }
 
         async function fetchGameState() {
-            // ... fetch game state logic
+            try {
+                const response = await fetch('/.netlify/functions/get-game-state');
+                if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+                state.gameState = await response.json();
+            } catch (error) {
+                console.error("Error fetching game state:", error);
+                showMessage("Failed to load game state.");
+                state.gameState = null;
+            }
         }
         
         function showMessage(message) {
             messageBox.textContent = message;
             messageBox.style.display = 'block';
+        }
+        
+        function updateDashboardActions(currentPhase) {
+            const playerActions = document.getElementById('player-dashboard-actions');
+            if (!playerActions) return;
+            // Clear existing buttons
+            playerActions.innerHTML = '';
+
+            const isNight = currentPhase && currentPhase.toLowerCase() !== 'day';
+
+            const createButton = (id, text, style, onClick) => {
+                const button = document.createElement('button');
+                button.id = id;
+                button.textContent = text;
+                button.className = `${style} text-white font-bold py-3 px-6 rounded-lg transition`;
+                button.onclick = onClick;
+                playerActions.appendChild(button);
+            };
+
+            // Always show Submit Accusation, but disable it during the day
+            const accBtn = document.createElement('button');
+            accBtn.id = 'btn-submit-accusation';
+            accBtn.textContent = 'Submit Accusation';
+            accBtn.className = 'bg-red-800 hover:bg-red-900 text-white font-bold py-3 px-6 rounded-lg transition';
+            accBtn.disabled = !isNight;
+            playerActions.appendChild(accBtn);
+            
+            // ... The rest of the button creation logic will go here
         }
 
         window.onload = async () => {
@@ -249,7 +289,6 @@
                     if (state.allPlayers.length > 0) {
                         await initializeGame(savedUserId);
                     } else {
-                        // If player list fails to load, force back to login
                         localStorage.removeItem('mafiaGameUserId');
                         renderView('login');
                         document.getElementById('login-error').textContent = "Could not load player list from the server.";
@@ -259,7 +298,7 @@
                 }
             } catch (error) {
                 console.error("Critical error on page load:", error);
-                renderView('login'); // Fallback to login screen on any major error
+                renderView('login');
                 document.getElementById('login-error').textContent = "An unexpected error occurred. Please try again.";
             } finally {
                 loadingOverlay.style.display = 'none';
