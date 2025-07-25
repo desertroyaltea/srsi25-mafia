@@ -404,7 +404,22 @@ const state = { allPlayers: [], currentUserId: null, currentUser: null, isCurren
         console.log("Attempting to start recording...");
         try {
             const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-            mediaRecorder = new MediaRecorder(stream, { mimeType: 'audio/webm;codecs=opus' });
+            // Attempt to use a more compatible mimeType for iOS, with fallbacks
+        let options = { mimeType: 'audio/mp4' }; // First attempt: MP4
+        if (!MediaRecorder.isTypeSupported(options.mimeType)) {
+            options = { mimeType: 'audio/webm;codecs=opus' }; // Fallback 1: WebM (for Android/Desktop)
+            if (!MediaRecorder.isTypeSupported(options.mimeType)) {
+                options = { mimeType: 'audio/wav' }; // Fallback 2: WAV (broadest, but larger files)
+                if (!MediaRecorder.isTypeSupported(options.mimeType)) {
+                    console.error('No supported audio mimeType found for MediaRecorder.');
+                    showMessage('Your browser does not support recording audio in any known format.');
+                    stream.getTracks().forEach(track => track.stop()); // Stop stream if no support
+                    return; // Exit function if no supported type
+                }
+            }
+        }
+        mediaRecorder = new MediaRecorder(stream, options); // Use the determined options
+        console.log(`MediaRecorder using mimeType: ${options.mimeType}`); // Log the chosen MIME type
 
             audioChunks = [];
             mediaRecorder.ondataavailable = event => {
