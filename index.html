@@ -232,35 +232,28 @@
             if (!codeInput || !loginError) return;
             
             const nameInput = codeInput.value.trim();
-            console.log(`--- LOGIN ATTEMPT ---`);
-            console.log(`User entered name: "${nameInput}"`);
-            
             if (!nameInput) return;
 
             loginError.textContent = '';
             loadingOverlay.style.display = 'flex';
             
             await fetchPlayers();
-            console.log("Fetched players list:", state.allPlayers);
+            
+            // FIX: Check if the player list is empty after fetching
+            if (state.allPlayers.length === 0) {
+                console.error("LOGIN FAILED: The player list is empty. Check the get-player-data function and the Google Sheet.");
+                loginError.textContent = 'Could not load player list from the server.';
+                loadingOverlay.style.display = 'none';
+                return;
+            }
             
             const lowercasedNameInput = nameInput.toLowerCase();
-            
-            console.log("--- STARTING SEARCH ---");
-            const player = state.allPlayers.find(p => {
-                const sheetName = p.Name ? p.Name.trim().toLowerCase() : '';
-                console.log(`Comparing: (Input) "${lowercasedNameInput}" === (Sheet) "${sheetName}" -> ${sheetName === lowercasedNameInput}`);
-                return sheetName === lowercasedNameInput;
-            });
-            
-            console.log("--- SEARCH COMPLETE ---");
-            console.log("Found player object:", player);
+            const player = state.allPlayers.find(p => p.Name && p.Name.trim().toLowerCase() === lowercasedNameInput);
 
             if (player) {
-                console.log(`SUCCESS: Found matching player ID: ${player.PlayerID}`);
                 localStorage.setItem('mafiaGameUserId', player.PlayerID);
                 await initializeGame(player.PlayerID);
             } else {
-                console.log("FAILURE: No matching player found.");
                 loadingOverlay.style.display = 'none';
                 loginError.textContent = 'Invalid Player Name. Please try again.';
             }
@@ -382,6 +375,15 @@
             try {
                 state.currentUserId = userId;
                 await fetchPlayers();
+                
+                // FIX: Check if the player list is empty after fetching
+                if (state.allPlayers.length === 0) {
+                    localStorage.removeItem('mafiaGameUserId');
+                    renderView('login');
+                    document.getElementById('login-error').textContent = "Could not load player list from the server.";
+                    return;
+                }
+
                 state.currentUser = state.allPlayers.find(p => p.PlayerID === state.currentUserId);
                 
                 if (!state.currentUser) {
