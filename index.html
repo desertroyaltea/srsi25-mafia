@@ -102,608 +102,619 @@
     <div id="app-root"></div>
     <div id="message-box" class="message-box"></div>
 
-    <script type="module">
-const state = { allPlayers: [], currentUserId: null, currentUser: null, isCurrentUserAdmin: false, gameState: null, pendingAccusations: [] };        const appRoot = document.getElementById('app-root');
-        const messageBox = document.getElementById('message-box');
-        const loadingOverlay = document.getElementById('loading-overlay');
-        // NEW GLOBAL VARIABLES FOR AUDIO RECORDING START HERE
-        let mediaRecorder;
-        let audioChunks = [];
-        let recordedAudioBlob = null;
-        let audioPlayer;
-        // NEW GLOBAL VARIABLES FOR AUDIO RECORDING END HERE
+<script type="module">
+    const state = { allPlayers: [], currentUserId: null, currentUser: null, isCurrentUserAdmin: false, gameState: null, pendingAccusations: [] };
+    const appRoot = document.getElementById('app-root');
+    const messageBox = document.getElementById('message-box');
+    const loadingOverlay = document.getElementById('loading-overlay');
+    let mediaRecorder;
+    let audioChunks = [];
+    let recordedAudioBlob = null;
+    let audioPlayer;
 
-        const templates = {
-            login: () => `
-                <div class="container">
-                    <h1 class="text-4xl font-bold text-center text-red-500 mb-6">SRSI MAFIA LOGIN</h1>
-                    <form id="login-form">
-                        <div class="mb-6">
-                            <label for="login-code" class="block text-gray-300 text-lg font-bold mb-2">Enter Your Player Name:</label>
-                            <input type="text" id="login-code" class="shadow appearance-none border rounded w-full py-3 px-4 text-lg text-gray-200 leading-tight focus:outline-none focus:shadow-outline" required>
-                        </div>
-                        <button type="submit" class="bg-red-700 hover:bg-red-800 text-white font-bold py-3 px-6 rounded-lg w-full text-xl">Enter Game</button>
-                        <p id="login-error" class="text-red-500 text-center mt-4"></p>
-                    </form>
-                </div>`,
-            gameLayout: (viewHtml) => `
-                <div class="container" id="game-container">
-                    <h1 class="text-4xl font-bold text-center text-red-500 mb-6">SRSI MAFIA</h1>
-                    <div class="bg-gray-900 p-4 rounded-lg flex justify-between items-center">
-                        <p class="text-base text-gray-400">Logged in as:</p>
-                        <span class="font-mono text-blue-400 text-base">${state.currentUser.Name} (${state.currentUser.Role})</span>
+    const templates = {
+        login: () => `
+            <div class="container">
+                <h1 class="text-4xl font-bold text-center text-red-500 mb-6">SRSI MAFIA LOGIN</h1>
+                <form id="login-form">
+                    <div class="mb-6">
+                        <label for="login-code" class="block text-gray-300 text-lg font-bold mb-2">Enter Your Player Name:</label>
+                        <input type="text" id="login-code" class="shadow appearance-none border rounded w-full py-3 px-4 text-lg text-gray-200 leading-tight focus:outline-none focus:shadow-outline" required>
                     </div>
-                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-                        <div class="bg-gray-900 p-5 rounded-lg">
-                            <h2 class="text-2xl font-semibold mb-3">Game Status</h2>
-                            <p>Current Day: <span class="font-bold text-red-400">${state.gameState?.CurrentDay || '...'}</span></p>
-                            <p>Current Phase: <span class="font-bold text-red-400">${state.gameState?.CurrentPhase || '...'}</span></p>
-                        </div>
-                        <div class="bg-gray-900 p-5 rounded-lg">
-                            <h2 class="text-2xl font-semibold mb-3">Trial Information</h2>
-                            <p>Accused Player: <span class="font-bold text-red-400">${getPlayerNameById(state.gameState?.LastAccusedPlayerID) || 'N/A'}</span></p>
-                            <p>Last Trial Result: <span class="font-bold text-green-400">${state.gameState?.LastTrialResult || 'N/A'}</span></p>
-                        </div>
-                    </div>
-                    <div id="view-content">${viewHtml}</div>
-                </div>`,
-            dashboard: () => `
-                <div class="bg-gray-900 p-5 rounded-lg mt-4">
-                    <h2 class="text-2xl font-semibold mb-4">Dashboard</h2>
-                    <p class="text-gray-400 mb-6">Select an action to proceed.</p>
-                    <div id="player-dashboard-actions" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4"></div>
-<div id="admin-dashboard-actions" class="grid-cols-1 md:grid-cols-2 gap-4 ${state.isCurrentUserAdmin ? 'grid' : 'hidden'}">
-                        <button id="btn-review-accusations" class="bg-green-700 hover:bg-green-800 text-white font-bold py-3 px-6 rounded-lg">Review Accusations</button>
-                    </div>
-                </div>`,
-            actionModal: ({ title, buttonText, targets, actionType }) => `
-                <div class="bg-gray-900 p-5 rounded-lg mt-4">
-                    <h2 class="text-2xl font-semibold mb-4 text-red-400">${title}</h2>
-                    <form id="action-form" data-action-type="${actionType}">
-                        <div class="mb-4">
-                            <label for="target-player" class="block text-gray-300 text-lg font-bold mb-2">Select Target:</label>
-                            <select id="target-player" class="shadow border rounded w-full py-3 px-4 text-lg leading-tight focus:outline-none focus:shadow-outline bg-gray-700 border-gray-600 text-white" required>
-                                <option value="">-- Select a player --</option>
-                                ${targets.map(p => `<option value="${p.PlayerID}">${p.Name}</option>`).join('')}
-                            </select>
-                        </div>
-                        <div class="flex flex-col md:flex-row gap-4">
-                            <button type="submit" class="bg-red-700 hover:bg-red-800 text-white font-bold py-3 px-6 rounded-lg w-full md:w-1/2 text-xl">
-                                ${buttonText}
-                            </button>
-                            <button type="button" id="back-to-dashboard" class="bg-gray-600 hover:bg-gray-700 text-white font-bold py-3 px-6 rounded-lg w-full md:w-1/2 text-xl">
-                                Cancel
-                            </button>
-                        </div>
-                    </form>
+                    <button type="submit" class="bg-red-700 hover:bg-red-800 text-white font-bold py-3 px-6 rounded-lg w-full text-xl">Enter Game</button>
+                    <p id="login-error" class="text-red-500 text-center mt-4"></p>
+                </form>
+            </div>`,
+        gameLayout: (viewHtml) => `
+            <div class="container" id="game-container">
+                <h1 class="text-4xl font-bold text-center text-red-500 mb-6">SRSI MAFIA</h1>
+                <div class="bg-gray-900 p-4 rounded-lg flex justify-between items-center">
+                    <p class="text-base text-gray-400">Logged in as:</p>
+                    <span class="font-mono text-blue-400 text-base">${state.currentUser.Name} (${state.currentUser.Role})</span>
                 </div>
-            `,
-            // NEW ACCUSATION FORM TEMPLATE
-            accusationForm: ({ targets }) => `
-                <div class="bg-gray-900 p-5 rounded-lg mt-4">
-                    <h2 class="text-2xl font-semibold mb-4 text-red-400">Submit Accusation</h2>
-                    <form id="accusation-submission-form">
-                        <div class="mb-4">
-                            <label for="accuser-name" class="block text-gray-300 text-lg font-bold mb-2">Accuser (Your Name):</label>
-                            <input type="text" id="accuser-name" class="shadow appearance-none border rounded w-full py-3 px-4 text-lg text-gray-200 leading-tight focus:outline-none focus:shadow-outline bg-gray-700 border-gray-600 cursor-not-allowed" value="${state.currentUser.Name}" readonly>
-                        </div>
-                        <div class="mb-4">
-                            <label for="accused-player-select" class="block text-gray-300 text-lg font-bold mb-2">Accused Player:</label>
-                            <select id="accused-player-select" class="shadow border rounded w-full py-3 px-4 text-lg leading-tight focus:outline-none focus:shadow-outline bg-gray-700 border-gray-600 text-white" required>
-                                <option value="">-- Select accused player --</option>
-                                ${targets.map(p => `<option value="${p.PlayerID}">${p.Name}</option>`).join('')}
-                            </select>
-                        </div>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div class="bg-gray-900 p-5 rounded-lg">
+                        <h2 class="text-2xl font-semibold mb-3">Game Status</h2>
+                        <p>Current Day: <span class="font-bold text-red-400">${state.gameState?.CurrentDay || '...'}</span></p>
+                        <p>Current Phase: <span class="font-bold text-red-400">${state.gameState?.CurrentPhase || '...'}</span></p>
+                    </div>
+                    <div class="bg-gray-900 p-5 rounded-lg">
+                        <h2 class="text-2xl font-semibold mb-3">Trial Information</h2>
+                        <p>Accused Player: <span class="font-bold text-red-400">${getPlayerNameById(state.gameState?.LastAccusedPlayerID) || 'N/A'}</span></p>
+                        <p>Last Trial Result: <span class="font-bold text-green-400">${state.gameState?.LastTrialResult || 'N/A'}</span></p>
+                    </div>
+                </div>
+                <div id="view-content">${viewHtml}</div>
+            </div>`,
+        dashboard: () => `
+            <div class="bg-gray-900 p-5 rounded-lg mt-4">
+                <h2 class="text-2xl font-semibold mb-4">Dashboard</h2>
+                <p class="text-gray-400 mb-6">Select an action to proceed.</p>
+                <div id="player-dashboard-actions" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4"></div>
+                <div id="admin-dashboard-actions" class="grid-cols-1 md:grid-cols-2 gap-4 ${state.isCurrentUserAdmin ? 'grid' : 'hidden'}">
+                    <button id="btn-review-accusations" class="bg-green-700 hover:bg-green-800 text-white font-bold py-3 px-6 rounded-lg">Review Accusations</button>
+                </div>
+            </div>`,
+        actionModal: ({ title, buttonText, targets, actionType }) => `
+            <div class="bg-gray-900 p-5 rounded-lg mt-4">
+                <h2 class="text-2xl font-semibold mb-4 text-red-400">${title}</h2>
+                <form id="action-form" data-action-type="${actionType}">
+                    <div class="mb-4">
+                        <label for="target-player" class="block text-gray-300 text-lg font-bold mb-2">Select Target:</label>
+                        <select id="target-player" class="shadow border rounded w-full py-3 px-4 text-lg leading-tight focus:outline-none focus:shadow-outline bg-gray-700 border-gray-600 text-white" required>
+                            <option value="">-- Select a player --</option>
+                            ${targets.map(p => `<option value="${p.PlayerID}">${p.Name}</option>`).join('')}
+                        </select>
+                    </div>
+                    <div class="flex flex-col md:flex-row gap-4">
+                        <button type="submit" class="bg-red-700 hover:bg-red-800 text-white font-bold py-3 px-6 rounded-lg w-full md:w-1/2 text-xl">
+                            ${buttonText}
+                        </button>
+                        <button type="button" id="back-to-dashboard" class="bg-gray-600 hover:bg-gray-700 text-white font-bold py-3 px-6 rounded-lg w-full md:w-1/2 text-xl">
+                            Cancel
+                        </button>
+                    </div>
+                </form>
+            </div>
+        `,
+        accusationForm: ({ targets }) => `
+            <div class="bg-gray-900 p-5 rounded-lg mt-4">
+                <h2 class="text-2xl font-semibold mb-4 text-red-400">Submit Accusation</h2>
+                <form id="accusation-submission-form">
+                    <div class="mb-4">
+                        <label for="accuser-name" class="block text-gray-300 text-lg font-bold mb-2">Accuser (Your Name):</label>
+                        <input type="text" id="accuser-name" class="shadow appearance-none border rounded w-full py-3 px-4 text-lg text-gray-200 leading-tight focus:outline-none focus:shadow-outline bg-gray-700 border-gray-600 cursor-not-allowed" value="${state.currentUser.Name}" readonly>
+                    </div>
+                    <div class="mb-4">
+                        <label for="accused-player-select" class="block text-gray-300 text-lg font-bold mb-2">Accused Player:</label>
+                        <select id="accused-player-select" class="shadow border rounded w-full py-3 px-4 text-lg leading-tight focus:outline-none focus:shadow-outline bg-gray-700 border-gray-600 text-white" required>
+                            <option value="">-- Select accused player --</option>
+                            ${targets.map(p => `<option value="${p.PlayerID}">${p.Name}</option>`).join('')}
+                        </select>
+                    </div>
 
-                        <div class="mb-6">
-                            <label class="block text-gray-300 text-lg font-bold mb-2">Record Accusation:</label>
-                            <div class="flex flex-wrap items-center gap-4 mb-4">
-                                <button type="button" id="start-recording" class="bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-4 rounded-lg">Start Recording</button>
-                                <button type="button" id="stop-recording" class="bg-gray-600 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded-lg" disabled>Stop Recording</button>
+                    <div class="mb-6">
+                        <label class="block text-gray-300 text-lg font-bold mb-2">Record Accusation:</label>
+                        <div class="flex flex-wrap items-center gap-4 mb-4">
+                            <button type="button" id="start-recording" class="bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-4 rounded-lg">Start Recording</button>
+                            <button type="button" id="stop-recording" class="bg-gray-600 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded-lg" disabled>Stop Recording</button>
+                        </div>
+                        <audio id="audio-playback" controls class="w-full hidden"></audio>
+                    </div>
+
+                    <div class="flex flex-col md:flex-row gap-4">
+                        <button type="submit" id="submit-accusation-btn" class="bg-green-700 hover:bg-green-800 text-white font-bold py-3 px-6 rounded-lg w-full md:w-1/2 text-xl" disabled>Submit Accusation</button>
+                        <button type="button" id="back-to-dashboard" class="bg-gray-600 hover:bg-gray-700 text-white font-bold py-3 px-6 rounded-lg w-full md:w-1/2 text-xl">Cancel</button>
+                    </div>
+                </form>
+            </div>
+        `,
+        adminReview: ({ pendingAccusations }) => `
+            <div class="bg-gray-900 p-5 rounded-lg mt-4">
+                <h2 class="text-2xl font-semibold mb-4 text-red-400">Admin Review: Pending Accusations</h2>
+                ${pendingAccusations.length > 0 ? `
+                    <div class="space-y-6">
+                        ${pendingAccusations.map(acc => `
+                            <div class="bg-gray-800 p-4 rounded-lg border border-gray-700">
+                                <p class="text-gray-300"><strong>Accusation ID:</strong> ${acc.AccusationID}</p>
+                                <p class="text-gray-300"><strong>Accuser:</strong> ${getPlayerNameById(acc.AccuserPlayerID)}</p>
+                                <p class="text-gray-300"><strong>Accused:</strong> ${getPlayerNameById(acc.AccusedPlayerID)}</p>
+                                <p class="text-gray-300"><strong>Submitted:</strong> ${new Date(acc.SubmissionTime).toLocaleString()}</p>
+                                <div class="mt-3 mb-4">
+                                    <label class="block text-gray-400 text-sm font-bold mb-2">Audio:</label>
+                                    <audio controls class="w-full">
+                                        <source src="${acc.AudioDriveLink}" type="audio/webm">
+                                        <source src="${acc.AudioDriveLink}" type="audio/mp4">
+                                        Your browser does not support the audio element.
+                                    </audio>
                                 </div>
-                            <audio id="audio-playback" controls class="w-full hidden"></audio>
-                        </div>
-
-                        <div class="flex flex-col md:flex-row gap-4">
-                            <button type="submit" id="submit-accusation-btn" class="bg-green-700 hover:bg-green-800 text-white font-bold py-3 px-6 rounded-lg w-full md:w-1/2 text-xl" disabled>Submit Accusation</button>
-                            <button type="button" id="back-to-dashboard" class="bg-gray-600 hover:bg-gray-700 text-white font-bold py-3 px-6 rounded-lg w-full md:w-1/2 text-xl">Cancel</button>
-                        </div>
-                    </form>
-                </div>
-            `,
-            revealedTeammates: ({ role, teammates }) => `
-                <div class="bg-gray-900 p-5 rounded-lg mt-4">
-                    <h2 class="text-2xl font-semibold text-cyan-400 mb-4">Your ${role} Team</h2>
-                    ${teammates.length > 0 ? `
-                    <ul class="list-disc list-inside space-y-2">
-                        ${teammates.map(name => `<li>${name}</li>`).join('')}
-                    </ul>
-                    ` : '<p class="text-gray-400">You have not revealed any teammates yet.</p>'}
-                    <button type="button" id="back-to-dashboard" class="mt-6 bg-gray-600 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded-lg w-full">Back to Dashboard</button>
-                </div>`,
-        };
-
-        // NEW ADMIN REVIEW TEMPLATE
-            adminReview: ({ pendingAccusations }) => `
-                <div class="bg-gray-900 p-5 rounded-lg mt-4">
-                    <h2 class="text-2xl font-semibold mb-4 text-red-400">Admin Review: Pending Accusations</h2>
-                    ${pendingAccusations.length > 0 ? `
-                        <div class="space-y-6">
-                            ${pendingAccusations.map(acc => `
-                                <div class="bg-gray-800 p-4 rounded-lg border border-gray-700">
-                                    <p class="text-gray-300"><strong>Accusation ID:</strong> ${acc.AccusationID}</p>
-                                    <p class="text-gray-300"><strong>Accuser:</strong> ${getPlayerNameById(acc.AccuserPlayerID)}</p>
-                                    <p class="text-gray-300"><strong>Accused:</strong> ${getPlayerNameById(acc.AccusedPlayerID)}</p>
-                                    <p class="text-gray-300"><strong>Submitted:</strong> ${new Date(acc.SubmissionTime).toLocaleString()}</p>
-                                    <div class="mt-3 mb-4">
-                                        <label class="block text-gray-400 text-sm font-bold mb-2">Audio:</label>
-                                        <audio controls class="w-full">
-                                            <source src="${acc.AudioDriveLink}" type="audio/webm">
-                                            <source src="${acc.AudioDriveLink}" type="audio/mp4">
-                                            Your browser does not support the audio element.
-                                        </audio>
-                                    </div>
-                                    <div class="flex flex-col md:flex-row gap-2">
-                                        <button type="button" class="btn-approve-accusation bg-green-700 hover:bg-green-800 text-white font-bold py-2 px-4 rounded-lg w-full" data-accusation-id="${acc.AccusationID}">Approve</button>
-                                        <button type="button" class="btn-deny-accusation bg-red-700 hover:bg-red-800 text-white font-bold py-2 px-4 rounded-lg w-full" data-accusation-id="${acc.AccusationID}">Deny</button>
-                                    </div>
+                                <div class="flex flex-col md:flex-row gap-2">
+                                    <button type="button" class="btn-approve-accusation bg-green-700 hover:bg-green-800 text-white font-bold py-2 px-4 rounded-lg w-full" data-accusation-id="${acc.AccusationID}">Approve</button>
+                                    <button type="button" class="btn-deny-accusation bg-red-700 hover:bg-red-800 text-white font-bold py-2 px-4 rounded-lg w-full" data-accusation-id="${acc.AccusationID}">Deny</button>
                                 </div>
-                            `).join('')}
-                        </div>
-                    ` : '<p class="text-gray-400">No pending accusations to review.</p>'}
-                    <button type="button" id="back-to-dashboard" class="mt-6 bg-gray-600 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded-lg w-full">Back to Dashboard</button>
-                </div>
-            `,
+                            </div>
+                        `).join('')}
+                    </div>
+                ` : '<p class="text-gray-400">No pending accusations to review.</p>'}
+                <button type="button" id="back-to-dashboard" class="mt-6 bg-gray-600 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded-lg w-full">Back to Dashboard</button>
+            </div>
+        `,
+        revealedTeammates: ({ role, teammates }) => `
+            <div class="bg-gray-900 p-5 rounded-lg mt-4">
+                <h2 class="text-2xl font-semibold text-cyan-400 mb-4">Your ${role} Team</h2>
+                ${teammates.length > 0 ? `
+                <ul class="list-disc list-inside space-y-2">
+                    ${teammates.map(name => `<li>${name}</li>`).join('')}
+                </ul>
+                ` : '<p class="text-gray-400">You have not revealed any teammates yet.</p>'}
+                <button type="button" id="back-to-dashboard" class="mt-6 bg-gray-600 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded-lg w-full">Back to Dashboard</button>
+            </div>`,
+    };
 
-        function renderView(viewName, data = {}) {
-            if (viewName === 'login') {
-                appRoot.innerHTML = templates.login();
-            } else {
-                appRoot.innerHTML = templates.gameLayout(templates[viewName](data));
-            }
-            // IMPORTANT: Event listeners for dynamically added content should use delegation
-            // or be re-attached AFTER content is rendered. Global appRoot listeners are better.
-            // Removing old inline event listener attachments from here.
+    function renderView(viewName, data = {}) {
+        if (viewName === 'login') {
+            appRoot.innerHTML = templates.login();
+        } else {
+            appRoot.innerHTML = templates.gameLayout(templates[viewName](data));
         }
-
-        async function handleLogin() {
-            const nameInput = document.getElementById('login-code').value.trim();
-            const loginError = document.getElementById('login-error');
-            if (!nameInput) return;
-
-            loginError.textContent = '';
-            loadingOverlay.style.display = 'flex';
-            
-            await fetchPlayers();
-
-            if (state.allPlayers.length === 0) {
-                loadingOverlay.style.display = 'none';
-                loginError.textContent = 'Could not load player list from the server. Check Netlify function logs.';
-                return;
-            }
-
-            const player = state.allPlayers.find(p => p.Name && p.Name.trim().toLowerCase() === nameInput.toLowerCase());
-            
-            if (player) {
-                localStorage.setItem('mafiaGameUserId', player.PlayerID);
-                await initializeGame(player.PlayerID);
-            } else {
-                loadingOverlay.style.display = 'none';
-                loginError.textContent = 'Invalid Player Name. Please try again.';
-            }
-        }
-
-        async function fetchPlayers(forceRefresh = false) {
-            if (state.allPlayers.length > 0 && !forceRefresh) return;
-            try {
-                const response = await fetch('/.netlify/functions/get-player-data');
-                if (!response.ok) {
-                    const errorText = await response.text();
-                    console.error('Fetch failed with status:', response.status, 'Response:', errorText);
-                    throw new Error(`HTTP error! status: ${response.status}`);
-                }
-                state.allPlayers = await response.json();
-            } catch (error) {
-                console.error("Full error in fetchPlayers:", error);
-                showMessage("Failed to load player data. Check console for details.");
-                state.allPlayers = [];
-            }
-        }
-
-        async function initializeGame(userId) {
-            state.currentUserId = userId;
-            state.currentUser = state.allPlayers.find(p => p.PlayerID === userId);
-            if (!state.currentUser) {
-                localStorage.removeItem('mafiaGameUserId');
-                renderView('login');
-                document.getElementById('login-error').textContent = "Your player data seems outdated. Please log in again.";
-                return;
-            }
-            state.isCurrentUserAdmin = state.currentUser.IsAdmin === 'TRUE';
-            await fetchGameState();
-            renderView('dashboard');
-            updateDashboardActions(state.gameState?.CurrentPhase || 'Day');
-        }
-
-        function getPlayerNameById(playerId) {
-            const player = state.allPlayers.find(p => p.PlayerID === playerId);
-            return player ? player.Name : 'N/A';
-        }
-
-        async function fetchGameState() {
-            try {
-                const response = await fetch('/.netlify/functions/get-game-state');
-                if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
-                state.gameState = await response.json();
-            } catch (error) {
-                console.error("Error fetching game state:", error);
-                showMessage("Failed to load game state.");
-                state.gameState = null;
-            }
-        }
-        
-        function showMessage(message) {
-            messageBox.textContent = message;
-            messageBox.style.display = 'block';
-        }
-
-        // --- Audio Recording Functions ---
-        async function startRecording() {
-            console.log("Attempting to start recording..."); // Added for debugging
-            try {
-                const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-                mediaRecorder = new MediaRecorder(stream, { mimeType: 'audio/webm;codecs=opus' });
-
-                audioChunks = [];
-                mediaRecorder.ondataavailable = event => {
-                    audioChunks.push(event.data);
-                };
-
-                mediaRecorder.onstop = () => {
-                    recordedAudioBlob = new Blob(audioChunks, { type: 'audio/webm;codecs=opus' });
-                    audioPlayer = document.getElementById('audio-playback');
-                    audioPlayer.src = URL.createObjectURL(recordedAudioBlob);
-                    audioPlayer.load(); // Load the new audio source
-
-                    // Show audio preview automatically and enable submission button
-                    document.getElementById('audio-playback').classList.remove('hidden');
-                    document.getElementById('submit-accusation-btn').disabled = false;
-
-                    // Stop the microphone stream tracks to release microphone
-                    stream.getTracks().forEach(track => track.stop());
-                };
-
-                mediaRecorder.start();
-                document.getElementById('start-recording').disabled = true;
-                document.getElementById('stop-recording').disabled = false;
-                document.getElementById('submit-accusation-btn').disabled = true; // Still disabled until stopped
-                document.getElementById('audio-playback').classList.add('hidden'); // Hide player during recording
-                showMessage('Recording started...');
-            } catch (err) {
-                console.error('Error accessing microphone:', err);
-                // More specific message based on common errors
-                if (err.name === 'NotAllowedError') {
-                    showMessage('Microphone access denied. Please allow microphone access in your browser settings.');
-                } else if (err.name === 'NotFoundError') {
-                    showMessage('No microphone found. Please ensure a microphone is connected.');
-                } else {
-                    showMessage('Could not access microphone: ' + err.message);
-                }
-            }
-        }
-
-        function stopRecording() {
-            if (mediaRecorder && mediaRecorder.state === 'recording') {
-                mediaRecorder.stop();
-                document.getElementById('start-recording').disabled = false;
-                document.getElementById('stop-recording').disabled = true;
-                // audio-playback visibility handled in mediaRecorder.onstop
-                showMessage('Recording stopped. Preview available.');
-            }
-        }
-
-        // playRecording function removed as per request (auto-preview is implemented)
-
-
-        // --- Accusation Form Submission Function ---
-        async function submitAccusation(accusedPlayerId, audioBlob) {
-            if (!accusedPlayerId) { // Check for accused player ID
-                showMessage("Please select an accused player.");
-                return;
-            }
-            if (!audioBlob) { // Check if audio has been recorded
-                showMessage("Please record an audio accusation first.");
-                return;
-            }
-
-            loadingOverlay.style.display = 'flex';
-            try {
-                const formData = new FormData();
-                formData.append('accuserPlayerId', state.currentUserId);
-                formData.append('accusedPlayerId', accusedPlayerId);
-                formData.append('audioFile', audioBlob, `accusation_${state.currentUserId}_${Date.now()}.webm`); // Using .webm extension
-
-                const response = await fetch('/.netlify/functions/submit-accusation', {
-                    method: 'POST',
-                    body: formData,
-                });
-
-                const result = await response.json();
-
-                if (response.ok) {
-                    showMessage(result.message || 'Accusation submitted successfully!');
-                    await fetchPlayers(true);
-                    await fetchGameState();
-                    initializeGame(state.currentUserId);
-                } else {
-                    throw new Error(result.message || `Error: ${response.status} ${response.statusText}`);
-                }
-            } catch (error) {
-                console.error("Error submitting accusation:", error);
-                showMessage(`Failed to submit accusation: ${error.message}`);
-            } finally {
-                loadingOverlay.style.display = 'none';
-                setTimeout(() => { messageBox.style.display = 'none'; }, 5000);
-                // Reset audio state after submission attempt
-                mediaRecorder = null;
-                audioChunks = [];
-                recordedAudioBlob = null;
-                if (audioPlayer) audioPlayer.src = ''; // Clear audio preview
-            }
-        }
-
-        // --- Admin Review Functions ---
-async function fetchPendingAccusations() {
-    loadingOverlay.style.display = 'flex';
-    try {
-        const response = await fetch('/.netlify/functions/get-pending-accusations');
-        if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
-        state.pendingAccusations = await response.json();
-    } catch (error) {
-        console.error("Error fetching pending accusations:", error);
-        showMessage("Failed to load pending accusations.");
-        state.pendingAccusations = [];
-    } finally {
-        loadingOverlay.style.display = 'none';
     }
-}
 
-async function handleApproveAccusation(accusationId) {
-    await performFetchAction('/.netlify/functions/approve-accusation', { accusationId, adminPlayerId: state.currentUserId });
-    // Re-fetch pending accusations and re-render the admin review page after action
-    await fetchPendingAccusations();
-    renderView('adminReview', { pendingAccusations: state.pendingAccusations });
-}
+    async function handleLogin() {
+        const nameInput = document.getElementById('login-code').value.trim();
+        const loginError = document.getElementById('login-error');
+        if (!nameInput) return;
 
-async function handleDenyAccusation(accusationId) {
-    await performFetchAction('/.netlify/functions/deny-accusation', { accusationId, adminPlayerId: state.currentUserId });
-    // Re-fetch pending accusations and re-render the admin review page after action
-    await fetchPendingAccusations();
-    renderView('adminReview', { pendingAccusations: state.pendingAccusations });
-}
+        loginError.textContent = '';
+        loadingOverlay.style.display = 'flex';
+        
+        await fetchPlayers();
 
-        function updateDashboardActions(currentPhase) {
-            const playerActions = document.getElementById('player-dashboard-actions');
-            if (!playerActions) return;
-            playerActions.innerHTML = ''; // Clear existing buttons
+        if (state.allPlayers.length === 0) {
+            loadingOverlay.style.display = 'none';
+            loginError.textContent = 'Could not load player list from the server. Check Netlify function logs.';
+            return;
+        }
 
-            const isNight = currentPhase && currentPhase.toLowerCase() !== 'day';
+        const player = state.allPlayers.find(p => p.Name && p.Name.trim().toLowerCase() === nameInput.toLowerCase());
+        
+        if (player) {
+            localStorage.setItem('mafiaGameUserId', player.PlayerID);
+            await initializeGame(player.PlayerID);
+        } else {
+            loadingOverlay.style.display = 'none';
+            loginError.textContent = 'Invalid Player Name. Please try again.';
+        }
+    }
 
-            const createButton = (id, text, style, onClick) => {
-                const button = document.createElement('button');
-                button.id = id;
-                button.textContent = text;
-                button.className = `${style} text-white font-bold py-3 px-6 rounded-lg transition`;
-                button.onclick = onClick;
-                playerActions.appendChild(button);
+    async function fetchPlayers(forceRefresh = false) {
+        if (state.allPlayers.length > 0 && !forceRefresh) return;
+        try {
+            const response = await fetch('/.netlify/functions/get-player-data');
+            if (!response.ok) {
+                const errorText = await response.text();
+                console.error('Fetch failed with status:', response.status, 'Response:', errorText);
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+            state.allPlayers = await response.json();
+        } catch (error) {
+            console.error("Full error in fetchPlayers:", error);
+            showMessage("Failed to load player data. Check console for details.");
+            state.allPlayers = [];
+        }
+    }
+
+    async function initializeGame(userId) {
+        state.currentUserId = userId;
+        state.currentUser = state.allPlayers.find(p => p.PlayerID === userId);
+        if (!state.currentUser) {
+            localStorage.removeItem('mafiaGameUserId');
+            renderView('login');
+            document.getElementById('login-error').textContent = "Your player data seems outdated. Please log in again.";
+            return;
+        }
+        state.isCurrentUserAdmin = state.currentUser.IsAdmin === 'TRUE';
+        await fetchGameState();
+        renderView('dashboard');
+        updateDashboardActions(state.gameState?.CurrentPhase || 'Day');
+    }
+
+    function getPlayerNameById(playerId) {
+        const player = state.allPlayers.find(p => p.PlayerID === playerId);
+        return player ? player.Name : 'N/A';
+    }
+
+    async function fetchGameState() {
+        try {
+            const response = await fetch('/.netlify/functions/get-game-state');
+            if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+            state.gameState = await response.json();
+        } catch (error) {
+            console.error("Error fetching game state:", error);
+            showMessage("Failed to load game state.");
+            state.gameState = null;
+        }
+    }
+    
+    function showMessage(message) {
+        messageBox.textContent = message;
+        messageBox.style.display = 'block';
+    }
+
+    async function performFetchAction(endpoint, payload) {
+        loadingOverlay.style.display = 'flex';
+        try {
+            const response = await fetch(endpoint, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify(payload),
+            });
+
+            const result = await response.json();
+
+            if (response.ok) {
+                showMessage(result.message || 'Action performed successfully!');
+                await fetchPlayers(true);
+                await fetchGameState();
+                initializeGame(state.currentUserId);
+            } else {
+                throw new Error(result.message || `Error: ${response.status} ${response.statusText}`);
+            }
+        } catch (error) {
+            console.error("Error performing action:", error);
+            showMessage(`Failed to perform action: ${error.message}`);
+        } finally {
+            loadingOverlay.style.display = 'none';
+            setTimeout(() => { messageBox.style.display = 'none'; }, 5000);
+        }
+    }
+
+    // --- Audio Recording Functions ---
+    async function startRecording() {
+        console.log("Attempting to start recording...");
+        try {
+            const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+            mediaRecorder = new MediaRecorder(stream, { mimeType: 'audio/webm;codecs=opus' });
+
+            audioChunks = [];
+            mediaRecorder.ondataavailable = event => {
+                audioChunks.push(event.data);
             };
 
-            const role = state.currentUser.Role.toLowerCase();
+            mediaRecorder.onstop = () => {
+                recordedAudioBlob = new Blob(audioChunks, { type: 'audio/webm;codecs=opus' });
+                audioPlayer = document.getElementById('audio-playback');
+                audioPlayer.src = URL.createObjectURL(recordedAudioBlob);
+                audioPlayer.load();
 
-            // --- ALL ROLES ---
-            createButton('btn-submit-accusation', 'Submit Accusation', 'bg-gray-700 hover:bg-gray-800', () => {
+                document.getElementById('audio-playback').classList.remove('hidden');
+                document.getElementById('submit-accusation-btn').disabled = false;
+
+                stream.getTracks().forEach(track => track.stop());
+            };
+
+            mediaRecorder.start();
+            document.getElementById('start-recording').disabled = true;
+            document.getElementById('stop-recording').disabled = false;
+            document.getElementById('submit-accusation-btn').disabled = true;
+            document.getElementById('audio-playback').classList.add('hidden');
+            showMessage('Recording started...');
+        } catch (err) {
+            console.error('Error accessing microphone:', err);
+            if (err.name === 'NotAllowedError') {
+                showMessage('Microphone access denied. Please allow microphone access in your browser settings.');
+            } else if (err.name === 'NotFoundError') {
+                showMessage('No microphone found. Please ensure a microphone is connected.');
+            } else {
+                showMessage('Could not access microphone: ' + err.message);
+            }
+        }
+    }
+
+    function stopRecording() {
+        if (mediaRecorder && mediaRecorder.state === 'recording') {
+            mediaRecorder.stop();
+            document.getElementById('start-recording').disabled = false;
+            document.getElementById('stop-recording').disabled = true;
+            showMessage('Recording stopped. Preview available.');
+        }
+    }
+
+    // --- Accusation Form Submission Function ---
+    async function submitAccusation(accusedPlayerId, audioBlob) {
+        if (!accusedPlayerId) {
+            showMessage("Please select an accused player.");
+            return;
+        }
+        if (!audioBlob) {
+            showMessage("Please record an audio accusation first.");
+            return;
+        }
+
+        loadingOverlay.style.display = 'flex';
+        try {
+            const formData = new FormData();
+            formData.append('accuserPlayerId', state.currentUserId);
+            formData.append('accusedPlayerId', accusedPlayerId);
+            formData.append('audioFile', audioBlob, `accusation_${state.currentUserId}_${Date.now()}.webm`);
+
+            const response = await fetch('/.netlify/functions/submit-accusation', {
+                method: 'POST',
+                body: formData,
+            });
+
+            const result = await response.json();
+
+            if (response.ok) {
+                showMessage(result.message || 'Accusation submitted successfully!');
+                await fetchPlayers(true);
+                await fetchGameState();
+                initializeGame(state.currentUserId);
+            } else {
+                throw new Error(result.message || `Error: ${response.status} ${response.statusText}`);
+            }
+        } catch (error) {
+            console.error("Error submitting accusation:", error);
+            showMessage(`Failed to submit accusation: ${error.message}`);
+        } finally {
+            loadingOverlay.style.display = 'none';
+            setTimeout(() => { messageBox.style.display = 'none'; }, 5000);
+            mediaRecorder = null;
+            audioChunks = [];
+            recordedAudioBlob = null;
+            if (audioPlayer) audioPlayer.src = '';
+        }
+    }
+
+    // --- Admin Review Functions ---
+    async function fetchPendingAccusations() {
+        loadingOverlay.style.display = 'flex';
+        try {
+            const response = await fetch('/.netlify/functions/get-pending-accusations');
+            if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+            state.pendingAccusations = await response.json();
+        } catch (error) {
+            console.error("Error fetching pending accusations:", error);
+            showMessage("Failed to load pending accusations.");
+            state.pendingAccusations = [];
+        } finally {
+            loadingOverlay.style.display = 'none';
+        }
+    }
+
+    async function handleApproveAccusation(accusationId) {
+        await performFetchAction('/.netlify/functions/approve-accusation', { accusationId, adminPlayerId: state.currentUserId });
+        await fetchPendingAccusations();
+        renderView('adminReview', { pendingAccusations: state.pendingAccusations });
+    }
+
+    async function handleDenyAccusation(accusationId) {
+        await performFetchAction('/.netlify/functions/deny-accusation', { accusationId, adminPlayerId: state.currentUserId });
+        await fetchPendingAccusations();
+        renderView('adminReview', { pendingAccusations: state.pendingAccusations });
+    }
+        
+    function updateDashboardActions(currentPhase) {
+        const playerActions = document.getElementById('player-dashboard-actions');
+        if (!playerActions) return;
+        playerActions.innerHTML = ''; // Clear existing buttons
+
+        const isNight = currentPhase && currentPhase.toLowerCase() !== 'day';
+
+        const createButton = (id, text, style, onClick) => {
+            const button = document.createElement('button');
+            button.id = id;
+            button.textContent = text;
+            button.className = `${style} text-white font-bold py-3 px-6 rounded-lg transition`;
+            button.onclick = onClick;
+            playerActions.appendChild(button);
+        };
+
+        const role = state.currentUser.Role.toLowerCase();
+
+        // --- ALL ROLES ---
+        createButton('btn-submit-accusation', 'Submit Accusation', 'bg-gray-700 hover:bg-gray-800', () => {
+            const targets = state.allPlayers.filter(p =>
+                p.Status && typeof p.Status === 'string' && p.Status.toLowerCase() === 'alive' &&
+                p.PlayerID !== state.currentUserId
+            );
+            renderView('accusationForm', { targets });
+        });
+
+        // --- MAFIA ---
+        if (role === 'mafia') {
+            createButton('btn-kill', 'Kill Player', 'bg-red-700 hover:bg-red-800', () => {
+                if (!isNight) return showMessage("You can only use this action at night.");
+                if (state.currentUser.MainUsed === 'TRUE') return showMessage("You have already used your main action tonight.");
+                const targets = state.allPlayers.filter(p =>
+                    p.Status && typeof p.Status === 'string' && p.Status.toLowerCase() === 'alive' &&
+                    p.Role && typeof p.Role === 'string' && p.Role.toLowerCase() !== 'mafia'
+                );
+                renderView('actionModal', { title: 'Choose a Target to Kill', buttonText: 'Confirm Kill', targets, actionType: 'kill' });
+            });
+            createButton('btn-convert', 'Convert Villager', 'bg-red-900', () => {
+                if (!isNight) return showMessage("You can only use this ability at night.");
+                if (state.currentUser.MafiaCanConvert !== 'TRUE') return showMessage("You have not unlocked this ability or have already used it.");
+                performFetchAction('/.netlify/functions/convert-villager', { mafiaPlayerId: state.currentUserId });
+            });
+            createButton('btn-reveal-mafia', 'Reveal Mafia', 'bg-red-900', () => {
+                if (!isNight) return showMessage("You can only use this ability at night.");
+                if (state.currentUser.MafiaCanRevealSelf !== 'TRUE') return showMessage("You have not unlocked this ability or have already used it.");
+                performFetchAction('/.netlify/functions/reveal-mafia', { mafiaPlayerId: state.currentUserId });
+            });
+            createButton('btn-view-teammates', 'List Mafia', 'bg-cyan-600 hover:bg-cyan-700', () => {
+                if (!state.currentUser.RevealedTeammates) return showMessage("You have not revealed any teammates yet.");
+                const teammates = state.currentUser.RevealedTeammates.split(',').map(id => getPlayerNameById(id));
+                renderView('revealedTeammates', { role: 'Mafia', teammates });
+            });
+        }
+
+        // --- DOCTOR ---
+        if (role === 'doctor') {
+            createButton('btn-protect', 'Protect Player', 'bg-blue-700 hover:bg-blue-800', () => {
+                if (!isNight) return showMessage("You can only use this action at night.");
+                if (state.currentUser.MainUsed === 'TRUE') return showMessage("You have already used your main action tonight.");
+                const targets = state.allPlayers.filter(p => p.Status && typeof p.Status === 'string' && p.Status.toLowerCase() === 'alive');
+                renderView('actionModal', { title: 'Choose a Player to Protect', buttonText: 'Confirm Protection', targets, actionType: 'protect' });
+            });
+            createButton('btn-revive', 'Revive Player', 'bg-blue-900', () => {
+                if (!isNight) return showMessage("You can only use this ability at night.");
+                if (state.currentUser.DoctorCanRevive !== 'TRUE') return showMessage("You have not unlocked this ability or have already used it.");
+                performFetchAction('/.netlify/functions/revive-player', { doctorPlayerId: state.currentUserId });
+            });
+            createButton('btn-reveal-doctor', 'Reveal Doctor', 'bg-blue-900', () => {
+                if (!isNight) return showMessage("You can only use this ability at night.");
+                if (state.currentUser.DoctorCanRevealSelf !== 'TRUE') return showMessage("You have not unlocked this ability or have already used it.");
+                performFetchAction('/.netlify/functions/reveal-doctor', { doctorPlayerId: state.currentUserId });
+            });
+            createButton('btn-view-teammates', 'List Doctors', 'bg-cyan-600 hover:bg-cyan-700', () => {
+                if (!state.currentUser.RevealedTeammates) return showMessage("You have not revealed any teammates yet.");
+                const teammates = state.currentUser.RevealedTeammates.split(',').map(id => getPlayerNameById(id));
+                renderView('revealedTeammates', { role: 'Doctor', teammates });
+            });
+        }
+
+        // --- DETECTIVE ---
+        if (role === 'detective') {
+            createButton('btn-check', 'Investigate Player', 'bg-yellow-600 hover:bg-yellow-700', () => {
+                if (!isNight) return showMessage("You can only use this action at night.");
+                if (state.currentUser.MainUsed === 'TRUE') return showMessage("You have already used your main action tonight.");
                 const targets = state.allPlayers.filter(p =>
                     p.Status && typeof p.Status === 'string' && p.Status.toLowerCase() === 'alive' &&
                     p.PlayerID !== state.currentUserId
                 );
-                renderView('accusationForm', { targets });
+                renderView('actionModal', { title: 'Choose a Player to Investigate', buttonText: 'Confirm Investigation', targets, actionType: 'check' });
             });
-
-            // --- MAFIA ---
-            if (role === 'mafia') {
-                createButton('btn-kill', 'Kill Player', 'bg-red-700 hover:bg-red-800', () => {
-                    if (!isNight) return showMessage("You can only use this action at night.");
-                    if (state.currentUser.MainUsed === 'TRUE') return showMessage("You have already used your main action tonight.");
-                    const targets = state.allPlayers.filter(p =>
-                        p.Status && typeof p.Status === 'string' && p.Status.toLowerCase() === 'alive' &&
-                        p.Role && typeof p.Role === 'string' && p.Role.toLowerCase() !== 'mafia'
-                    );
-                    renderView('actionModal', { title: 'Choose a Target to Kill', buttonText: 'Confirm Kill', targets, actionType: 'kill' });
-                });
-                createButton('btn-convert', 'Convert Villager', 'bg-red-900', () => {
-                    if (!isNight) return showMessage("You can only use this ability at night.");
-                    if (state.currentUser.MafiaCanConvert !== 'TRUE') return showMessage("You have not unlocked this ability or have already used it.");
-                    performFetchAction('/.netlify/functions/convert-villager', { mafiaPlayerId: state.currentUserId });
-                });
-                createButton('btn-reveal-mafia', 'Reveal Mafia', 'bg-red-900', () => {
-                    if (!isNight) return showMessage("You can only use this ability at night.");
-                    if (state.currentUser.MafiaCanRevealSelf !== 'TRUE') return showMessage("You have not unlocked this ability or have already used it.");
-                    performFetchAction('/.netlify/functions/reveal-mafia', { mafiaPlayerId: state.currentUserId });
-                });
-                createButton('btn-view-teammates', 'List Mafia', 'bg-cyan-600 hover:bg-cyan-700', () => {
-                    if (!state.currentUser.RevealedTeammates) return showMessage("You have not revealed any teammates yet.");
-                    const teammates = state.currentUser.RevealedTeammates.split(',').map(id => getPlayerNameById(id));
-                    renderView('revealedTeammates', { role: 'Mafia', teammates });
-                });
-            }
-
-            // --- DOCTOR ---
-            if (role === 'doctor') {
-                createButton('btn-protect', 'Protect Player', 'bg-blue-700 hover:bg-blue-800', () => {
-                    if (!isNight) return showMessage("You can only use this action at night.");
-                    if (state.currentUser.MainUsed === 'TRUE') return showMessage("You have already used your main action tonight.");
-                    const targets = state.allPlayers.filter(p => p.Status && typeof p.Status === 'string' && p.Status.toLowerCase() === 'alive');
-                    renderView('actionModal', { title: 'Choose a Player to Protect', buttonText: 'Confirm Protection', targets, actionType: 'protect' });
-                });
-                createButton('btn-revive', 'Revive Player', 'bg-blue-900', () => {
-                    if (!isNight) return showMessage("You can only use this ability at night.");
-                    if (state.currentUser.DoctorCanRevive !== 'TRUE') return showMessage("You have not unlocked this ability or have already used it.");
-                    performFetchAction('/.netlify/functions/revive-player', { doctorPlayerId: state.currentUserId });
-                });
-                createButton('btn-reveal-doctor', 'Reveal Doctor', 'bg-blue-900', () => {
-                    if (!isNight) return showMessage("You can only use this ability at night.");
-                    if (state.currentUser.DoctorCanRevealSelf !== 'TRUE') return showMessage("You have not unlocked this ability or have already used it.");
-                    performFetchAction('/.netlify/functions/reveal-doctor', { doctorPlayerId: state.currentUserId });
-                });
-                createButton('btn-view-teammates', 'List Doctors', 'bg-cyan-600 hover:bg-cyan-700', () => {
-                    if (!state.currentUser.RevealedTeammates) return showMessage("You have not revealed any teammates yet.");
-                    const teammates = state.currentUser.RevealedTeammates.split(',').map(id => getPlayerNameById(id));
-                    renderView('revealedTeammates', { role: 'Doctor', teammates });
-                });
-            }
-
-            // --- DETECTIVE ---
-            if (role === 'detective') {
-                createButton('btn-check', 'Investigate Player', 'bg-yellow-600 hover:bg-yellow-700', () => {
-                    if (!isNight) return showMessage("You can only use this action at night.");
-                    if (state.currentUser.MainUsed === 'TRUE') return showMessage("You have already used your main action tonight.");
-                    const targets = state.allPlayers.filter(p =>
-                        p.Status && typeof p.Status === 'string' && p.Status.toLowerCase() === 'alive' &&
-                        p.PlayerID !== state.currentUserId
-                    );
-                    renderView('actionModal', { title: 'Choose a Player to Investigate', buttonText: 'Confirm Investigation', targets, actionType: 'check' });
-                });
-                createButton('btn-reveal-detective', 'Reveal a Detective', 'bg-yellow-900', () => showMessage("This ability is not yet implemented."));
-                createButton('btn-view-history', 'Investigation History', 'bg-purple-700 hover:bg-purple-800', () => renderView('investigationHistory'));
-            }
-
-            // --- VILLAGER ---
-            if (role === 'villager') {
-                createButton('btn-increase-vote', 'Increase Vote Power', 'bg-green-900', () => {
-                    if (!isNight) return showMessage("You can only use this ability at night.");
-                    if (state.currentUser.VillagerCanIncreaseVote !== 'TRUE') return showMessage("You have not unlocked this ability or have already used it.");
-                    performFetchAction('/.netlify/functions/increase-vote-power', { villagerPlayerId: state.currentUserId });
-                });
-                createButton('btn-change-role', 'Change Role', 'bg-green-900', () => {
-                    if (!isNight) return showMessage("You can only use this ability at night.");
-                    if (state.currentUser.VillagerCanChangeRole !== 'TRUE') return showMessage("You have not unlocked this ability or have already used it.");
-                    performFetchAction('/.netlify/functions/change-role', { villagerPlayerId: state.currentUserId });
-                });
-            }
-
-            // --- SHERIFF ---
-            if (role === 'sheriff') {
-                createButton('btn-shoot', 'Shoot Player', 'bg-gray-700 hover:bg-gray-800', () => {
-                    if (!isNight) return showMessage("You can only use this action at night.");
-                    if (state.currentUser.MainUsed === 'TRUE') return showMessage("You have already used your main action tonight.");
-                    if (state.currentUser.SheriffShotUsed === 'TRUE') return showMessage("You have already used your one-time shot.");
-                    const targets = state.allPlayers.filter(p =>
-                        p.Status && typeof p.Status === 'string' && p.Status.toLowerCase() === 'alive' &&
-                        p.PlayerID !== state.currentUserId
-                    );
-                    renderView('actionModal', { title: 'Choose Your Target', buttonText: 'Fire!', targets, actionType: 'shoot' });
-                });
-            }
+            createButton('btn-reveal-detective', 'Reveal a Detective', 'bg-yellow-900', () => showMessage("This ability is not yet implemented."));
+            createButton('btn-view-history', 'Investigation History', 'bg-purple-700 hover:bg-purple-800', () => renderView('investigationHistory'));
         }
 
-        window.onload = async () => {
-            const savedUserId = localStorage.getItem('mafiaGameUserId');
-            try {
-                if (savedUserId) {
-                    loadingOverlay.style.display = 'flex';
-                    await fetchPlayers();
-                    if (state.allPlayers.length > 0) {
-                        await initializeGame(savedUserId);
-                    } else {
-                        localStorage.removeItem('mafiaGameUserId');
-                        renderView('login');
-                        document.getElementById('login-error').textContent = "Could not load player list from the server.";
-                    }
+        // --- VILLAGER ---
+        if (role === 'villager') {
+            createButton('btn-increase-vote', 'Increase Vote Power', 'bg-green-900', () => {
+                if (!isNight) return showMessage("You can only use this ability at night.");
+                if (state.currentUser.VillagerCanIncreaseVote !== 'TRUE') return showMessage("You have not unlocked this ability or have already used it.");
+                performFetchAction('/.netlify/functions/increase-vote-power', { villagerPlayerId: state.currentUserId });
+            });
+            createButton('btn-change-role', 'Change Role', 'bg-green-900', () => {
+                if (!isNight) return showMessage("You can only use this ability at night.");
+                if (state.currentUser.VillagerCanChangeRole !== 'TRUE') return showMessage("You have not unlocked this ability or have already used it.");
+                performFetchAction('/.netlify/functions/change-role', { villagerPlayerId: state.currentUserId });
+            });
+        }
+
+        // --- SHERIFF ---
+        if (role === 'sheriff') {
+            createButton('btn-shoot', 'Shoot Player', 'bg-gray-700 hover:bg-gray-800', () => {
+                if (!isNight) return showMessage("You can only use this action at night.");
+                if (state.currentUser.MainUsed === 'TRUE') return showMessage("You have already used your main action tonight.");
+                if (state.currentUser.SheriffShotUsed === 'TRUE') return showMessage("You have already used your one-time shot.");
+                const targets = state.allPlayers.filter(p =>
+                    p.Status && typeof p.Status === 'string' && p.Status.toLowerCase() === 'alive' &&
+                    p.PlayerID !== state.currentUserId
+                );
+                renderView('actionModal', { title: 'Choose Your Target', buttonText: 'Fire!', targets, actionType: 'shoot' });
+            });
+        }
+    }
+
+    window.onload = async () => {
+        const savedUserId = localStorage.getItem('mafiaGameUserId');
+        try {
+            if (savedUserId) {
+                loadingOverlay.style.display = 'flex';
+                await fetchPlayers();
+                if (state.allPlayers.length > 0) {
+                    await initializeGame(savedUserId);
                 } else {
+                    localStorage.removeItem('mafiaGameUserId');
                     renderView('login');
+                    document.getElementById('login-error').textContent = "Could not load player list from the server.";
                 }
-            } catch (error) {
-                console.error("Critical error on page load:", error);
+            } else {
                 renderView('login');
-                document.getElementById('login-error').textContent = "An unexpected error occurred. Please try again.";
-            } finally {
-                loadingOverlay.style.display = 'none';
             }
-        };
+        } catch (error) {
+            console.error("Critical error on page load:", error);
+            renderView('login');
+            document.getElementById('login-error').textContent = "An unexpected error occurred. Please try again.";
+        } finally {
+            loadingOverlay.style.display = 'none';
+        }
+    };
 
-        // This block replaced your previous appRoot.addEventListener('submit', ...)
-        appRoot.addEventListener('submit', async (e) => {
-            e.preventDefault(); // Prevent default form submission for all forms
+    appRoot.addEventListener('submit', async (e) => {
+        e.preventDefault();
 
-            if (e.target.id === 'login-form') {
-                handleLogin();
-            } else if (e.target.id === 'action-form') {
-                const actionType = e.target.dataset.actionType;
-                const targetPlayerId = document.getElementById('target-player').value;
+        if (e.target.id === 'login-form') {
+            handleLogin();
+        } else if (e.target.id === 'action-form') {
+            const actionType = e.target.dataset.actionType;
+            const targetPlayerId = document.getElementById('target-player').value;
 
-                if (!targetPlayerId) {
-                    showMessage("Please select a target player.");
+            if (!targetPlayerId) {
+                showMessage("Please select a target player.");
+                return;
+            }
+
+            let endpoint;
+            let payload;
+
+            switch (actionType) {
+                case 'kill':
+                    endpoint = '/.netlify/functions/kill-player';
+                    payload = { mafiaPlayerId: state.currentUserId, targetPlayerId: targetPlayerId };
+                    break;
+                case 'protect':
+                    endpoint = '/.netlify/functions/protect-player';
+                    payload = { doctorPlayerId: state.currentUserId, targetPlayerId: targetPlayerId };
+                    break;
+                case 'check':
+                    endpoint = '/.netlify/functions/check-mafia';
+                    payload = { detectivePlayerId: state.currentUserId, targetPlayerId: targetPlayerId };
+                    break;
+                case 'shoot':
+                    endpoint = '/.netlify/functions/shoot-player';
+                    payload = { sheriffPlayerId: state.currentUserId, targetPlayerId: targetPlayerId };
+                    break;
+                default:
+                    showMessage('Unknown action type for submission.');
+                    console.error('Unknown actionType:', actionType);
                     return;
-                }
-
-                let endpoint;
-                let payload;
-
-                switch (actionType) {
-                    case 'kill':
-                        endpoint = '/.netlify/functions/kill-player';
-                        payload = { mafiaPlayerId: state.currentUserId, targetPlayerId: targetPlayerId };
-                        break;
-                    case 'protect':
-                        endpoint = '/.netlify/functions/protect-player';
-                        payload = { doctorPlayerId: state.currentUserId, targetPlayerId: targetPlayerId };
-                        break;
-                    case 'check':
-                        endpoint = '/.netlify/functions/check-mafia';
-                        payload = { detectivePlayerId: state.currentUserId, targetPlayerId: targetPlayerId };
-                        break;
-                    case 'shoot':
-                        endpoint = '/.netlify/functions/shoot-player';
-                        payload = { sheriffPlayerId: state.currentUserId, targetPlayerId: targetPlayerId };
-                        break;
-                    default:
-                        showMessage('Unknown action type for submission.');
-                        console.error('Unknown actionType:', actionType);
-                        return;
-                }
-
-                if (endpoint) {
-                    await performFetchAction(endpoint, payload);
-                    renderView('dashboard');
-                }
-            } else if (e.target.id === 'accusation-submission-form') {
-                await submitAccusation(document.getElementById('accused-player-select').value, recordedAudioBlob);
             }
-        });
 
-        // This block replaced your previous appRoot.addEventListener('click', ...)
-appRoot.addEventListener('click', async (e) => {
-            if (e.target.id === 'back-to-dashboard') {
+            if (endpoint) {
+                await performFetchAction(endpoint, payload);
                 renderView('dashboard');
-            } else if (e.target.id === 'start-recording') {
-                await startRecording();
-            } else if (e.target.id === 'stop-recording') {
-                stopRecording();
-            } else if (e.target.id === 'btn-review-accusations') { // NEW: Admin Review button
-                await fetchPendingAccusations(); // Fetch data before rendering
-                renderView('adminReview', { pendingAccusations: state.pendingAccusations });
-            } else if (e.target.classList.contains('btn-approve-accusation')) { // NEW: Approve button
-                const accusationId = e.target.dataset.accusationId;
-                if (accusationId) {
-                    await handleApproveAccusation(accusationId);
-                }
-            } else if (e.target.classList.contains('btn-deny-accusation')) { // NEW: Deny button
-                const accusationId = e.target.dataset.accusationId;
-                if (accusationId) {
-                    await handleDenyAccusation(accusationId);
-                }
             }
-        });
-    </script>
+        } else if (e.target.id === 'accusation-submission-form') {
+            await submitAccusation(document.getElementById('accused-player-select').value, recordedAudioBlob);
+        }
+    });
+
+    appRoot.addEventListener('click', async (e) => {
+        if (e.target.id === 'back-to-dashboard') {
+            renderView('dashboard');
+        } else if (e.target.id === 'start-recording') {
+            await startRecording();
+        } else if (e.target.id === 'stop-recording') {
+            stopRecording();
+        } else if (e.target.id === 'btn-review-accusations') {
+            await fetchPendingAccusations();
+            renderView('adminReview', { pendingAccusations: state.pendingAccusations });
+        } else if (e.target.classList.contains('btn-approve-accusation')) {
+            const accusationId = e.target.dataset.accusationId;
+            if (accusationId) {
+                await handleApproveAccusation(accusationId);
+            }
+        } else if (e.target.classList.contains('btn-deny-accusation')) {
+            const accusationId = e.target.dataset.accusationId;
+            if (accusationId) {
+                await handleDenyAccusation(accusationId);
+            }
+        }
+    });
+</script>
 </body>
 </html>
