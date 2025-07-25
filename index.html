@@ -223,12 +223,24 @@ const templates = {
         </div>`,
 };
 
-        function renderView(viewName, data = {}) {
-            if (viewName === 'login') {
-                appRoot.innerHTML = templates.login();
-            } else {
-                appRoot.innerHTML = templates.gameLayout(templates[viewName](data));
-            }
+function renderView(viewName, data = {}) {
+    if (viewName === 'login') {
+        appRoot.innerHTML = templates.login();
+    } else {
+        appRoot.innerHTML = templates.gameLayout(templates[viewName](data));
+    }
+    
+    // Setup audio recording listeners if accusation form is rendered
+    if (document.getElementById('start-recording')) {
+        document.getElementById('start-recording').addEventListener('click', startRecording);
+        document.getElementById('stop-recording').addEventListener('click', stopRecording);
+    }
+
+    // Setup accusation form submission
+    if (document.getElementById('accusation-submission-form')) {
+        document.getElementById('accusation-submission-form').addEventListener('submit', handleAccusationSubmission);
+    }
+}
         }
 
 // Existing appRoot.addEventListener for submit
@@ -417,12 +429,16 @@ async function startRecording() {
         mediaRecorder.onstop = () => {
             recordedAudioBlob = new Blob(audioChunks, { type: 'audio/webm;codecs=opus' });
             audioPlayer = document.getElementById('audio-playback');
-            audioPlayer.src = URL.createObjectURL(recordedAudioBlob);
-            audioPlayer.load();
+audioPlayer.src = URL.createObjectURL(recordedAudioBlob);
+audioPlayer.load();
 
-            document.getElementById('play-recording').disabled = false;
-            document.getElementById('submit-accusation-btn').disabled = false;
+// Show audio preview automatically and hide the play button
+document.getElementById('audio-playback').classList.remove('hidden');
+document.getElementById('submit-accusation-btn').disabled = false;
 
+// Hide the play recording button since preview shows automatically
+const playBtn = document.getElementById('play-recording');
+if (playBtn) playBtn.style.display = 'none';
             stream.getTracks().forEach(track => track.stop());
         };
 
@@ -505,6 +521,24 @@ async function submitAccusation(accusedPlayerId, audioBlob) {
         recordedAudioBlob = null;
         if (audioPlayer) audioPlayer.src = '';
     }
+}
+
+async function handleAccusationSubmission(e) {
+    e.preventDefault();
+    
+    const accusedPlayerId = document.getElementById('accused-player-select').value;
+    
+    if (!accusedPlayerId) {
+        showMessage("Please select an accused player.");
+        return;
+    }
+    
+    if (!recordedAudioBlob) {
+        showMessage("Please record an audio accusation first.");
+        return;
+    }
+    
+    await submitAccusation(accusedPlayerId, recordedAudioBlob);
 }
         
 function updateDashboardActions(currentPhase) {
