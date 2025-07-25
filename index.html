@@ -107,83 +107,121 @@
         const appRoot = document.getElementById('app-root');
         const messageBox = document.getElementById('message-box');
         const loadingOverlay = document.getElementById('loading-overlay');
+        let mediaRecorder;
+        let audioChunks = [];
+        let recordedAudioBlob = null;
+        let audioPlayer;
 
-        const templates = {
-            login: () => `
-                <div class="container">
-                    <h1 class="text-4xl font-bold text-center text-red-500 mb-6">SRSI MAFIA LOGIN</h1>
-                    <form id="login-form">
-                        <div class="mb-6">
-                            <label for="login-code" class="block text-gray-300 text-lg font-bold mb-2">Enter Your Player Name:</label>
-                            <input type="text" id="login-code" class="shadow appearance-none border rounded w-full py-3 px-4 text-lg text-gray-200 leading-tight focus:outline-none focus:shadow-outline" required>
-                        </div>
-                        <button type="submit" class="bg-red-700 hover:bg-red-800 text-white font-bold py-3 px-6 rounded-lg w-full text-xl">Enter Game</button>
-                        <p id="login-error" class="text-red-500 text-center mt-4"></p>
-                    </form>
-                </div>`,
-            gameLayout: (viewHtml) => `
-                <div class="container" id="game-container">
-                    <h1 class="text-4xl font-bold text-center text-red-500 mb-6">SRSI MAFIA</h1>
-                    <div class="bg-gray-900 p-4 rounded-lg flex justify-between items-center">
-                        <p class="text-base text-gray-400">Logged in as:</p>
-                        <span class="font-mono text-blue-400 text-base">${state.currentUser.Name} (${state.currentUser.Role})</span>
-                    </div>
-                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-                        <div class="bg-gray-900 p-5 rounded-lg">
-                            <h2 class="text-2xl font-semibold mb-3">Game Status</h2>
-                            <p>Current Day: <span class="font-bold text-red-400">${state.gameState?.CurrentDay || '...'}</span></p>
-                            <p>Current Phase: <span class="font-bold text-red-400">${state.gameState?.CurrentPhase || '...'}</span></p>
-                        </div>
-                        <div class="bg-gray-900 p-5 rounded-lg">
-                            <h2 class="text-2xl font-semibold mb-3">Trial Information</h2>
-                            <p>Accused Player: <span class="font-bold text-red-400">${getPlayerNameById(state.gameState?.LastAccusedPlayerID) || 'N/A'}</span></p>
-                            <p>Last Trial Result: <span class="font-bold text-green-400">${state.gameState?.LastTrialResult || 'N/A'}</span></p>
-                        </div>
-                    </div>
-                    <div id="view-content">${viewHtml}</div>
-                </div>`,
-            dashboard: () => `
-                <div class="bg-gray-900 p-5 rounded-lg mt-4">
-                    <h2 class="text-2xl font-semibold mb-4">Dashboard</h2>
-                    <p class="text-gray-400 mb-6">Select an action to proceed.</p>
-                    <div id="player-dashboard-actions" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4"></div>
-                    <div id="admin-dashboard-actions" class="hidden grid-cols-1 md:grid-cols-2 gap-4">
-                        <button id="btn-review-accusations" class="bg-green-700 hover:bg-green-800 text-white font-bold py-3 px-6 rounded-lg">Review Accusations</button>
-                    </div>
-                </div>`,
-            actionModal: ({ title, buttonText, targets, actionType }) => `
-    <div class="bg-gray-900 p-5 rounded-lg mt-4">
-        <h2 class="text-2xl font-semibold mb-4 text-red-400">${title}</h2>
-        <form id="action-form" data-action-type="${actionType}">
-            <div class="mb-4">
-                <label for="target-player" class="block text-gray-300 text-lg font-bold mb-2">Select Target:</label>
-                <select id="target-player" class="shadow border rounded w-full py-3 px-4 text-lg leading-tight focus:outline-none focus:shadow-outline bg-gray-700 border-gray-600 text-white" required>
-                    <option value="">-- Select a player --</option>
-                    ${targets.map(p => `<option value="${p.PlayerID}">${p.Name}</option>`).join('')}
-                </select>
+const templates = {
+    login: () => `
+        <div class="container">
+            <h1 class="text-4xl font-bold text-center text-red-500 mb-6">SRSI MAFIA LOGIN</h1>
+            <form id="login-form">
+                <div class="mb-6">
+                    <label for="login-code" class="block text-gray-300 text-lg font-bold mb-2">Enter Your Player Name:</label>
+                    <input type="text" id="login-code" class="shadow appearance-none border rounded w-full py-3 px-4 text-lg text-gray-200 leading-tight focus:outline-none focus:shadow-outline" required>
+                </div>
+                <button type="submit" class="bg-red-700 hover:bg-red-800 text-white font-bold py-3 px-6 rounded-lg w-full text-xl">Enter Game</button>
+                <p id="login-error" class="text-red-500 text-center mt-4"></p>
+            </form>
+        </div>`,
+    gameLayout: (viewHtml) => `
+        <div class="container" id="game-container">
+            <h1 class="text-4xl font-bold text-center text-red-500 mb-6">SRSI MAFIA</h1>
+            <div class="bg-gray-900 p-4 rounded-lg flex justify-between items-center">
+                <p class="text-base text-gray-400">Logged in as:</p>
+                <span class="font-mono text-blue-400 text-base">${state.currentUser.Name} (${state.currentUser.Role})</span>
             </div>
-            <div class="flex flex-col md:flex-row gap-4">
-                <button type="submit" class="bg-red-700 hover:bg-red-800 text-white font-bold py-3 px-6 rounded-lg w-full md:w-1/2 text-xl">
-                    ${buttonText}
-                </button>
-                <button type="button" id="back-to-dashboard" class="bg-gray-600 hover:bg-gray-700 text-white font-bold py-3 px-6 rounded-lg w-full md:w-1/2 text-xl">
-                    Cancel
-                </button>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div class="bg-gray-900 p-5 rounded-lg">
+                    <h2 class="text-2xl font-semibold mb-3">Game Status</h2>
+                    <p>Current Day: <span class="font-bold text-red-400">${state.gameState?.CurrentDay || '...'}</span></p>
+                    <p>Current Phase: <span class="font-bold text-red-400">${state.gameState?.CurrentPhase || '...'}</span></p>
+                </div>
+                <div class="bg-gray-900 p-5 rounded-lg">
+                    <h2 class="text-2xl font-semibold mb-3">Trial Information</h2>
+                    <p>Accused Player: <span class="font-bold text-red-400">${getPlayerNameById(state.gameState?.LastAccusedPlayerID) || 'N/A'}</span></p>
+                    <p>Last Trial Result: <span class="font-bold text-green-400">${state.gameState?.LastTrialResult || 'N/A'}</span></p>
+                </div>
             </div>
-        </form>
-    </div>
-`, // Make sure this comma is there if it's not the last template!
-            revealedTeammates: ({ role, teammates }) => `
-                <div class="bg-gray-900 p-5 rounded-lg mt-4">
-                    <h2 class="text-2xl font-semibold text-cyan-400 mb-4">Your ${role} Team</h2>
-                    ${teammates.length > 0 ? `
-                    <ul class="list-disc list-inside space-y-2">
-                        ${teammates.map(name => `<li>${name}</li>`).join('')}
-                    </ul>
-                    ` : '<p class="text-gray-400">You have not revealed any teammates yet.</p>'}
-                    <button type="button" id="back-to-dashboard" class="mt-6 bg-gray-600 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded-lg w-full">Back to Dashboard</button>
-                </div>`,
-        };
+            <div id="view-content">${viewHtml}</div>
+        </div>`,
+    dashboard: () => `
+        <div class="bg-gray-900 p-5 rounded-lg mt-4">
+            <h2 class="text-2xl font-semibold mb-4">Dashboard</h2>
+            <p class="text-gray-400 mb-6">Select an action to proceed.</p>
+            <div id="player-dashboard-actions" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4"></div>
+            <div id="admin-dashboard-actions" class="hidden grid-cols-1 md:grid-cols-2 gap-4">
+                <button id="btn-review-accusations" class="bg-green-700 hover:bg-green-800 text-white font-bold py-3 px-6 rounded-lg">Review Accusations</button>
+            </div>
+        </div>`,
+    actionModal: ({ title, buttonText, targets, actionType }) => `
+        <div class="bg-gray-900 p-5 rounded-lg mt-4">
+            <h2 class="text-2xl font-semibold mb-4 text-red-400">${title}</h2>
+            <form id="action-form" data-action-type="${actionType}">
+                <div class="mb-4">
+                    <label for="target-player" class="block text-gray-300 text-lg font-bold mb-2">Select Target:</label>
+                    <select id="target-player" class="shadow border rounded w-full py-3 px-4 text-lg leading-tight focus:outline-none focus:shadow-outline bg-gray-700 border-gray-600 text-white" required>
+                        <option value="">-- Select a player --</option>
+                        ${targets.map(p => `<option value="${p.PlayerID}">${p.Name}</option>`).join('')}
+                    </select>
+                </div>
+                <div class="flex flex-col md:flex-row gap-4">
+                    <button type="submit" class="bg-red-700 hover:bg-red-800 text-white font-bold py-3 px-6 rounded-lg w-full md:w-1/2 text-xl">
+                        ${buttonText}
+                    </button>
+                    <button type="button" id="back-to-dashboard" class="bg-gray-600 hover:bg-gray-700 text-white font-bold py-3 px-6 rounded-lg w-full md:w-1/2 text-xl">
+                        Cancel
+                    </button>
+                </div>
+            </form>
+        </div>
+    `,
+    // THIS IS THE NEW ACCUSATION FORM TEMPLATE - IT HAS BEEN ADDED HERE
+    accusationForm: ({ targets }) => `
+        <div class="bg-gray-900 p-5 rounded-lg mt-4">
+            <h2 class="text-2xl font-semibold mb-4 text-red-400">Submit Accusation</h2>
+            <form id="accusation-submission-form">
+                <div class="mb-4">
+                    <label for="accuser-name" class="block text-gray-300 text-lg font-bold mb-2">Accuser (Your Name):</label>
+                    <input type="text" id="accuser-name" class="shadow appearance-none border rounded w-full py-3 px-4 text-lg text-gray-200 leading-tight focus:outline-none focus:shadow-outline bg-gray-700 border-gray-600 cursor-not-allowed" value="${state.currentUser.Name}" readonly>
+                </div>
+                <div class="mb-4">
+                    <label for="accused-player-select" class="block text-gray-300 text-lg font-bold mb-2">Accused Player:</label>
+                    <select id="accused-player-select" class="shadow border rounded w-full py-3 px-4 text-lg leading-tight focus:outline-none focus:shadow-outline bg-gray-700 border-gray-600 text-white" required>
+                        <option value="">-- Select accused player --</option>
+                        ${targets.map(p => `<option value="${p.PlayerID}">${p.Name}</option>`).join('')}
+                    </select>
+                </div>
+
+                <div class="mb-6">
+                    <label class="block text-gray-300 text-lg font-bold mb-2">Record Accusation:</label>
+                    <div class="flex flex-wrap items-center gap-4 mb-4">
+                        <button type="button" id="start-recording" class="bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-4 rounded-lg">Start Recording</button>
+                        <button type="button" id="stop-recording" class="bg-gray-600 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded-lg" disabled>Stop Recording</button>
+                        <button type="button" id="play-recording" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg" disabled>Play Recording</button>
+                    </div>
+                    <audio id="audio-playback" controls class="w-full hidden"></audio>
+                </div>
+
+                <div class="flex flex-col md:flex-row gap-4">
+                    <button type="submit" id="submit-accusation-btn" class="bg-green-700 hover:bg-green-800 text-white font-bold py-3 px-6 rounded-lg w-full md:w-1/2 text-xl" disabled>Submit Accusation</button>
+                    <button type="button" id="back-to-dashboard" class="bg-gray-600 hover:bg-gray-700 text-white font-bold py-3 px-6 rounded-lg w-full md:w-1/2 text-xl">Cancel</button>
+                </div>
+            </form>
+        </div>
+    `,
+    revealedTeammates: ({ role, teammates }) => `
+        <div class="bg-gray-900 p-5 rounded-lg mt-4">
+            <h2 class="text-2xl font-semibold text-cyan-400 mb-4">Your ${role} Team</h2>
+            ${teammates.length > 0 ? `
+            <ul class="list-disc list-inside space-y-2">
+                ${teammates.map(name => `<li>${name}</li>`).join('')}
+            </ul>
+            ` : '<p class="text-gray-400">You have not revealed any teammates yet.</p>'}
+            <button type="button" id="back-to-dashboard" class="mt-6 bg-gray-600 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded-lg w-full">Back to Dashboard</button>
+        </div>`,
+};
 
         function renderView(viewName, data = {}) {
             if (viewName === 'login') {
@@ -365,6 +403,109 @@ async function performFetchAction(endpoint, payload) {
             messageBox.textContent = message;
             messageBox.style.display = 'block';
         }
+// --- Audio Recording Functions ---
+async function startRecording() {
+    try {
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        mediaRecorder = new MediaRecorder(stream, { mimeType: 'audio/webm;codecs=opus' });
+
+        audioChunks = [];
+        mediaRecorder.ondataavailable = event => {
+            audioChunks.push(event.data);
+        };
+
+        mediaRecorder.onstop = () => {
+            recordedAudioBlob = new Blob(audioChunks, { type: 'audio/webm;codecs=opus' });
+            audioPlayer = document.getElementById('audio-playback');
+            audioPlayer.src = URL.createObjectURL(recordedAudioBlob);
+            audioPlayer.load();
+
+            document.getElementById('play-recording').disabled = false;
+            document.getElementById('submit-accusation-btn').disabled = false;
+
+            stream.getTracks().forEach(track => track.stop());
+        };
+
+        mediaRecorder.start();
+        document.getElementById('start-recording').disabled = true;
+        document.getElementById('stop-recording').disabled = false;
+        document.getElementById('play-recording').disabled = true;
+        document.getElementById('submit-accusation-btn').disabled = true;
+        document.getElementById('audio-playback').classList.add('hidden');
+        showMessage('Recording started...');
+    } catch (err) {
+        console.error('Error accessing microphone:', err);
+        showMessage('Could not access microphone. Please ensure it is connected and permissions are granted.');
+    }
+}
+
+function stopRecording() {
+    if (mediaRecorder && mediaRecorder.state === 'recording') {
+        mediaRecorder.stop();
+        document.getElementById('start-recording').disabled = false;
+        document.getElementById('stop-recording').disabled = true;
+        document.getElementById('audio-playback').classList.remove('hidden'); // Show player after stopping
+        showMessage('Recording stopped. Preview available.');
+    }
+}
+
+function playRecording() {
+    if (audioPlayer && recordedAudioBlob) {
+        audioPlayer.play();
+    } else {
+        showMessage('No recording to play.');
+    }
+}
+
+// --- Accusation Form Submission Function ---
+async function submitAccusation(accusedPlayerId, audioBlob) {
+    if (!accusedPlayerId || !audioBlob) {
+        showMessage("Please select an accused player and record an audio accusation.");
+        return;
+    }
+
+    loadingOverlay.style.display = 'flex';
+    try {
+        // Use FormData to send the audio file along with other data
+        const formData = new FormData();
+        formData.append('accuserPlayerId', state.currentUserId);
+        formData.append('accusedPlayerId', accusedPlayerId);
+        // Rename audio file to .mp4 or appropriate extension for your backend (even if it's webm internally)
+        // You mentioned MP4, but MediaRecorder typically outputs WebM. Let's send as webm for now,
+        // and if your backend truly needs MP4, we'll need a conversion step (more complex).
+        // If your backend handles webm well, this is fine.
+        formData.append('audioFile', audioBlob, `accusation_${state.currentUserId}_${Date.now()}.webm`);
+
+
+        const response = await fetch('/.netlify/functions/submit-accusation', {
+            method: 'POST',
+            body: formData, // Sending FormData, so no 'Content-Type' header needed (browser sets it)
+        });
+
+        const result = await response.json(); // Assuming your Netlify function returns JSON
+
+        if (response.ok) {
+            showMessage(result.message || 'Accusation submitted successfully!');
+            // After successful submission, refresh data and return to dashboard
+            await fetchPlayers(true);
+            await fetchGameState();
+            renderView('dashboard');
+        } else {
+            throw new Error(result.message || `Error: ${response.status} ${response.statusText}`);
+        }
+    } catch (error) {
+        console.error("Error submitting accusation:", error);
+        showMessage(`Failed to submit accusation: ${error.message}`);
+    } finally {
+        loadingOverlay.style.display = 'none';
+        setTimeout(() => { messageBox.style.display = 'none'; }, 5000);
+        // Reset audio state after submission attempt
+        mediaRecorder = null;
+        audioChunks = [];
+        recordedAudioBlob = null;
+        if (audioPlayer) audioPlayer.src = '';
+    }
+}
         
 function updateDashboardActions(currentPhase) {
         const playerActions = document.getElementById('player-dashboard-actions');
