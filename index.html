@@ -264,117 +264,131 @@
             messageBox.style.display = 'block';
         }
         
-        function updateDashboardActions(currentPhase) {
-            const playerActions = document.getElementById('player-dashboard-actions');
-            if (!playerActions) return;
-            playerActions.innerHTML = ''; // Clear existing buttons
+function updateDashboardActions(currentPhase) {
+        const playerActions = document.getElementById('player-dashboard-actions');
+        if (!playerActions) return;
+        playerActions.innerHTML = ''; // Clear existing buttons
 
-            const isNight = currentPhase && currentPhase.toLowerCase() !== 'day';
+        const isNight = currentPhase && currentPhase.toLowerCase() !== 'day';
 
-            const createButton = (id, text, style, onClick) => {
-                const button = document.createElement('button');
-                button.id = id;
-                button.textContent = text;
-                button.className = `${style} text-white font-bold py-3 px-6 rounded-lg transition`;
-                button.onclick = onClick;
-                playerActions.appendChild(button);
-            };
+        const createButton = (id, text, style, onClick) => {
+            const button = document.createElement('button');
+            button.id = id;
+            button.textContent = text;
+            button.className = `${style} text-white font-bold py-3 px-6 rounded-lg transition`;
+            button.onclick = onClick;
+            playerActions.appendChild(button);
+        };
 
-            const role = state.currentUser.Role.toLowerCase();
+        const role = state.currentUser.Role.toLowerCase();
 
-            // --- ALL ROLES ---
-            createButton('btn-submit-accusation', 'Submit Accusation', 'bg-gray-700 hover:bg-gray-800', () => {
-                const targets = state.allPlayers.filter(p => p.Status && p.Status.toLowerCase() === 'alive' && p.PlayerID !== state.currentUserId);
-                renderView('accusationForm', { targets });
+        // --- ALL ROLES ---
+        createButton('btn-submit-accusation', 'Submit Accusation', 'bg-gray-700 hover:bg-gray-800', () => {
+            const targets = state.allPlayers.filter(p =>
+                p.Status && typeof p.Status === 'string' && p.Status.toLowerCase() === 'alive' &&
+                p.PlayerID !== state.currentUserId
+            );
+            renderView('accusationForm', { targets });
+        });
+
+        // --- MAFIA ---
+        if (role === 'mafia') {
+            createButton('btn-kill', 'Kill Player', 'bg-red-700 hover:bg-red-800', () => {
+                if (!isNight) return showMessage("You can only use this action at night.");
+                if (state.currentUser.MainUsed === 'TRUE') return showMessage("You have already used your main action tonight.");
+                const targets = state.allPlayers.filter(p =>
+                    p.Status && typeof p.Status === 'string' && p.Status.toLowerCase() === 'alive' &&
+                    p.Role && typeof p.Role === 'string' && p.Role.toLowerCase() !== 'mafia'
+                );
+                renderView('actionModal', { title: 'Choose a Target to Kill', buttonText: 'Confirm Kill', targets, actionType: 'kill' });
             });
-
-            // --- MAFIA ---
-            if (role === 'mafia') {
-                createButton('btn-kill', 'Kill Player', 'bg-red-700 hover:bg-red-800', () => {
-                    if (!isNight) return showMessage("You can only use this action at night.");
-                    if (state.currentUser.MainUsed === 'TRUE') return showMessage("You have already used your main action tonight.");
-                    const targets = state.allPlayers.filter(p => p.Status && p.Status.toLowerCase() === 'alive' && p.Role.toLowerCase() !== 'mafia');
-                    renderView('actionModal', { title: 'Choose a Target to Kill', buttonText: 'Confirm Kill', targets, actionType: 'kill' });
-                });
-                createButton('btn-convert', 'Convert Villager', 'bg-red-900', () => {
-                    if (!isNight) return showMessage("You can only use this ability at night.");
-                    if (state.currentUser.MafiaCanConvert !== 'TRUE') return showMessage("You have not unlocked this ability or have already used it.");
-                    performFetchAction('/.netlify/functions/convert-villager', { mafiaPlayerId: state.currentUserId });
-                });
-                createButton('btn-reveal-mafia', 'Reveal Mafia', 'bg-red-900', () => {
-                    if (!isNight) return showMessage("You can only use this ability at night.");
-                    if (state.currentUser.MafiaCanRevealSelf !== 'TRUE') return showMessage("You have not unlocked this ability or have already used it.");
-                    performFetchAction('/.netlify/functions/reveal-mafia', { mafiaPlayerId: state.currentUserId });
-                });
-                createButton('btn-view-teammates', 'List Mafia', 'bg-cyan-600 hover:bg-cyan-700', () => {
-                    if (!state.currentUser.RevealedTeammates) return showMessage("You have not revealed any teammates yet.");
-                    const teammates = state.currentUser.RevealedTeammates.split(',').map(id => getPlayerNameById(id));
-                    renderView('revealedTeammates', { role: 'Mafia', teammates });
-                });
-            }
-
-            // --- DOCTOR ---
-            if (role === 'doctor') {
-                createButton('btn-protect', 'Protect Player', 'bg-blue-700 hover:bg-blue-800', () => {
-                    if (!isNight) return showMessage("You can only use this action at night.");
-                    if (state.currentUser.MainUsed === 'TRUE') return showMessage("You have already used your main action tonight.");
-                    const targets = state.allPlayers.filter(p => p.Status && p.Status.toLowerCase() === 'alive');
-                    renderView('actionModal', { title: 'Choose a Player to Protect', buttonText: 'Confirm Protection', targets, actionType: 'protect' });
-                });
-                createButton('btn-revive', 'Revive Player', 'bg-blue-900', () => {
-                    if (!isNight) return showMessage("You can only use this ability at night.");
-                    if (state.currentUser.DoctorCanRevive !== 'TRUE') return showMessage("You have not unlocked this ability or have already used it.");
-                    performFetchAction('/.netlify/functions/revive-player', { doctorPlayerId: state.currentUserId });
-                });
-                createButton('btn-reveal-doctor', 'Reveal Doctor', 'bg-blue-900', () => {
-                    if (!isNight) return showMessage("You can only use this ability at night.");
-                    if (state.currentUser.DoctorCanRevealSelf !== 'TRUE') return showMessage("You have not unlocked this ability or have already used it.");
-                    performFetchAction('/.netlify/functions/reveal-doctor', { doctorPlayerId: state.currentUserId });
-                });
-                createButton('btn-view-teammates', 'List Doctors', 'bg-cyan-600 hover:bg-cyan-700', () => {
-                    if (!state.currentUser.RevealedTeammates) return showMessage("You have not revealed any teammates yet.");
-                    const teammates = state.currentUser.RevealedTeammates.split(',').map(id => getPlayerNameById(id));
-                    renderView('revealedTeammates', { role: 'Doctor', teammates });
-                });
-            }
-
-            // --- DETECTIVE ---
-            if (role === 'detective') {
-                createButton('btn-check', 'Investigate Player', 'bg-yellow-600 hover:bg-yellow-700', () => {
-                    if (!isNight) return showMessage("You can only use this action at night.");
-                    if (state.currentUser.MainUsed === 'TRUE') return showMessage("You have already used your main action tonight.");
-                    const targets = state.allPlayers.filter(p => p.Status && p.Status.toLowerCase() === 'alive' && p.PlayerID !== state.currentUserId);
-                    renderView('actionModal', { title: 'Choose a Player to Investigate', buttonText: 'Confirm Investigation', targets, actionType: 'check' });
-                });
-                createButton('btn-reveal-detective', 'Reveal a Detective', 'bg-yellow-900', () => showMessage("This ability is not yet implemented."));
-                createButton('btn-view-history', 'Investigation History', 'bg-purple-700 hover:bg-purple-800', () => renderView('investigationHistory'));
-            }
-
-            // --- VILLAGER ---
-            if (role === 'villager') {
-                createButton('btn-increase-vote', 'Increase Vote Power', 'bg-green-900', () => {
-                    if (!isNight) return showMessage("You can only use this ability at night.");
-                    if (state.currentUser.VillagerCanIncreaseVote !== 'TRUE') return showMessage("You have not unlocked this ability or have already used it.");
-                    performFetchAction('/.netlify/functions/increase-vote-power', { villagerPlayerId: state.currentUserId });
-                });
-                createButton('btn-change-role', 'Change Role', 'bg-green-900', () => {
-                    if (!isNight) return showMessage("You can only use this ability at night.");
-                    if (state.currentUser.VillagerCanChangeRole !== 'TRUE') return showMessage("You have not unlocked this ability or have already used it.");
-                    performFetchAction('/.netlify/functions/change-role', { villagerPlayerId: state.currentUserId });
-                });
-            }
-
-            // --- SHERIFF ---
-            if (role === 'sheriff') {
-                createButton('btn-shoot', 'Shoot Player', 'bg-gray-700 hover:bg-gray-800', () => {
-                    if (!isNight) return showMessage("You can only use this action at night.");
-                    if (state.currentUser.MainUsed === 'TRUE') return showMessage("You have already used your main action tonight.");
-                    if (state.currentUser.SheriffShotUsed === 'TRUE') return showMessage("You have already used your one-time shot.");
-                    const targets = state.allPlayers.filter(p => p.Status && p.Status.toLowerCase() === 'alive' && p.PlayerID !== state.currentUserId);
-                    renderView('actionModal', { title: 'Choose Your Target', buttonText: 'Fire!', targets, actionType: 'shoot' });
-                });
-            }
+            createButton('btn-convert', 'Convert Villager', 'bg-red-900', () => {
+                if (!isNight) return showMessage("You can only use this ability at night.");
+                if (state.currentUser.MafiaCanConvert !== 'TRUE') return showMessage("You have not unlocked this ability or have already used it.");
+                // This calls performFetchAction which you mentioned isn't fully defined yet.
+                // It will be the next step to address this.
+                performFetchAction('/.netlify/functions/convert-villager', { mafiaPlayerId: state.currentUserId });
+            });
+            createButton('btn-reveal-mafia', 'Reveal Mafia', 'bg-red-900', () => {
+                if (!isNight) return showMessage("You can only use this ability at night.");
+                if (state.currentUser.MafiaCanRevealSelf !== 'TRUE') return showMessage("You have not unlocked this ability or have already used it.");
+                performFetchAction('/.netlify/functions/reveal-mafia', { mafiaPlayerId: state.currentUserId });
+            });
+            createButton('btn-view-teammates', 'List Mafia', 'bg-cyan-600 hover:bg-cyan-700', () => {
+                if (!state.currentUser.RevealedTeammates) return showMessage("You have not revealed any teammates yet.");
+                const teammates = state.currentUser.RevealedTeammates.split(',').map(id => getPlayerNameById(id));
+                renderView('revealedTeammates', { role: 'Mafia', teammates });
+            });
         }
+
+        // --- DOCTOR ---
+        if (role === 'doctor') {
+            createButton('btn-protect', 'Protect Player', 'bg-blue-700 hover:bg-blue-800', () => {
+                if (!isNight) return showMessage("You can only use this action at night.");
+                if (state.currentUser.MainUsed === 'TRUE') return showMessage("You have already used your main action tonight.");
+                const targets = state.allPlayers.filter(p => p.Status && typeof p.Status === 'string' && p.Status.toLowerCase() === 'alive');
+                renderView('actionModal', { title: 'Choose a Player to Protect', buttonText: 'Confirm Protection', targets, actionType: 'protect' });
+            });
+            createButton('btn-revive', 'Revive Player', 'bg-blue-900', () => {
+                if (!isNight) return showMessage("You can only use this ability at night.");
+                if (state.currentUser.DoctorCanRevive !== 'TRUE') return showMessage("You have not unlocked this ability or have already used it.");
+                performFetchAction('/.netlify/functions/revive-player', { doctorPlayerId: state.currentUserId });
+            });
+            createButton('btn-reveal-doctor', 'Reveal Doctor', 'bg-blue-900', () => {
+                if (!isNight) return showMessage("You can only use this ability at night.");
+                if (state.currentUser.DoctorCanRevealSelf !== 'TRUE') return showMessage("You have not unlocked this ability or have already used it.");
+                performFetchAction('/.netlify/functions/reveal-doctor', { doctorPlayerId: state.currentUserId });
+            });
+            createButton('btn-view-teammates', 'List Doctors', 'bg-cyan-600 hover:bg-cyan-700', () => {
+                if (!state.currentUser.RevealedTeammates) return showMessage("You have not revealed any teammates yet.");
+                const teammates = state.currentUser.RevealedTeammates.split(',').map(id => getPlayerNameById(id));
+                renderView('revealedTeammates', { role: 'Doctor', teammates });
+            });
+        }
+
+        // --- DETECTIVE ---
+        if (role === 'detective') {
+            createButton('btn-check', 'Investigate Player', 'bg-yellow-600 hover:bg-yellow-700', () => {
+                if (!isNight) return showMessage("You can only use this action at night.");
+                if (state.currentUser.MainUsed === 'TRUE') return showMessage("You have already used your main action tonight.");
+                const targets = state.allPlayers.filter(p =>
+                    p.Status && typeof p.Status === 'string' && p.Status.toLowerCase() === 'alive' &&
+                    p.PlayerID !== state.currentUserId
+                );
+                renderView('actionModal', { title: 'Choose a Player to Investigate', buttonText: 'Confirm Investigation', targets, actionType: 'check' });
+            });
+            createButton('btn-reveal-detective', 'Reveal a Detective', 'bg-yellow-900', () => showMessage("This ability is not yet implemented."));
+            createButton('btn-view-history', 'Investigation History', 'bg-purple-700 hover:bg-purple-800', () => renderView('investigationHistory'));
+        }
+
+        // --- VILLAGER ---
+        if (role === 'villager') {
+            createButton('btn-increase-vote', 'Increase Vote Power', 'bg-green-900', () => {
+                if (!isNight) return showMessage("You can only use this ability at night.");
+                if (state.currentUser.VillagerCanIncreaseVote !== 'TRUE') return showMessage("You have not unlocked this ability or have already used it.");
+                performFetchAction('/.netlify/functions/increase-vote-power', { villagerPlayerId: state.currentUserId });
+            });
+            createButton('btn-change-role', 'Change Role', 'bg-green-900', () => {
+                if (!isNight) return showMessage("You can only use this ability at night.");
+                if (state.currentUser.VillagerCanChangeRole !== 'TRUE') return showMessage("You have not unlocked this ability or have already used it.");
+                performFetchAction('/.netlify/functions/change-role', { villagerPlayerId: state.currentUserId });
+            });
+        }
+
+        // --- SHERIFF ---
+        if (role === 'sheriff') {
+            createButton('btn-shoot', 'Shoot Player', 'bg-gray-700 hover:bg-gray-800', () => {
+                if (!isNight) return showMessage("You can only use this action at night.");
+                if (state.currentUser.MainUsed === 'TRUE') return showMessage("You have already used your main action tonight.");
+                if (state.currentUser.SheriffShotUsed === 'TRUE') return showMessage("You have already used your one-time shot.");
+                const targets = state.allPlayers.filter(p =>
+                    p.Status && typeof p.Status === 'string' && p.Status.toLowerCase() === 'alive' &&
+                    p.PlayerID !== state.currentUserId
+                );
+                renderView('actionModal', { title: 'Choose Your Target', buttonText: 'Fire!', targets, actionType: 'shoot' });
+            });
+        }
+    }
 
         window.onload = async () => {
             const savedUserId = localStorage.getItem('mafiaGameUserId');
