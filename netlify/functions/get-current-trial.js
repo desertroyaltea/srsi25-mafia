@@ -77,11 +77,11 @@ exports.handler = async (event, context) => {
         const votingDeadlineCol = headers.indexOf('VotingDeadline'); // Added for completeness
         const statusCol = headers.indexOf('Status');
         const guiltyCol = headers.indexOf('GUILTY');
-        const notGuiltyCol = headers.indexOf('NOTGUILTY');
+        const notGuiltyCol = 8;
 
         console.log(`get-current-trial: Column indices: TrialID=${trialIdCol}, AccusedPlayerID=${accusedPlayerIdCol}, AudioLink=${audioLinkCol}, Status=${statusCol}, Guilty=${guiltyCol}, NotGuilty=${notGuiltyCol}`); // LOG 11
 
-        if ([trialIdCol, accusedPlayerIdCol, audioLinkCol, statusCol, guiltyCol, notGuiltyCol, trialStartTimeCol, votingDeadlineCol].includes(-1)) {
+        if ([trialIdCol, accusedPlayerIdCol, audioLinkCol, statusCol, guiltyCol, trialStartTimeCol, votingDeadlineCol].includes(-1)) {
             console.error('get-current-trial: One or more required columns not found in Trials sheet. Check headers.'); // LOG 12
             throw new Error('One or more required columns not found in Trials sheet.');
         }
