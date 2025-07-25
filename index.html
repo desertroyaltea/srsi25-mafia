@@ -303,6 +303,27 @@ gameLayout: (viewHtml) => `
                 </div>
             `,
 
+
+// NEW INVESTIGATION RESULT TEMPLATE
+            investigationResult: ({ targetName, isMafiaResult }) => `
+                <div class="bg-gray-900 p-5 rounded-lg mt-4 text-center">
+                    <h2 class="text-3xl font-bold mb-4 ${isMafiaResult === 'YES' ? 'text-red-500' : 'text-green-500'}">Investigation Result</h2>
+                    <p class="text-xl text-gray-300 mb-4">
+                        Your investigation of <span class="font-bold text-blue-400">${targetName}</span> reveals:
+                    </p>
+                    ${isMafiaResult === 'YES' ? `
+                        <p class="text-4xl font-bold text-red-500 mb-6">MAFIA!</p>
+                        <p class="text-lg text-gray-400">Proceed with caution.</p>
+                    ` : `
+                        <p class="text-4xl font-bold text-green-500 mb-6">NOT MAFIA.</p>
+                        <p class="text-lg text-gray-400">They appear to be innocent.</p>
+                    `}
+                    <button type="button" id="back-to-dashboard" class="mt-8 bg-gray-600 hover:bg-gray-700 text-white font-bold py-3 px-6 rounded-lg w-full md:w-1/2 text-xl mx-auto block">
+                        Back to Dashboard
+                    </button>
+                </div>
+            `,
+
         revealedTeammates: ({ role, teammates }) => `
             <div class="bg-gray-900 p-5 rounded-lg mt-4">
                 <h2 class="text-2xl font-semibold text-cyan-400 mb-4">Your ${role} Team</h2>
@@ -751,14 +772,20 @@ async function fetchCurrentTrial() {
 
         // --- DETECTIVE ---
         if (role === 'detective') {
-            createButton('btn-check', 'Investigate Player', 'bg-yellow-600 hover:bg-yellow-700', () => {
+createButton('btn-check', 'Investigate Player', 'bg-yellow-600 hover:bg-yellow-700', async () => {
                 if (!isNight) return showMessage("You can only use this action at night.");
                 if (state.currentUser.MainUsed === 'TRUE') return showMessage("You have already used your main action tonight.");
                 const targets = state.allPlayers.filter(p =>
                     p.Status && typeof p.Status === 'string' && p.Status.toLowerCase() === 'alive' &&
                     p.PlayerID !== state.currentUserId
                 );
-                renderView('actionModal', { title: 'Choose a Player to Investigate', buttonText: 'Confirm Investigation', targets, actionType: 'check' });
+                // CRITICAL CHANGE: Modify actionModal submission to directly handle investigation result
+                renderView('actionModal', {
+                    title: 'Choose a Player to Investigate',
+                    buttonText: 'Confirm Investigation',
+                    targets,
+                    actionType: 'check-and-display-result' // NEW actionType to differentiate
+                });
             });
             createButton('btn-reveal-detective', 'Reveal a Detective', 'bg-yellow-900', () => showMessage("This ability is not yet implemented."));
 createButton('btn-view-history', 'Investigation History', 'bg-purple-700 hover:bg-purple-800', async () => {
@@ -861,6 +888,36 @@ createButton('btn-view-history', 'Investigation History', 'bg-purple-700 hover:b
                     endpoint = '/.netlify/functions/shoot-player';
                     payload = { sheriffPlayerId: state.currentUserId, targetPlayerId: targetPlayerId };
                     break;
+                    case 'check-and-display-result': // NEW CASE for Investigation
+                    endpoint = '/.netlify/functions/check-mafia';
+                    payload = { detectivePlayerId: state.currentUserId, targetPlayerId: targetPlayerId };
+                    
+                    loadingOverlay.style.display = 'flex'; // Show loading for this specific action
+                    try {
+                        const response = await fetch(endpoint, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify(payload),
+                        });
+                        const result = await response.json();
+
+                        if (response.ok) {
+                            // Instead of showMessage, render the new template
+                            const targetName = getPlayerNameById(targetPlayerId);
+                            renderView('investigationResult', { targetName: targetName, isMafiaResult: result.isMafiaResult });
+                            // No automatic return to dashboard here, user clicks "Back to Dashboard"
+                        } else {
+                            throw new Error(result.message || `Error: ${response.status} ${response.statusText}`);
+                        }
+                    } catch (error) {
+                        console.error("Error performing investigation:", error);
+                        showMessage(`Failed to perform investigation: ${error.message}`);
+                        renderView('dashboard'); // Return to dashboard on error
+                    } finally {
+                        loadingOverlay.style.display = 'none';
+                        setTimeout(() => { messageBox.style.display = 'none'; }, 5000); // Still hide message box if used
+                    }
+                    return; // IMPORTANT: Return here to prevent falling through to generic performFetchAction
                 default:
                     showMessage('Unknown action type for submission.');
                     console.error('Unknown actionType:', actionType);
