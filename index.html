@@ -953,7 +953,7 @@ createButton('btn-change-role', 'Change Role', 'bg-green-900', () => {
         }
     });
 
-    appRoot.addEventListener('click', async (e) => {
+appRoot.addEventListener('click', async (e) => {
         if (e.target.id === 'back-to-dashboard') {
             renderView('dashboard');
         } else if (e.target.id === 'start-recording') {
@@ -973,47 +973,55 @@ createButton('btn-change-role', 'Change Role', 'bg-green-900', () => {
             if (accusationId) {
                 await handleDenyAccusation(accusationId);
             }
-        else if (e.target.classList.contains('btn-select-new-role')) { // NEW: Handle role selection
-                const newRole = e.target.dataset.newRole;
-                if (newRole) {
-                    await performFetchAction('/.netlify/functions/change-role', { villagerPlayerId: state.currentUserId, newRole: newRole });
-                    renderView('dashboard'); // Return to dashboard after role change
-                } else {
-                    showMessage('No role selected.');
-                }
+        } else if (e.target.classList.contains('btn-select-new-role')) { // Handle role selection
+            const newRole = e.target.dataset.newRole;
+            if (newRole) {
+                await performFetchAction('/.netlify/functions/change-role', { villagerPlayerId: state.currentUserId, newRole: newRole });
+                renderView('dashboard'); // Return to dashboard after role change
+            } else {
+                showMessage('No role selected.');
             }
-} else if (e.target.id === 'btn-vote-guilty') { // GUILTY vote button
-                const trialId = e.target.dataset.trialId;
-                const votingPower = state.currentUser.CurrentVotingPower;
-                if (trialId && votingPower !== undefined) {
-                    await performFetchAction('/.netlify/functions/submit-jury-vote', { trialId, voterPlayerId: state.currentUserId, voteType: 'GUILTY', votingPower });
-                    // After voting, try to load the next trial
-                    await fetchCurrentTrial();
-                    if (state.currentTrial) {
-                        renderView('trialPage', { trial: state.currentTrial }); // Show next trial
-                    } else {
-                        renderView('dashboard'); // No more trials, go to dashboard
-                    }
+        } else if (e.target.id === 'btn-vote-guilty') { // GUILTY vote button
+            const trialId = e.target.dataset.trialId;
+            const votingPower = state.currentUser.CurrentVotingPower;
+            if (trialId && votingPower !== undefined) {
+                await performFetchAction('/.netlify/functions/submit-jury-vote', { trialId, voterPlayerId: state.currentUserId, voteType: 'GUILTY', votingPower });
+                // After voting, try to load the next trial
+                await fetchCurrentTrial();
+                if (state.currentTrial) {
+                    renderView('trialPage', { trial: state.currentTrial }); // Show next trial
                 } else {
-                    showMessage('Missing trial ID or voting power to submit vote.');
+                    renderView('dashboard'); // No more trials, go to dashboard
                 }
-            } else if (e.target.id === 'btn-vote-not-guilty') { // NOT GUILTY vote button
-                const trialId = e.target.dataset.trialId;
-                const votingPower = state.currentUser.CurrentVotingPower;
-                if (trialId && votingPower !== undefined) {
-                    await performFetchAction('/.netlify/functions/submit-jury-vote', { trialId, voterPlayerId: state.currentUserId, voteType: 'NOTGUILTY', votingPower });
-                    // After voting, try to load the next trial
-                    await fetchCurrentTrial();
-                    if (state.currentTrial) {
-                        renderView('trialPage', { trial: state.currentTrial }); // Show next trial
-                    } else {
-                        renderView('dashboard'); // No more trials, go to dashboard
-                    }
-                } else {
-                    showMessage('Missing trial ID or voting power to submit vote.');
-                }
+            } else {
+                showMessage('Missing trial ID or voting power to submit vote.');
             }
-        
+        } else if (e.target.id === 'btn-vote-not-guilty') { // NOT GUILTY vote button
+            const trialId = e.target.dataset.trialId;
+            const votingPower = state.currentUser.CurrentVotingPower;
+            if (trialId && votingPower !== undefined) {
+                await performFetchAction('/.netlify/functions/submit-jury-vote', { trialId, voterPlayerId: state.currentUserId, voteType: 'NOTGUILTY', votingPower });
+                // After voting, try to load the next trial
+                await fetchCurrentTrial();
+                if (state.currentTrial) {
+                    renderView('trialPage', { trial: state.currentTrial }); // Show next trial
+                } else {
+                    renderView('dashboard'); // No more trials, go to dashboard
+                }
+            } else {
+                showMessage('Missing trial ID or voting power to submit vote.');
+            }
+        } else if (e.target.id === 'logout-button') { // Logout button (from dead page)
+            localStorage.removeItem('mafiaGameUserId'); // Clear saved user ID
+            state.currentUserId = null;
+            state.currentUser = null;
+            state.isCurrentUserAdmin = false;
+            state.gameState = null;
+            state.pendingAccusations = [];
+            state.currentTrial = null;
+            renderView('login'); // Go back to login page
+            showMessage('You have been logged out.');
+        }
     });
 </script>
 </body>
