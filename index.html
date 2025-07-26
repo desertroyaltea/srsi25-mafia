@@ -128,19 +128,24 @@ login: () => `
 gameLayout: (viewHtml) => `
             <div class="container" id="game-container">
                 <h1 class="text-4xl font-bold text-center text-red-500 mb-2">🩸SRSI Mafia🔫</h1>
-                <p class="text-sm text-gray-400 text-center mb-6">Made by: Abdulelah AlHarbi | EXCOR 23'24'</p>
-                <div class="bg-gray-900 p-4 rounded-lg flex justify-between items-center">
+                <p class="text-sm text-gray-400 text-center mb-6">Made by: Abdulelah AlHarbi | EXCOR 23'24'</p>
+                <div class="bg-gray-900 p-4 rounded-lg flex justify-between items-center mb-4"> <!-- Added mb-4 -->
                     <p class="text-base text-gray-400">Logged in as:</p>
                     <span class="font-mono text-blue-400 text-base">${state.currentUser.Name} (${state.currentUser.Role})</span>
                 </div>
-                <div class="grid grid-cols-1 gap-6"> <!-- Adjusted grid to 1 column since Trial Info is removed -->
+                <!-- NEW UNIVERSAL LOGOUT BUTTON -->
+                <button type="button" id="logout-button" class="bg-gray-600 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded-lg w-full mb-6">
+                    Logout
+                </button>
+                <!-- END NEW UNIVERSAL LOGOUT BUTTON -->
+                <div class="grid grid-cols-1 gap-6">
                     <div class="bg-gray-900 p-5 rounded-lg">
                         <h2 class="text-2xl font-semibold mb-3">Game Status</h2>
                         <p>Current Day: <span class="font-bold text-red-400">${state.gameState?.CurrentDay || '...'}</span></p>
                         <p>Current Phase: <span class="font-bold text-red-400">${state.gameState?.CurrentPhase || '...'}</span></p>
                     </div>
-                    <!-- The Trial Information div has been removed -->
-                </div>
+                    <!-- The Trial Information div has been removed -->
+                </div>
                 <div id="view-content">${viewHtml}</div>
             </div>`,
 dashboard: () => `
@@ -275,9 +280,6 @@ dashboard: () => `
                         You can no longer participate in game actions.
                         Wait for the final verdict of the living.
                     </p>
-                    <button type="button" id="logout-button" class="mt-8 bg-gray-600 hover:bg-gray-700 text-white font-bold py-3 px-6 rounded-lg w-full md:w-1/2 text-xl mx-auto block">
-                        Logout
-                    </button>
                 </div>
             `,
 
@@ -795,8 +797,16 @@ function generateNightlyRecapStory(recapData) {
 
     const storyParts = [];
 
-    // Get names for various events
-    // These are players Mafia tried to kill but were protected by Doctors
+    // Helper for joining names with purple color
+    const formatNames = (names) => {
+        if (names.length === 0) return '';
+        const coloredNames = names.map(name => `<span class="text-purple-400 font-bold">${name}</span>`); // Player names purple
+        if (coloredNames.length === 1) return coloredNames[0];
+        if (coloredNames.length === 2) return `${coloredNames[0]} and ${coloredNames[1]}`;
+        return `${coloredNames.slice(0, -1).join(', ')}, and ${coloredNames[coloredNames.length - 1]}`;
+    };
+
+    // Get names for various events, now using formatNames directly
     const successfullyProtectedNames = recapData.mafiaProtected.map(id => getPlayerNameById(id));
     const mafiaKilledNames = recapData.mafiaKills.map(id => getPlayerNameById(id));
     const sheriffKilledNames = recapData.sheriffKills.map(id => getPlayerNameById(id));
@@ -808,14 +818,6 @@ function generateNightlyRecapStory(recapData) {
     const notGuiltyAccusedNames = recapData.trialResults
         .filter(trial => trial.result === 'NOT GUILTY')
         .map(trial => getPlayerNameById(trial.accusedPlayerId));
-
-    // Helper for joining names
-    const formatNames = (names) => {
-        if (names.length === 0) return '';
-        if (names.length === 1) return names[0];
-        if (names.length === 2) return `${names[0]} and ${names[1]}`;
-        return `${names.slice(0, -1).join(', ')}, and ${names[names.length - 1]}`;
-    };
 
     // Opening
     storyParts.push(`As the first rays of dawn pierced through the darkness, <span class="font-bold text-gray-300">building 9</span> slowly awoke from a restless night.`);
@@ -853,22 +855,24 @@ function generateNightlyRecapStory(recapData) {
         storyParts.push(`The <span class="text-yellow-500 font-bold">Sheriff's</span> gun remained silent, their target perhaps elusive or their moment yet to come.`);
     }
 
-    // Closing
-    storyParts.push(`<span class="font-bold text-gray-300">SRSI25 Cohort</span> now faces a new day, with new questions and old suspicions lingering in the air.`);
+    // Closing - SRSI25 Cohort colored differently
+    storyParts.push(`<span class="font-bold text-blue-400">SRSI25 Cohort</span> now faces a new day, with new questions and old suspicions lingering in the air.`); // Changed color to blue-400
 
     return storyParts.map(part => `<p>${part}</p>`).join('');
 }
-
         const role = state.currentUser.Role.toLowerCase();
 
-        // --- ALL ROLES ---
-        createButton('btn-submit-accusation', 'Submit Accusation', 'bg-gray-700 hover:bg-gray-800', () => {
-            const targets = state.allPlayers.filter(p =>
-                p.Status && typeof p.Status === 'string' && p.Status.toLowerCase() === 'alive' &&
-                p.PlayerID !== state.currentUserId
-            );
-            renderView('accusationForm', { targets });
-        });
+// --- ALL ROLES ---
+        // Allow "Submit Accusation" only during the Day phase
+        if (currentPhase.toLowerCase() === 'day') {
+            createButton('btn-submit-accusation', 'Submit Accusation', 'bg-gray-700 hover:bg-gray-800', () => {
+                const targets = state.allPlayers.filter(p =>
+                    p.Status && typeof p.Status === 'string' && p.Status.toLowerCase() === 'alive' &&
+                    p.PlayerID !== state.currentUserId
+                );
+                renderView('accusationForm', { targets });
+            });
+        }
 
 // --- TRIAL BUTTON (for non-admins) ---
             if (!state.isCurrentUserAdmin) {
