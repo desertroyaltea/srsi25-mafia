@@ -103,7 +103,7 @@
     <div id="message-box" class="message-box"></div>
 
 <script type="module">
-const state = { allPlayers: [], currentUserId: null, currentUser: null, isCurrentUserAdmin: false, gameState: null, pendingAccusations: [], currentTrial: null, currentMission: null };    
+const state = { allPlayers: [], currentUserId: null, currentUser: null, isCurrentUserAdmin: false, gameState: null, pendingAccusations: [], currentTrial: null, currentMission: null, nightlyRecap: null };    
     const appRoot = document.getElementById('app-root');
     const messageBox = document.getElementById('message-box');
     const loadingOverlay = document.getElementById('loading-overlay');
@@ -143,12 +143,12 @@ gameLayout: (viewHtml) => `
                 </div>
                 <div id="view-content">${viewHtml}</div>
             </div>`,
-        dashboard: () => `
+dashboard: () => `
             <div class="bg-gray-900 p-5 rounded-lg mt-4">
                 <h2 class="text-2xl font-semibold mb-4">Dashboard</h2>
                 <p class="text-gray-400 mb-6">Select an action to proceed.</p>
 
-                 <!-- NEW CURRENT MISSION SECTION -->
+                 <!-- CURRENT MISSION SECTION -->
                  <div class="bg-gray-800 p-4 rounded-lg mb-6 border border-gray-700">
                      <h3 class="text-xl font-semibold text-yellow-400 mb-2">Current Mission:</h3>
                      ${state.currentMission ? `
@@ -157,7 +157,18 @@ gameLayout: (viewHtml) => `
                          <p class="text-gray-400">No active mission assigned.</p>
                      `}
                  </div>
-                 <!-- END NEW CURRENT MISSION SECTION -->
+                 <!-- END CURRENT MISSION SECTION -->
+
+                 <!-- NEW NIGHTLY RECAP SECTION -->
+                 ${state.gameState?.CurrentPhase === 'Day' && state.nightlyRecap ? `
+                     <div class="bg-gray-800 p-4 rounded-lg mb-6 border border-gray-700">
+                         <h3 class="text-xl font-semibold text-red-400 mb-2">Last Night's Story:</h3>
+                         <div id="nightly-recap-story" class="text-gray-300 leading-relaxed">
+                             <!-- Story will be generated here by JavaScript -->
+                         </div>
+                     </div>
+                 ` : ''}
+                 <!-- END NEW NIGHTLY RECAP SECTION -->
 
                 <div id="player-dashboard-actions" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4"></div>
                 <div id="admin-dashboard-actions" class="grid-cols-1 md:grid-cols-2 gap-4 ${state.isCurrentUserAdmin ? 'grid' : 'hidden'}">
@@ -449,13 +460,41 @@ async function initializeGame(userId) {
             loadingOverlay.style.display = 'none'; // Hide loading after mission fetch
         }
 
-            // Check if the current user is dead
-            if (state.currentUser.Status && state.currentUser.Status.toLowerCase() === 'dead') {
-                renderView('deadPage'); // Show the dead page
-            } else {
-                renderView('dashboard'); // Otherwise, show the dashboard
-                updateDashboardActions(state.gameState?.CurrentPhase || 'Day');
-            }
+// Check if the current user is dead
+            if (state.currentUser.Status && state.currentUser.Status.toLowerCase() === 'dead') {
+                renderView('deadPage'); // Show the dead page
+            } else {
+                // If alive, render dashboard and fetch recap if it's Day
+                renderView('dashboard');
+                updateDashboardActions(state.gameState?.CurrentPhase || 'Day'); // This will render action buttons
+
+                // NEW: Fetch nightly recap if it's Day phase
+                if (state.gameState?.CurrentPhase === 'Day') {
+                    const previousDay = parseInt(state.gameState.CurrentDay) - 1;
+                    if (previousDay >= 1) { // Only fetch recap if it's not Day 1
+                        loadingOverlay.style.display = 'flex'; // Show loading for recap fetch
+                        try {
+                            const recapResponse = await fetch(`/.netlify/functions/get-nightly-recap?dayNumber=${previousDay}`);
+                            if (recapResponse.ok) {
+                                const recapResult = await recapResponse.json();
+                                state.nightlyRecap = recapResult.recapData;
+                                // After state is updated, re-render the dashboard to show the recap
+                                // This might cause a slight flicker, but ensures recap is displayed.
+                                renderView('dashboard'); // Re-render to display recap
+                                updateDashboardActions(state.gameState?.CurrentPhase || 'Day'); // Re-render actions too
+                            } else {
+                                console.error("Error fetching nightly recap:", await recapResponse.text());
+                                state.nightlyRecap = null;
+                            }
+                        } catch (error) {
+                            console.error("Error fetching nightly recap:", error);
+                            state.nightlyRecap = null;
+                        } finally {
+                            loadingOverlay.style.display = 'none';
+                        }
+                    }
+                }
+            }
     }
 
     function getPlayerNameById(playerId) {
@@ -732,6 +771,11 @@ async function fetchCurrentTrial() {
         if (!playerActions) return;
         playerActions.innerHTML = ''; // Clear existing buttons
 
+const recapStoryDiv = document.getElementById('nightly-recap-story');
+        if (recapStoryDiv && state.nightlyRecap) {
+            recapStoryDiv.innerHTML = generateNightlyRecapStory(state.nightlyRecap);
+        }
+
         const isNight = currentPhase && currentPhase.toLowerCase() !== 'day';
 
         const createButton = (id, text, style, onClick) => {
@@ -742,6 +786,62 @@ async function fetchCurrentTrial() {
             button.onclick = onClick;
             playerActions.appendChild(button);
         };
+
+// --- Nightly Recap Story Generation ---
+function generateNightlyRecapStory(recapData) {
+    if (!recapData) {
+        return '<p class="text-gray-400">No events recorded last night.</p>';
+    }
+
+    const storyParts = [];
+    const protectedNames = recapData.doctorProtections.map(id => getPlayerNameById(id));
+    const killedNames = recapData.mafiaKills.map(id => getPlayerNameById(id));
+    const mafiaProtectedNames = recapData.mafiaProtected.map(id => getPlayerNameById(id));
+    const sheriffKilledNames = recapData.sheriffKills.map(id => getPlayerNameById(id));
+
+    // Opening
+    storyParts.push(`As the first rays of dawn pierced through the darkness, the town slowly awoke from a restless night.`);
+
+    // Doctor Protections
+    if (protectedNames.length > 0) {
+        storyParts.push(`The <span class="text-blue-400 font-bold">Doctors</span> worked tirelessly, their healing touch safeguarding ${protectedNames.length === 1 ? protectedNames[0] : protectedNames.join(' and ')} from harm.`);
+    } else {
+        storyParts.push(`No one felt the comforting presence of the <span class="text-blue-400 font-bold">Doctors</span> this night.`);
+    }
+
+    // Mafia Kills
+    if (killedNames.length > 0) {
+        storyParts.push(`But the chilling silence was broken by the grim news: the <span class="text-red-500 font-bold">Mafia</span> had claimed ${killedNames.length === 1 ? killedNames[0] : killedNames.join(' and ')}.`);
+    } else if (mafiaProtectedNames.length > 0) {
+        storyParts.push(`The <span class="text-red-500 font-bold">Mafia's</span> deadly aim was thwarted, as ${mafiaProtectedNames.join(' and ')} were miraculously saved.`);
+    } else {
+        storyParts.push(`Remarkably, the <span class="text-red-500 font-bold">Mafia</span> seemed to have missed their mark, or perhaps, chose to lay low.`);
+    }
+
+    // Trial Results
+    if (recapData.trialResults.length > 0) {
+        for (const trial of recapData.trialResults) {
+            const accusedName = getPlayerNameById(trial.accusedPlayerId);
+            if (trial.result === 'GUILTY') {
+                storyParts.push(`In a tense moment, the trial of <span class="text-purple-400 font-bold">${accusedName}</span> concluded with a unanimous verdict of <span class="text-red-500 font-bold">GUILTY</span>. Justice, swift and final, was served.`);
+            } else {
+                storyParts.push(`The town deliberated over <span class="text-purple-400 font-bold">${accusedName}'s</span> fate, but the verdict came back <span class="text-green-500 font-bold">NOT GUILTY</span>. They walk free, for now.`);
+            }
+        }
+    }
+
+    // Sheriff Actions
+    if (sheriffKilledNames.length > 0) {
+        storyParts.push(`Amidst the chaos, the vigilant <span class="text-yellow-500 font-bold">Sheriff</span> exacted their own brand of justice, eliminating ${sheriffKilledNames.length === 1 ? sheriffKilledNames[0] : sheriffKilledNames.join(' and ')}.`);
+    } else {
+        storyParts.push(`The <span class="text-yellow-500 font-bold">Sheriff's</span> gun remained silent, their target perhaps elusive or their moment yet to come.`);
+    }
+
+    // Closing
+    storyParts.push(`The town now faces a new day, with new questions and old suspicions lingering in the air.`);
+
+    return storyParts.map(part => `<p>${part}</p>`).join('');
+}
 
         const role = state.currentUser.Role.toLowerCase();
 
