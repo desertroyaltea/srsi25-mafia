@@ -127,18 +127,18 @@ login: () => `
             </div>`,
 gameLayout: (viewHtml) => `
             <div class="container" id="game-container">
-                <h1 class="text-4xl font-bold text-center text-red-500 mb-2">🩸SRSI Mafia🔫</h1>
-                <p class="text-sm text-gray-400 text-center mb-6">Made by: Abdulelah AlHarbi | EXCOR 23'24'</p>
-                <div class="bg-gray-900 p-4 rounded-lg flex justify-between items-center mb-4"> <!-- Added mb-4 -->
+                <h1 class="text-4xl font-bold text-center text-red-500 mb-1">🩸SRSI Mafia🔫</h1> <!-- mb-2 to mb-1 -->
+                <p class="text-sm text-gray-400 text-center mb-4">Made by: Abdulelah AlHarbi | EXCOR 23'24'</p> <!-- mb-6 to mb-4 -->
+                <div class="bg-gray-900 p-4 rounded-lg flex justify-between items-center mb-4">
                     <p class="text-base text-gray-400">Logged in as:</p>
                     <span class="font-mono text-blue-400 text-base">${state.currentUser.Name} (${state.currentUser.Role})</span>
                 </div>
-                <!-- NEW UNIVERSAL LOGOUT BUTTON -->
-                <button type="button" id="logout-button" class="bg-gray-600 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded-lg w-full mb-6">
-                    Logout
-                </button>
-                <!-- END NEW UNIVERSAL LOGOUT BUTTON -->
-                <div class="grid grid-cols-1 gap-6">
+             <!-- NEW UNIVERSAL LOGOUT BUTTON -->
+             <button type="button" id="logout-button" class="bg-gray-600 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded-lg w-full mb-4"> <!-- mb-6 to mb-4 -->
+                 Logout
+             </button>
+             <!-- END NEW UNIVERSAL LOGOUT BUTTON -->
+                <div class="grid grid-cols-1 gap-6"> <!-- This div's gap might be contributing -->
                     <div class="bg-gray-900 p-5 rounded-lg">
                         <h2 class="text-2xl font-semibold mb-3">Game Status</h2>
                         <p>Current Day: <span class="font-bold text-red-400">${state.gameState?.CurrentDay || '...'}</span></p>
@@ -151,29 +151,29 @@ gameLayout: (viewHtml) => `
 dashboard: () => `
             <div class="bg-gray-900 p-5 rounded-lg mt-4">
                 <h2 class="text-2xl font-semibold mb-4">Dashboard</h2>
-                <p class="text-gray-400 mb-6">Select an action to proceed.</p>
+                <p class="text-gray-400 mb-4">Select an action to proceed.</p> <!-- mb-6 to mb-4 -->
 
-                 <!-- CURRENT MISSION SECTION -->
-                 <div class="bg-gray-800 p-4 rounded-lg mb-6 border border-gray-700">
-                     <h3 class="text-xl font-semibold text-yellow-400 mb-2">Current Mission:</h3>
-                     ${state.currentMission ? `
-                         <p class="text-gray-300">${state.currentMission.MissionDescription}</p>
-                     ` : `
-                         <p class="text-gray-400">No active mission assigned.</p>
-                     `}
-                 </div>
-                 <!-- END CURRENT MISSION SECTION -->
+             <!-- CURRENT MISSION SECTION -->
+             <div class="bg-gray-800 p-4 rounded-lg mb-4 border border-gray-700"> <!-- mb-6 to mb-4 -->
+                 <h3 class="text-xl font-semibold text-yellow-400 mb-2">Current Mission:</h3>
+                 ${state.currentMission ? `
+                     <p class="text-gray-300">${state.currentMission.MissionDescription}</p>
+                 ` : `
+                     <p class="text-gray-400">No active mission assigned.</p>
+                 `}
+             </div>
+             <!-- END CURRENT MISSION SECTION -->
 
-                 <!-- NEW NIGHTLY RECAP SECTION -->
-                 ${state.gameState?.CurrentPhase === 'Day' && state.nightlyRecap ? `
-                     <div class="bg-gray-800 p-4 rounded-lg mb-6 border border-gray-700">
-                         <h3 class="text-xl font-semibold text-red-400 mb-2">Last Night's Story:</h3>
-                         <div id="nightly-recap-story" class="text-gray-300 leading-relaxed">
-                             <!-- Story will be generated here by JavaScript -->
-                         </div>
+             <!-- NEW NIGHTLY RECAP SECTION -->
+             ${state.gameState?.CurrentPhase === 'Day' && state.nightlyRecap ? `
+                 <div class="bg-gray-800 p-4 rounded-lg mb-4 border border-gray-700"> <!-- mb-6 to mb-4 -->
+                     <h3 class="text-xl font-semibold text-red-400 mb-2">Last Night's Story:</h3>
+                     <div id="nightly-recap-story" class="text-gray-300 leading-relaxed">
+                         <!-- Story will be generated here by JavaScript -->
                      </div>
-                 ` : ''}
-                 <!-- END NEW NIGHTLY RECAP SECTION -->
+                 </div>
+             ` : ''}
+             <!-- END NEW NIGHTLY RECAP SECTION -->
 
                 <div id="player-dashboard-actions" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4"></div>
                 <div id="admin-dashboard-actions" class="grid-cols-1 md:grid-cols-2 gap-4 ${state.isCurrentUserAdmin ? 'grid' : 'hidden'}">
@@ -898,12 +898,13 @@ function generateNightlyRecapStory(recapData) {
 
         // --- MAFIA ---
         if (role === 'mafia') {
-            createButton('btn-kill', 'Kill Player', 'bg-red-700 hover:bg-red-800', () => {
+createButton('btn-kill', 'Kill Player', 'bg-red-700 hover:bg-red-800', () => {
                 if (!isNight) return showMessage("You can only use this action at night.");
                 if (state.currentUser.MainUsed === 'TRUE') return showMessage("You have already used your main action tonight.");
+                // CRITICAL CHANGE: Mafia kill targets now include ALL alive players, including other Mafia
                 const targets = state.allPlayers.filter(p =>
-                    p.Status && typeof p.Status === 'string' && p.Status.toLowerCase() === 'alive' &&
-                    p.Role && typeof p.Role === 'string' && p.Role.toLowerCase() !== 'mafia'
+                    p.Status && typeof p.Status === 'string' && p.Status.toLowerCase() === 'alive'
+                    // Removed: && p.Role && typeof p.Role === 'string' && p.Role.toLowerCase() !== 'mafia'
                 );
                 renderView('actionModal', { title: 'Choose a Target to Kill', buttonText: 'Confirm Kill', targets, actionType: 'kill' });
             });
@@ -1053,8 +1054,18 @@ createButton('btn-change-role', 'Change Role', 'bg-green-900', () => {
 
             switch (actionType) {
 case 'kill':
-                    const targetPlayerId1 = document.getElementById('target-player-1').value;
-                    const targetPlayerId2 = document.getElementById('target-player-2').value;
+                    // CRITICAL FIX: Ensure target-player-1 and target-player-2 exist before accessing value
+                    const targetPlayer1Element = document.getElementById('target-player-1');
+                    const targetPlayer2Element = document.getElementById('target-player-2');
+
+                    if (!targetPlayer1Element || !targetPlayer2Element) {
+                        showMessage("Error: Target selection fields not found. Please refresh.");
+                        console.error("Missing target selection elements for kill action.");
+                        return;
+                    }
+
+                    const targetPlayerId1 = targetPlayer1Element.value;
+                    const targetPlayerId2 = targetPlayer2Element.value;
 
                     if (!targetPlayerId1 || !targetPlayerId2) {
                         showMessage("Please select both target players.");
@@ -1066,7 +1077,7 @@ case 'kill':
                     }
 
                     endpoint = '/.netlify/functions/kill-player';
-                    payload = { mafiaPlayerId: state.currentUserId, targetPlayerId1: targetPlayerId1, targetPlayerId2: targetPlayerId2 }; // Send both targets
+                    payload = { mafiaPlayerId: state.currentUserId, targetPlayerId1: targetPlayerId1, targetPlayerId2: targetPlayerId2 };
                     break;
                 case 'protect':
                     endpoint = '/.netlify/functions/protect-player';
