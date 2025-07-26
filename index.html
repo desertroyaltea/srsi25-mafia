@@ -1042,60 +1042,103 @@ createButton('btn-change-role', 'Change Role', 'bg-green-900', () => {
             handleLogin();
         } else if (e.target.id === 'action-form') {
             const actionType = e.target.dataset.actionType;
-            const targetPlayerId = document.getElementById('target-player').value;
-
-            if (!targetPlayerId) {
-                showMessage("Please select a target player.");
-                return;
-            }
-
             let endpoint;
             let payload;
 
-            switch (actionType) {
-case 'kill':
-                    // CRITICAL FIX: Ensure target-player-1 and target-player-2 exist before accessing value
-                    const targetPlayer1Element = document.getElementById('target-player-1');
-                    const targetPlayer2Element = document.getElementById('target-player-2');
+            // Remove the problematic line here:
+            // const targetPlayerId = document.getElementById('target-player').value; // <-- DELETE THIS LINE
 
-                    if (!targetPlayer1Element || !targetPlayer2Element) {
+            switch (actionType) {
+                case 'kill':
+                    const targetPlayer1Element_kill = document.getElementById('target-player-1');
+                    const targetPlayer2Element_kill = document.getElementById('target-player-2');
+
+                    if (!targetPlayer1Element_kill || !targetPlayer2Element_kill) {
                         showMessage("Error: Target selection fields not found. Please refresh.");
                         console.error("Missing target selection elements for kill action.");
                         return;
                     }
 
-                    const targetPlayerId1 = targetPlayer1Element.value;
-                    const targetPlayerId2 = targetPlayer2Element.value;
+                    const targetPlayerId1_kill = targetPlayer1Element_kill.value;
+                    const targetPlayerId2_kill = targetPlayer2Element_kill.value;
 
-                    if (!targetPlayerId1 || !targetPlayerId2) {
+                    if (!targetPlayerId1_kill || !targetPlayerId2_kill) {
                         showMessage("Please select both target players.");
                         return;
                     }
-                    if (targetPlayerId1 === targetPlayerId2) {
+                    if (targetPlayerId1_kill === targetPlayerId2_kill) {
                         showMessage("You must select two different players to kill.");
                         return;
                     }
 
-                    endpoint = '/.netlify/functions/kill-player';
-                    payload = { mafiaPlayerId: state.currentUserId, targetPlayerId1: targetPlayerId1, targetPlayerId2: targetPlayerId2 };
-                    break;
+                    endpoint = '/.netlify/functions/kill-player';
+                    payload = { mafiaPlayerId: state.currentUserId, targetPlayerId1: targetPlayerId1_kill, targetPlayerId2: targetPlayerId2_kill };
+                    break;
+
                 case 'protect':
+                    const targetPlayerElement_protect = document.getElementById('target-player-1'); // Get from target-player-1
+                    if (!targetPlayerElement_protect) {
+                        showMessage("Error: Target selection field not found. Please refresh.");
+                        console.error("Missing target selection element for protect action.");
+                        return;
+                    }
+                    const targetPlayerId_protect = targetPlayerElement_protect.value;
+                    if (!targetPlayerId_protect) {
+                        showMessage("Please select a target player.");
+                        return;
+                    }
                     endpoint = '/.netlify/functions/protect-player';
-                    payload = { doctorPlayerId: state.currentUserId, targetPlayerId: targetPlayerId };
+                    payload = { doctorPlayerId: state.currentUserId, targetPlayerId: targetPlayerId_protect };
                     break;
+
                 case 'check':
+                    const targetPlayerElement_check = document.getElementById('target-player-1'); // Get from target-player-1
+                    if (!targetPlayerElement_check) {
+                        showMessage("Error: Target selection field not found. Please refresh.");
+                        console.error("Missing target selection element for check action.");
+                        return;
+                    }
+                    const targetPlayerId_check = targetPlayerElement_check.value;
+                    if (!targetPlayerId_check) {
+                        showMessage("Please select a target player.");
+                        return;
+                    }
                     endpoint = '/.netlify/functions/check-mafia';
-                    payload = { detectivePlayerId: state.currentUserId, targetPlayerId: targetPlayerId };
+                    payload = { detectivePlayerId: state.currentUserId, targetPlayerId: targetPlayerId_check };
                     break;
+
                 case 'shoot':
+                    const targetPlayerElement_shoot = document.getElementById('target-player-1'); // Get from target-player-1
+                    if (!targetPlayerElement_shoot) {
+                        showMessage("Error: Target selection field not found. Please refresh.");
+                        console.error("Missing target selection element for shoot action.");
+                        return;
+                    }
+                    const targetPlayerId_shoot = targetPlayerElement_shoot.value;
+                    if (!targetPlayerId_shoot) {
+                        showMessage("Please select a target player.");
+                        return;
+                    }
                     endpoint = '/.netlify/functions/shoot-player';
-                    payload = { sheriffPlayerId: state.currentUserId, targetPlayerId: targetPlayerId };
+                    payload = { sheriffPlayerId: state.currentUserId, targetPlayerId: targetPlayerId_shoot };
                     break;
-                    case 'check-and-display-result': // NEW CASE for Investigation
+
+                case 'check-and-display-result':
+                    const targetPlayerElement_display = document.getElementById('target-player-1'); // Get from target-player-1
+                    if (!targetPlayerElement_display) {
+                        showMessage("Error: Target selection field not found. Please refresh.");
+                        console.error("Missing target selection element for check-and-display-result action.");
+                        return;
+                    }
+                    const targetPlayerId_display = targetPlayerElement_display.value;
+                    if (!targetPlayerId_display) {
+                        showMessage("Please select a target player.");
+                        return;
+                    }
                     endpoint = '/.netlify/functions/check-mafia';
-                    payload = { detectivePlayerId: state.currentUserId, targetPlayerId: targetPlayerId };
+                    payload = { detectivePlayerId: state.currentUserId, targetPlayerId: targetPlayerId_display };
                     
-                    loadingOverlay.style.display = 'flex'; // Show loading for this specific action
+                    loadingOverlay.style.display = 'flex';
                     try {
                         const response = await fetch(endpoint, {
                             method: 'POST',
@@ -1105,29 +1148,27 @@ case 'kill':
                         const result = await response.json();
 
                         if (response.ok) {
-                            // Instead of showMessage, render the new template
-                            const targetName = getPlayerNameById(targetPlayerId);
+                            const targetName = getPlayerNameById(targetPlayerId_display);
                             renderView('investigationResult', { targetName: targetName, isMafiaResult: result.isMafiaResult });
-                            // No automatic return to dashboard here, user clicks "Back to Dashboard"
                         } else {
                             throw new Error(result.message || `Error: ${response.status} ${response.statusText}`);
                         }
                     } catch (error) {
                         console.error("Error performing investigation:", error);
                         showMessage(`Failed to perform investigation: ${error.message}`);
-                        renderView('dashboard'); // Return to dashboard on error
+                        renderView('dashboard');
                     } finally {
                         loadingOverlay.style.display = 'none';
-                        setTimeout(() => { messageBox.style.display = 'none'; }, 5000); // Still hide message box if used
+                        setTimeout(() => { messageBox.style.display = 'none'; }, 5000);
                     }
-                    return; // IMPORTANT: Return here to prevent falling through to generic performFetchAction
+                    return;
                 default:
                     showMessage('Unknown action type for submission.');
                     console.error('Unknown actionType:', actionType);
                     return;
             }
 
-            if (endpoint) {
+            if (endpoint) { // This block handles 'kill', 'protect', 'check', 'shoot'
                 await performFetchAction(endpoint, payload);
                 renderView('dashboard');
             }
