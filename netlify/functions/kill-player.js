@@ -24,10 +24,11 @@ exports.handler = async (event, context) => {
     }
 
     try {
-        const { mafiaPlayerId, targetPlayerId } = JSON.parse(event.body);
-        if (!mafiaPlayerId || !targetPlayerId) {
-            return { statusCode: 400, body: JSON.stringify({ error: 'Missing mafiaPlayerId or targetPlayerId.' }) };
-        }
+const { mafiaPlayerId, targetPlayerId1, targetPlayerId2 } = JSON.parse(event.body); // NEW: Receive two targets
+if (!mafiaPlayerId || !targetPlayerId1 || !targetPlayerId2) { // Check both new target IDs
+            console.log("kill-player: Missing mafiaPlayerId or one of the targetPlayerIds.");
+            return { statusCode: 400, body: JSON.stringify({ error: 'Missing mafiaPlayerId or targetPlayerIds.' }) };
+        }
 
         const sheets = await getSheetsService();
 
@@ -63,13 +64,31 @@ exports.handler = async (event, context) => {
         const currentDay = gameStateResponse.data.values ? gameStateResponse.data.values[0][0] : 'Unknown';
 
         // 3. Log the action
-        const newActionRow = [`ACT_KILL_${Date.now()}`, currentDay, mafiaPlayerId, 'Kill', targetPlayerId, new Date().toISOString(), 'Logged'];
+// CRITICAL CHANGE: Log two separate actions for two targets
+        const timestamp = new Date().toISOString();
+        const actionId1 = `ACT_KILL_${Date.now()}_1`;
+        const actionId2 = `ACT_KILL_${Date.now()}_2`;
+
+        const newActionRow1 = [actionId1, currentDay, mafiaPlayerId, targetPlayerId1, timestamp, null, 'Logged'];
+        const newActionRow2 = [actionId2, currentDay, mafiaPlayerId, targetPlayerId2, timestamp, null, 'Logged'];
+
+        console.log("kill-player: Appending action for Target 1 to Actions_Mafia sheet.");
         await sheets.spreadsheets.values.append({
             spreadsheetId: sheetId,
             range: 'Actions_Mafia!A:G',
             valueInputOption: 'USER_ENTERED',
-            resource: { values: [newActionRow] },
+            resource: { values: [newActionRow1] },
         });
+        console.log("kill-player: Action logged for Target 1.");
+
+        console.log("kill-player: Appending action for Target 2 to Actions_Mafia sheet.");
+        await sheets.spreadsheets.values.append({
+            spreadsheetId: sheetId,
+            range: 'Actions_Mafia!A:G',
+            valueInputOption: 'USER_ENTERED',
+            resource: { values: [newActionRow2] },
+        });
+        console.log("kill-player: Action logged for Target 2.");
 
         // 4. Update the player's MainUsed status to TRUE
         const updateRange = `Players!${String.fromCharCode(65 + mainUsedCol)}${playerRowIndex}`;

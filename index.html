@@ -180,28 +180,38 @@ dashboard: () => `
                     <button id="btn-review-accusations" class="bg-green-700 hover:bg-green-800 text-white font-bold py-3 px-6 rounded-lg">Review Accusations</button>
                 </div>
             </div>`,
-        actionModal: ({ title, buttonText, targets, actionType }) => `
-            <div class="bg-gray-900 p-5 rounded-lg mt-4">
-                <h2 class="text-2xl font-semibold mb-4 text-red-400">${title}</h2>
-                <form id="action-form" data-action-type="${actionType}">
-                    <div class="mb-4">
-                        <label for="target-player" class="block text-gray-300 text-lg font-bold mb-2">Select Target:</label>
-                        <select id="target-player" class="shadow border rounded w-full py-3 px-4 text-lg leading-tight focus:outline-none focus:shadow-outline bg-gray-700 border-gray-600 text-white" required>
-                            <option value="">-- Select a player --</option>
-                            ${targets.map(p => `<option value="${p.PlayerID}">${p.Name}</option>`).join('')}
-                        </select>
-                    </div>
-                    <div class="flex flex-col md:flex-row gap-4">
-                        <button type="submit" class="bg-red-700 hover:bg-red-800 text-white font-bold py-3 px-6 rounded-lg w-full md:w-1/2 text-xl">
-                            ${buttonText}
-                        </button>
-                        <button type="button" id="back-to-dashboard" class="bg-gray-600 hover:bg-gray-700 text-white font-bold py-3 px-6 rounded-lg w-full md:w-1/2 text-xl">
-                            Cancel
-                        </button>
-                    </div>
-                </form>
-            </div>
-        `,
+actionModal: ({ title, buttonText, targets, actionType }) => `
+                <div class="bg-gray-900 p-5 rounded-lg mt-4">
+                    <h2 class="text-2xl font-semibold mb-4 text-red-400">${title}</h2>
+                    <form id="action-form" data-action-type="${actionType}">
+                        <div class="mb-4">
+                            <label for="target-player-1" class="block text-gray-300 text-lg font-bold mb-2">Select Target 1:</label>
+                            <select id="target-player-1" class="shadow border rounded w-full py-3 px-4 text-lg leading-tight focus:outline-none focus:shadow-outline bg-gray-700 border-gray-600 text-white" required>
+                                <option value="">-- Select a player --</option>
+                                ${targets.map(p => `<option value="${p.PlayerID}">${p.Name}</option>`).join('')}
+                            </select>
+                        </div>
+                        <!-- NEW: Second target selection for Mafia Kill -->
+                        ${actionType === 'kill' ? `
+                            <div class="mb-4">
+                                <label for="target-player-2" class="block text-gray-300 text-lg font-bold mb-2">Select Target 2:</label>
+                                <select id="target-player-2" class="shadow border rounded w-full py-3 px-4 text-lg leading-tight focus:outline-none focus:shadow-outline bg-gray-700 border-gray-600 text-white" required>
+                                    <option value="">-- Select a player --</option>
+                                    ${targets.map(p => `<option value="${p.PlayerID}">${p.Name}</option>`).join('')}
+                                </select>
+                            </div>
+                        ` : ''}
+                        <div class="flex flex-col md:flex-row gap-4">
+                            <button type="submit" class="bg-red-700 hover:bg-red-800 text-white font-bold py-3 px-6 rounded-lg w-full md:w-1/2 text-xl">
+                                ${buttonText}
+                            </button>
+                            <button type="button" id="back-to-dashboard" class="bg-gray-600 hover:bg-gray-700 text-white font-bold py-3 px-6 rounded-lg w-full md:w-1/2 text-xl">
+                                Cancel
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            `,
         accusationForm: ({ targets }) => `
             <div class="bg-gray-900 p-5 rounded-lg mt-4">
                 <h2 class="text-2xl font-semibold mb-4 text-red-400">Submit Accusation</h2>
@@ -820,7 +830,7 @@ function generateNightlyRecapStory(recapData) {
         .map(trial => getPlayerNameById(trial.accusedPlayerId));
 
     // Opening
-    storyParts.push(`As the first rays of dawn pierced through the darkness, <span class="font-bold text-gray-300">building 9</span> slowly awoke from a restless night.`);
+    storyParts.push(`As the first rays of dawn pierced through the darkness, <span class="font-bold text-gray-300">Building 9</span> slowly awoke from a restless night.`);
 
     // Doctor Protections (only if they successfully protected someone from Mafia)
     if (successfullyProtectedNames.length > 0) {
@@ -1042,10 +1052,22 @@ createButton('btn-change-role', 'Change Role', 'bg-green-900', () => {
             let payload;
 
             switch (actionType) {
-                case 'kill':
-                    endpoint = '/.netlify/functions/kill-player';
-                    payload = { mafiaPlayerId: state.currentUserId, targetPlayerId: targetPlayerId };
-                    break;
+case 'kill':
+                    const targetPlayerId1 = document.getElementById('target-player-1').value;
+                    const targetPlayerId2 = document.getElementById('target-player-2').value;
+
+                    if (!targetPlayerId1 || !targetPlayerId2) {
+                        showMessage("Please select both target players.");
+                        return;
+                    }
+                    if (targetPlayerId1 === targetPlayerId2) {
+                        showMessage("You must select two different players to kill.");
+                        return;
+                    }
+
+                    endpoint = '/.netlify/functions/kill-player';
+                    payload = { mafiaPlayerId: state.currentUserId, targetPlayerId1: targetPlayerId1, targetPlayerId2: targetPlayerId2 }; // Send both targets
+                    break;
                 case 'protect':
                     endpoint = '/.netlify/functions/protect-player';
                     payload = { doctorPlayerId: state.currentUserId, targetPlayerId: targetPlayerId };
