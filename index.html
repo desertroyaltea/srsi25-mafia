@@ -103,7 +103,7 @@
     <div id="message-box" class="message-box"></div>
 
 <script type="module">
-const state = { allPlayers: [], currentUserId: null, currentUser: null, isCurrentUserAdmin: false, gameState: null, pendingAccusations: [], currentTrial: null };    
+const state = { allPlayers: [], currentUserId: null, currentUser: null, isCurrentUserAdmin: false, gameState: null, pendingAccusations: [], currentTrial: null, currentMission: null };    
     const appRoot = document.getElementById('app-root');
     const messageBox = document.getElementById('message-box');
     const loadingOverlay = document.getElementById('loading-overlay');
@@ -144,14 +144,26 @@ gameLayout: (viewHtml) => `
                 <div id="view-content">${viewHtml}</div>
             </div>`,
         dashboard: () => `
-            <div class="bg-gray-900 p-5 rounded-lg mt-4">
-                <h2 class="text-2xl font-semibold mb-4">Dashboard</h2>
-                <p class="text-gray-400 mb-6">Select an action to proceed.</p>
-                <div id="player-dashboard-actions" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4"></div>
-                <div id="admin-dashboard-actions" class="grid-cols-1 md:grid-cols-2 gap-4 ${state.isCurrentUserAdmin ? 'grid' : 'hidden'}">
-                    <button id="btn-review-accusations" class="bg-green-700 hover:bg-green-800 text-white font-bold py-3 px-6 rounded-lg">Review Accusations</button>
-                </div>
-            </div>`,
+            <div class="bg-gray-900 p-5 rounded-lg mt-4">
+                <h2 class="text-2xl font-semibold mb-4">Dashboard</h2>
+                <p class="text-gray-400 mb-6">Select an action to proceed.</p>
+
+                 <!-- NEW CURRENT MISSION SECTION -->
+                 <div class="bg-gray-800 p-4 rounded-lg mb-6 border border-gray-700">
+                     <h3 class="text-xl font-semibold text-yellow-400 mb-2">Current Mission:</h3>
+                     ${state.currentMission ? `
+                         <p class="text-gray-300">${state.currentMission.MissionDescription}</p>
+                     ` : `
+                         <p class="text-gray-400">No active mission assigned.</p>
+                     `}
+                 </div>
+                 <!-- END NEW CURRENT MISSION SECTION -->
+
+                <div id="player-dashboard-actions" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4"></div>
+                <div id="admin-dashboard-actions" class="grid-cols-1 md:grid-cols-2 gap-4 ${state.isCurrentUserAdmin ? 'grid' : 'hidden'}">
+                    <button id="btn-review-accusations" class="bg-green-700 hover:bg-green-800 text-white font-bold py-3 px-6 rounded-lg">Review Accusations</button>
+                </div>
+            </div>`,
         actionModal: ({ title, buttonText, targets, actionType }) => `
             <div class="bg-gray-900 p-5 rounded-lg mt-4">
                 <h2 class="text-2xl font-semibold mb-4 text-red-400">${title}</h2>
@@ -407,26 +419,44 @@ async function handleLogin() {
         }
     }
 
-    async function initializeGame(userId) {
-        state.currentUserId = userId;
-        state.currentUser = state.allPlayers.find(p => p.PlayerID === userId);
-        if (!state.currentUser) {
-            localStorage.removeItem('mafiaGameUserId');
-            renderView('login');
-            document.getElementById('login-error').textContent = "Your player data seems outdated. Please log in again.";
-            return;
-        }
-state.isCurrentUserAdmin = state.currentUser.IsAdmin === 'TRUE';
-            await fetchGameState();
+async function initializeGame(userId) {
+        state.currentUserId = userId;
+        state.currentUser = state.allPlayers.find(p => p.PlayerID === userId);
+        if (!state.currentUser) {
+            localStorage.removeItem('mafiaGameUserId');
+            renderView('login');
+            document.getElementById('login-error').textContent = "Your player data seems outdated. Please log in again.";
+            return;
+        }
+        state.isCurrentUserAdmin = state.currentUser.IsAdmin === 'TRUE';
+        await fetchGameState();
 
-            // NEW: Check if the current user is dead
-            if (state.currentUser.Status && state.currentUser.Status.toLowerCase() === 'dead') {
-                renderView('deadPage'); // Show the dead page
+        // NEW: Fetch current player's mission
+        loadingOverlay.style.display = 'flex'; // Show loading while fetching mission
+        try {
+            const missionResponse = await fetch(`/.netlify/functions/get-player-mission?playerId=${state.currentUserId}`);
+            if (missionResponse.ok) {
+                const missionResult = await missionResponse.json();
+                state.currentMission = missionResult.currentMission;
             } else {
-                renderView('dashboard'); // Otherwise, show the dashboard
-                updateDashboardActions(state.gameState?.CurrentPhase || 'Day');
+                console.error("Error fetching player mission:", await missionResponse.text());
+                state.currentMission = null; // Ensure it's null on error
             }
-    }
+        } catch (error) {
+            console.error("Error fetching player mission:", error);
+            state.currentMission = null;
+        } finally {
+            loadingOverlay.style.display = 'none'; // Hide loading after mission fetch
+        }
+
+            // Check if the current user is dead
+            if (state.currentUser.Status && state.currentUser.Status.toLowerCase() === 'dead') {
+                renderView('deadPage'); // Show the dead page
+            } else {
+                renderView('dashboard'); // Otherwise, show the dashboard
+                updateDashboardActions(state.gameState?.CurrentPhase || 'Day');
+            }
+    }
 
     function getPlayerNameById(playerId) {
         const player = state.allPlayers.find(p => p.PlayerID === playerId);
