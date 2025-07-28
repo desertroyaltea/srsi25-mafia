@@ -447,43 +447,58 @@ actionModal: ({ title, buttonText, targets, actionType }) => `
     }
 
 async function handleLogin() {
-        const passcodeInput = document.getElementById('passcode-input').value.trim(); // Only get passcode
-        const loginError = document.getElementById('login-error');
-        if (!passcodeInput) { // Only check passcode input
-            loginError.textContent = 'Please enter your passcode.';
+        const passcodeInputElement = document.getElementById('passcode-input');
+        const loginError = document.getElementById('login-error');
+
+        if (!passcodeInputElement) {
+            console.error("handleLogin: 'passcode-input' element not found in the DOM. This is the source of the TypeError.");
+            loginError.textContent = 'Login form element missing. Please refresh the page.';
+            hideLoadingOverlay(); // Ensure hidden if error
             return;
         }
 
-        loginError.textContent = '';
-        loadingOverlay.style.display = 'flex';
-        
-        await fetchPlayers(); // This fetches all players, including their passcodes
+        const passcodeInput = passcodeInputElement.value.trim();
 
-        if (state.allPlayers.length === 0) {
-            loadingOverlay.style.display = 'none';
-            loginError.textContent = 'Could not load player list from the server. Check Netlify function logs.';
-            return;
-        }
+        if (!passcodeInput) {
+            loginError.textContent = 'Please enter your passcode.';
+            hideLoadingOverlay(); // Ensure hidden if validation fails
+            return;
+        }
 
-        // Find the player by passcode only
-        const player = state.allPlayers.find(p => 
-            p.Passcode && p.Passcode.trim() === passcodeInput // Check passcode only
-        );
-        
-        if (player) {
-            localStorage.setItem('mafiaGameUserId', player.PlayerID);
-            await initializeGame(player.PlayerID);
-        } else {
-            loadingOverlay.style.display = 'none';
-            loginError.textContent = 'Invalid Passcode. Please try again.'; // Simplified error message
-        }
-    }
+        loginError.textContent = '';
+        showLoadingOverlay(); // Use centralized function
+
+        try {
+            // CRITICAL CHANGE: Call the new authentication Netlify Function
+            const response = await fetch('/.netlify/functions/authenticate-player', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ passcode: passcodeInput }),
+            });
+
+            const result = await response.json();
+
+            if (response.ok && result.playerId) {
+                const authenticatedPlayerId = result.playerId;
+                localStorage.setItem('mafiaGameUserId', authenticatedPlayerId);
+                showMessage('Login successful!');
+                // Now initialize the game with the authenticated player ID
+                await initializeGame(authenticatedPlayerId);
+            } else {
+                loginError.textContent = result.error || 'Login failed. Please try again.';
+                console.error("handleLogin: Authentication failed:", result.error);
+            }
+        } catch (error) {
+            console.error("handleLogin: Error during authentication:", error);
+            loginError.textContent = 'An error occurred during login. Please try again.';
+        } finally {
+            hideLoadingOverlay(); // Use centralized function
+        }
+    }
 
 async function fetchPlayers(forceRefresh = false) {
-        console.log(`fetchPlayers: Function started. Force refresh: ${forceRefresh}`);
         // CRITICAL CHANGE: state.allPlayers will now only hold public data
         if (state.allPlayers.length > 0 && !forceRefresh) {
-            console.log("fetchPlayers: Using cached public player data (no force refresh).");
             return;
         }
 
@@ -504,7 +519,6 @@ async function fetchPlayers(forceRefresh = false) {
                 throw new Error(`HTTP error! status: ${response.status}`);
             }
             state.allPlayers = await response.json(); // This now contains ONLY PUBLIC data for all players
-            console.log("fetchPlayers: Successfully fetched ALL PUBLIC player data. Raw response:", state.allPlayers);
         } catch (error) {
             console.error("fetchPlayers: Full error in fetchPlayers:", error);
             showMessage("Failed to load player data. Check console for details.");
@@ -516,9 +530,9 @@ async function fetchPlayers(forceRefresh = false) {
 
 
 async function initializeGame(userId) {
-    state.currentUserId = userId;
+    state.currentUserId = userId; // Set currentUserId from the authenticated ID
 
-    // CRITICAL CHANGE: Fetch current user's FULL data separately
+    // CRITICAL CHANGE: Fetch current user's FULL data using the provided userId
     let currentUserFetchTimeout;
     showLoadingOverlay(); // Show loader for this fetch
 
@@ -526,7 +540,7 @@ async function initializeGame(userId) {
         hideLoadingOverlay();
         showMessage('Failed to load your player data (timeout). Please refresh.');
         console.warn("initializeGame: Current user data fetch timeout occurred.");
-    }, 10000); // Shorter timeout for individual user data
+    }, 10000);
 
     try {
         const response = await fetch(`/.netlify/functions/get-player-data?playerId=${userId}`); // Fetch specific user's full data
@@ -536,7 +550,6 @@ async function initializeGame(userId) {
             throw new Error(`Failed to fetch your player data: ${response.statusText}`);
         }
         state.currentUser = await response.json(); // This now contains the FULL data for the current user
-        console.log("initializeGame: Fetched current user's FULL data:", state.currentUser);
 
     } catch (error) {
         console.error("initializeGame: Error fetching current user data:", error);
@@ -553,34 +566,25 @@ async function initializeGame(userId) {
     state.isCurrentUserAdmin = state.currentUser.IsAdmin === 'TRUE';
     await fetchGameState();
 
-    console.log(`initializeGame: Current User ID: ${state.currentUserId}`);
-    console.log(`initializeGame: Current User Object (after fetchGameState):`, state.currentUser);
-    console.log(`initializeGame: Current User Welcome Status (raw): '${state.currentUser.Welcome}' (Type: ${typeof state.currentUser.Welcome})`);
 
     const currentUserWelcomeStatus = state.currentUser.Welcome?.toString().toUpperCase();
-    console.log(`initializeGame: Current User Welcome Status (processed for comparison): '${currentUserWelcomeStatus}'`);
 
     if (state.currentUser.Status && state.currentUser.Status.toLowerCase() === 'dead') {
-        console.log(`initializeGame: User is DEAD. Showing Dead Page.`);
         renderView('deadPage');
         hideLoadingOverlay();
     } else if (state.gameState?.CurrentPhase === 'Off') {
-        console.log(`initializeGame: Game is OFF. Showing Off Limits Page.`);
         renderView('offLimitsPage');
         hideLoadingOverlay();
     } else if (currentUserWelcomeStatus !== 'TRUE') {
-        console.log(`initializeGame: Welcome Status is NOT TRUE. Showing Welcome Page.`);
         localStorage.removeItem('mafiaGameUserId');
         renderView('welcomePage');
         hideLoadingOverlay();
     } else {
-        console.log(`initializeGame: Welcome Status is TRUE. Proceeding to Dashboard.`);
         renderView('dashboard');
         updateDashboardActions(state.gameState?.CurrentPhase || 'Day');
 
         if (state.gameState?.CurrentPhase === 'Day') {
             const previousDay = parseInt(state.gameState.CurrentDay) - 1;
-            console.log(`initializeGame: It's DAY. Previous Day for recap: ${previousDay}`);
             if (previousDay >= 1) {
                 let recapLoadingTimeout;
                 showLoadingOverlay();
@@ -596,7 +600,6 @@ async function initializeGame(userId) {
                     if (recapResponse.ok) {
                         const recapResult = await recapResponse.json();
                         state.nightlyRecap = recapResult.recapData;
-                        console.log("initializeGame: Fetched Nightly Recap Data:", state.nightlyRecap);
                         renderView('dashboard');
                         updateDashboardActions(state.gameState?.CurrentPhase || 'Day');
                     } else {
@@ -611,7 +614,6 @@ async function initializeGame(userId) {
                     hideLoadingOverlay();
                 }
             } else {
-                console.log("initializeGame: Previous Day is 0, no recap for Day 1.");
             }
         }
     }
@@ -648,13 +650,11 @@ function showMessage(message) {
  // Centralized function to show loading overlay
  function showLoadingOverlay() {
      loadingOverlay.style.display = 'flex';
-     console.log("Loading Overlay: DISPLAYED (flex)"); // DEBUG LOG Loader 1
  }
 
  // Centralized function to hide loading overlay
  function hideLoadingOverlay() {
      loadingOverlay.style.display = 'none';
-     console.log("Loading Overlay: HIDDEN (none)"); // DEBUG LOG Loader 2
  }
 
 
@@ -950,7 +950,6 @@ async function fetchCurrentTrial() {
         if (!allTrialsResponse.ok) throw new Error(`HTTP error! status: ${allTrialsResponse.status}`);
         const allTrialsResult = await allTrialsResponse.json();
         const allActiveTrials = allTrialsResult.activeTrials || [];
-        console.log(`fetchCurrentTrial: Found ${allActiveTrials.length} active trials.`);
 
         if (allActiveTrials.length === 0) {
             state.currentTrial = null;
@@ -962,7 +961,6 @@ async function fetchCurrentTrial() {
         if (!userVotesResponse.ok) throw new Error(`HTTP error! status: ${userVotesResponse.status}`);
         const userVotesResult = await userVotesResponse.json();
         const votedTrialIds = new Set(userVotesResult.userVotes.map(vote => vote.TrialID));
-        console.log(`fetchCurrentTrial: User has voted on ${votedTrialIds.size} trials.`);
 
         let nextTrial = null;
         for (const trial of allActiveTrials) {
@@ -1198,7 +1196,6 @@ window.onload = async () => {
                 document.getElementById('login-error').textContent = "Could not load player list from the server.";
             }
         } else {
-            console.log("window.onload: No saved user ID found. Rendering login view.");
             renderView('login');
         }
     } catch (error) {
