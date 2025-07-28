@@ -479,81 +479,101 @@ async function handleLogin() {
         }
     }
 
-    async function fetchPlayers(forceRefresh = false) {
-        if (state.allPlayers.length > 0 && !forceRefresh) return;
-        try {
-            const response = await fetch('/.netlify/functions/get-player-data');
-            if (!response.ok) {
-                const errorText = await response.text();
-                console.error('Fetch failed with status:', response.status, 'Response:', errorText);
-                throw new Error(`HTTP error! status: ${response.status}`);
-            }
-            state.allPlayers = await response.json();
-        } catch (error) {
-            console.error("Full error in fetchPlayers:", error);
-            showMessage("Failed to load player data. Check console for details.");
-            state.allPlayers = [];
-        }
-    }
+async function fetchPlayers(forceRefresh = false) {
+     console.log(`fetchPlayers: Function started. Force refresh: ${forceRefresh}`); // DEBUG LOG J
+     // CRITICAL FIX: Always force refresh if requested, even if state.allPlayers is populated
+     if (state.allPlayers.length > 0 && !forceRefresh) {
+         console.log("fetchPlayers: Using cached player data (no force refresh)."); // DEBUG LOG K
+         return;
+     }
+     try {
+         // Add a cache-busting parameter to ensure fresh data from Netlify Function
+         const cacheBuster = new Date().getTime();
+         const response = await fetch(`/.netlify/functions/get-player-data?_t=${cacheBuster}`);
+         if (!response.ok) {
+             const errorText = await response.text();
+             console.error('fetchPlayers: Fetch failed with status:', response.status, 'Response:', errorText); // DEBUG LOG L
+             throw new Error(`HTTP error! status: ${response.status}`);
+         }
+         state.allPlayers = await response.json();
+         console.log("fetchPlayers: Successfully fetched player data. Raw response:", state.allPlayers); // DEBUG LOG M
+     } catch (error) {
+         console.error("fetchPlayers: Full error in fetchPlayers:", error); // DEBUG LOG N
+         showMessage("Failed to load player data. Check console for details.");
+         state.allPlayers = [];
+     }
+ }
 
 async function initializeGame(userId) {
-    state.currentUserId = userId;
-    state.currentUser = state.allPlayers.find(p => p.PlayerID === userId);
-    if (!state.currentUser) {
-        localStorage.removeItem('mafiaGameUserId');
-        renderView('login');
-        document.getElementById('login-error').textContent = "Your player data seems outdated. Please log in again.";
-        return;
-    }
-    state.isCurrentUserAdmin = state.currentUser.IsAdmin === 'TRUE';
-    await fetchGameState();
+ state.currentUserId = userId;
+ // CRITICAL DEBUG: Re-derive currentUser immediately after state.allPlayers is updated
+ state.currentUser = state.allPlayers.find(p => p.PlayerID === userId);
 
-    console.log(`initializeGame: Current User ID: ${state.currentUserId}`); // DEBUG LOG A
-    console.log(`initializeGame: Current User Object (after fetchGameState):`, state.currentUser); // DEBUG LOG B
-    console.log(`initializeGame: Current User Welcome Status (raw): '${state.currentUser.Welcome}' (Type: ${typeof state.currentUser.Welcome})`); // DEBUG LOG C
+ console.log(`initializeGame: Current User ID: ${state.currentUserId}`); // DEBUG LOG A
+ console.log(`initializeGame: Current User Object (at start of initializeGame):`, state.currentUser); // DEBUG LOG B
+ console.log(`initializeGame: Current User Welcome Status (raw from state.currentUser): '${state.currentUser?.Welcome}' (Type: ${typeof state.currentUser?.Welcome})`); // DEBUG LOG C
 
-    // Check if the current user is dead, if the game is off limits, or if they need to see the welcome message
-    // CRITICAL FIX: Convert Welcome status to string and then toUpperCase for consistent comparison
-    if (state.currentUser.Status && state.currentUser.Status.toLowerCase() === 'dead') {
-        renderView('deadPage');
-    } else if (state.gameState?.CurrentPhase === 'Off') {
-        renderView('offLimitsPage');
-    } else if (state.currentUser.Welcome && state.currentUser.Welcome.toString().toUpperCase() !== 'TRUE') { // Check if Welcome is NOT TRUE (case-insensitive)
-        console.log(`initializeGame: Welcome Status is NOT TRUE (case-insensitive). Showing Welcome Page.`); // DEBUG LOG D
-        renderView('welcomePage');
-    } else {
-        console.log(`initializeGame: Welcome Status is TRUE (case-insensitive). Proceeding to Dashboard.`); // DEBUG LOG E
-        renderView('dashboard');
-        updateDashboardActions(state.gameState?.CurrentPhase || 'Day');
+ if (!state.currentUser) {
+     localStorage.removeItem('mafiaGameUserId');
+     renderView('login');
+     document.getElementById('login-error').textContent = "Your player data seems outdated. Please log in again.";
+     return;
+ }
 
-        if (state.gameState?.CurrentPhase === 'Day') {
-            const previousDay = parseInt(state.gameState.CurrentDay) - 1;
-            console.log(`initializeGame: It's DAY. Previous Day for recap: ${previousDay}`);
-            if (previousDay >= 1) {
-                loadingOverlay.style.display = 'flex';
-                try {
-                    const recapResponse = await fetch(`/.netlify/functions/get-nightly-recap?dayNumber=${previousDay}`);
-                    if (recapResponse.ok) {
-                        const recapResult = await recapResponse.json();
-                        state.nightlyRecap = recapResult.recapData;
-                        console.log("initializeGame: Fetched Nightly Recap Data:", state.nightlyRecap);
-                        renderView('dashboard');
-                        updateDashboardActions(state.gameState?.CurrentPhase || 'Day');
-                    } else {
-                        console.error("Error fetching nightly recap:", await recapResponse.text());
-                        state.nightlyRecap = null;
-                    }
-                } catch (error) {
-                    console.error("Error fetching nightly recap:", error);
-                    state.nightlyRecap = null;
-                } finally {
-                    loadingOverlay.style.display = 'none';
-                }
-            } else {
-                console.log("initializeGame: Previous Day is 0, no recap for Day 1.");
-            }
-        }
-    }
+ state.isCurrentUserAdmin = state.currentUser.IsAdmin === 'TRUE';
+ await fetchGameState(); // Ensure gameState is fetched BEFORE checking phase
+
+ console.log(`initializeGame: Current Game State Phase: ${state.gameState?.CurrentPhase}, Day: ${state.gameState?.CurrentDay}`); // DEBUG LOG D
+
+ // CRITICAL FIX: Ensure Welcome status is correctly evaluated (case-insensitive and handles undefined/null)
+ const currentUserWelcomeStatus = state.currentUser?.Welcome?.toString().toUpperCase();
+ console.log(`initializeGame: Current User Welcome Status (processed for comparison): '${currentUserWelcomeStatus}'`); // DEBUG LOG E
+
+ // Check if the current user is dead, if the game is off limits, or if they need to see the welcome message
+ if (state.currentUser.Status && state.currentUser.Status.toLowerCase() === 'dead') {
+     console.log(`initializeGame: User is DEAD. Showing Dead Page.`); // DEBUG LOG F
+     renderView('deadPage');
+ } else if (state.gameState?.CurrentPhase === 'Off') {
+     console.log(`initializeGame: Game is OFF. Showing Off Limits Page.`); // DEBUG LOG G
+     renderView('offLimitsPage');
+ } else if (currentUserWelcomeStatus !== 'TRUE') { // If Welcome is NOT TRUE (case-insensitive)
+     console.log(`initializeGame: Welcome Status is NOT TRUE. Showing Welcome Page.`); // DEBUG LOG H
+     // CRITICAL FIX: If Welcome is FALSE, ensure localStorage is cleared to force re-login/re-fetch on next visit
+     localStorage.removeItem('mafiaGameUserId'); // Clear ID if Welcome is FALSE to prevent auto-login loop
+     renderView('welcomePage');
+ } else {
+     console.log(`initializeGame: Welcome Status is TRUE. Proceeding to Dashboard.`); // DEBUG LOG I
+     renderView('dashboard');
+     updateDashboardActions(state.gameState?.CurrentPhase || 'Day');
+
+     if (state.gameState?.CurrentPhase === 'Day') {
+         const previousDay = parseInt(state.gameState.CurrentDay) - 1;
+         console.log(`initializeGame: It's DAY. Previous Day for recap: ${previousDay}`);
+         if (previousDay >= 1) {
+             loadingOverlay.style.display = 'flex';
+             try {
+                 const recapResponse = await fetch(`/.netlify/functions/get-nightly-recap?dayNumber=${previousDay}`);
+                 if (recapResponse.ok) {
+                     const recapResult = await recapResponse.json();
+                     state.nightlyRecap = recapResult.recapData;
+                     console.log("initializeGame: Fetched Nightly Recap Data:", state.nightlyRecap);
+                     renderView('dashboard'); // Re-render the dashboard to display the recap
+                     updateDashboardActions(state.gameState?.CurrentPhase || 'Day');
+                 } else {
+                     console.error("Error fetching nightly recap:", await recapResponse.text());
+                     state.nightlyRecap = null;
+                 }
+             } catch (error) {
+                 console.error("Error fetching nightly recap:", error);
+                 state.nightlyRecap = null;
+             } finally {
+                 loadingOverlay.style.display = 'none';
+             }
+         } else {
+             console.log("initializeGame: Previous Day is 0, no recap for Day 1.");
+         }
+     }
+ }
 }
 
     function getPlayerNameById(playerId) {
