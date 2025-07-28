@@ -1163,7 +1163,7 @@ window.onload = async () => {
 
     try {
         if (savedUserId) {
-            await fetchPlayers();
+            await fetchPlayers(true);
             if (state.allPlayers.length > 0) {
                 await initializeGame(savedUserId);
             } else {
