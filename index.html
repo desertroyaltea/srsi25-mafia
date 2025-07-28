@@ -480,37 +480,38 @@ async function handleLogin() {
     }
 
 async function fetchPlayers(forceRefresh = false) {
-    console.log(`fetchPlayers: Function started. Force refresh: ${forceRefresh}`);
-    if (state.allPlayers.length > 0 && !forceRefresh) {
-        console.log("fetchPlayers: Using cached player data (no force refresh).");
-        return;
-    }
-    try {
-        let playersLoadingTimeout;
-        playersLoadingTimeout = setTimeout(() => {
-            hideLoadingOverlay(); // Use centralized function
-            showMessage('Initial player data load timed out. Please refresh.');
-            console.warn("fetchPlayers: Initial player data load timeout occurred.");
-        }, 20000);
-
-        const cacheBuster = new Date().getTime();
-        const response = await fetch(`/.netlify/functions/get-player-data?_t=${cacheBuster}`);
-        if (!response.ok) {
-            const errorText = await response.text();
-            console.error('fetchPlayers: Fetch failed with status:', response.status, 'Response:', errorText);
-            throw new Error(`HTTP error! status: ${response.status}`);
+        console.log(`fetchPlayers: Function started. Force refresh: ${forceRefresh}`);
+        if (state.allPlayers.length > 0 && !forceRefresh) {
+            console.log("fetchPlayers: Using cached player data (no force refresh).");
+            return;
         }
-        state.allPlayers = await response.json();
-        console.log("fetchPlayers: Successfully fetched player data. Raw response:", state.allPlayers);
-    } catch (error) {
-        console.error("fetchPlayers: Full error in fetchPlayers:", error);
-        showMessage("Failed to load player data. Check console for details.");
-        state.allPlayers = [];
-    } finally {
-        clearTimeout(playersLoadingTimeout);
-        // hideLoadingOverlay() is handled by initializeGame's final block or specific button handlers.
+
+        let playersLoadingTimeout; // CRITICAL FIX: Declare here, outside try/catch
+
+        try {
+            playersLoadingTimeout = setTimeout(() => {
+                hideLoadingOverlay();
+                showMessage('Initial player data load timed out. Please refresh.');
+                console.warn("fetchPlayers: Initial player data load timeout occurred.");
+            }, 20000);
+
+            const cacheBuster = new Date().getTime();
+            const response = await fetch(`/.netlify/functions/get-player-data?_t=${cacheBuster}`);
+            if (!response.ok) {
+                const errorText = await response.text();
+                console.error('fetchPlayers: Fetch failed with status:', response.status, 'Response:', errorText);
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+            state.allPlayers = await response.json();
+            console.log("fetchPlayers: Successfully fetched player data. Raw response:", state.allPlayers);
+        } catch (error) {
+            console.error("fetchPlayers: Full error in fetchPlayers:", error);
+            showMessage("Failed to load player data. Check console for details.");
+            state.allPlayers = [];
+        } finally {
+            clearTimeout(playersLoadingTimeout);
+        }
     }
-}
 
 
 async function initializeGame(userId) {
