@@ -561,6 +561,78 @@ function showMessage(message) {
         }, 5000); // 5000 milliseconds = 5 seconds
     }
 
+// --- Nightly Recap Story Generation ---
+function generateNightlyRecapStory(recapData) {
+    if (!recapData) {
+        return '<p class="text-gray-400">No events recorded last night.</p>';
+    }
+
+    const storyParts = [];
+
+    // Helper for joining names with purple color
+    const formatNames = (names) => {
+        if (names.length === 0) return '';
+        const coloredNames = names.map(name => `<span class="text-purple-400 font-bold">${name}</span>`); // Player names purple
+        if (coloredNames.length === 1) return coloredNames[0];
+        if (coloredNames.length === 2) return `${coloredNames[0]} and ${coloredNames[1]}`;
+        return `${coloredNames.slice(0, -1).join(', ')}, and ${coloredNames[coloredNames.length - 1]}`;
+    };
+
+    // Get names for various events, now using formatNames directly
+    const successfullyProtectedNames = recapData.mafiaProtected.map(id => getPlayerNameById(id));
+    const mafiaKilledNames = recapData.mafiaKills.map(id => getPlayerNameById(id));
+    const sheriffKilledNames = recapData.sheriffKills.map(id => getPlayerNameById(id));
+
+    const guiltyAccusedNames = recapData.trialResults
+        .filter(trial => trial.result === 'GUILTY')
+        .map(trial => getPlayerNameById(trial.accusedPlayerId));
+
+    const notGuiltyAccusedNames = recapData.trialResults
+        .filter(trial => trial.result === 'NOT GUILTY')
+        .map(trial => getPlayerNameById(trial.accusedPlayerId));
+
+    // Opening
+    storyParts.push(`As the first rays of dawn pierced through the darkness, <span class="font-bold text-gray-300">Building 9</span> slowly awoke from a restless night.`);
+
+    // Doctor Protections (only if they successfully protected someone from Mafia)
+    if (successfullyProtectedNames.length > 0) {
+        storyParts.push(`The <span class="text-blue-400 font-bold">Doctors</span> worked tirelessly, their healing touch safeguarding ${formatNames(successfullyProtectedNames)} from harm.`);
+    } else {
+        storyParts.push(`The <span class="text-blue-400 font-bold">Doctors</span> watched over the town, but their skills were either not needed or, sadly, not enough to prevent all tragedies.`);
+    }
+
+    // Mafia Kills
+    if (mafiaKilledNames.length > 0) {
+        storyParts.push(`But the chilling silence was broken by the grim news: the <span class="text-red-500 font-bold">Mafia</span> had claimed ${formatNames(mafiaKilledNames)}.`);
+    } else if (successfullyProtectedNames.length > 0) { // If Mafia targeted but failed
+         storyParts.push(`The <span class="text-red-500 font-bold">Mafia's</span> deadly aim was thwarted, as their targets managed to escape their grasp.`);
+    } else {
+        storyParts.push(`Remarkably, the <span class="text-red-500 font-bold">Mafia</span> seemed to have missed their mark, or perhaps, chose to lay low.`);
+    }
+
+    // Trial Results - GUILTY
+    if (guiltyAccusedNames.length > 0) {
+        storyParts.push(`In a tense moment, the trial${guiltyAccusedNames.length > 1 ? 's' : ''} of ${formatNames(guiltyAccusedNames)} concluded with a verdict of <span class="text-red-500 font-bold">GUILTY</span>. Justice, swift and final, was served.`);
+    }
+
+    // Trial Results - NOT GUILTY
+    if (notGuiltyAccusedNames.length > 0) {
+        storyParts.push(`The town deliberated over ${formatNames(notGuiltyAccusedNames)}'s fate, but the verdict came back <span class="text-green-500 font-bold">NOT GUILTY</span>. They walk free, for now.`);
+    }
+
+    // Sheriff Actions
+    if (sheriffKilledNames.length > 0) {
+        storyParts.push(`Amidst the chaos, the vigilant <span class="text-yellow-500 font-bold">Sheriff</span> exacted their own brand of justice, eliminating ${formatNames(sheriffKilledNames)}.`);
+    } else {
+        storyParts.push(`The <span class="text-yellow-500 font-bold">Sheriff's</span> gun remained silent, their target perhaps elusive or their moment yet to come.`);
+    }
+
+    // Closing - SRSI25 Cohort colored differently
+    storyParts.push(`<span class="font-bold text-blue-400">SRSI25 Cohort</span> now faces a new day, with new questions and old suspicions lingering in the air.`);
+
+    return storyParts.map(part => `<p>${part}</p>`).join('');
+}
+
     async function performFetchAction(endpoint, payload) {
         loadingOverlay.style.display = 'flex';
         try {
