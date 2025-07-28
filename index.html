@@ -181,37 +181,37 @@ dashboard: () => `
                 </div>
             </div>`,
 actionModal: ({ title, buttonText, targets, actionType }) => `
-                <div class="bg-gray-900 p-5 rounded-lg mt-4">
-                    <h2 class="text-2xl font-semibold mb-4 text-red-400">${title}</h2>
-                    <form id="action-form" data-action-type="${actionType}">
-                        <div class="mb-4">
-                            <label for="target-player-1" class="block text-gray-300 text-lg font-bold mb-2">Select Target 1:</label>
-                            <select id="target-player-1" class="shadow border rounded w-full py-3 px-4 text-lg leading-tight focus:outline-none focus:shadow-outline bg-gray-700 border-gray-600 text-white" required>
-                                <option value="">-- Select a player --</option>
-                                ${targets.map(p => `<option value="${p.PlayerID}">${p.Name}</option>`).join('')}
-                            </select>
-                        </div>
-                        <!-- NEW: Second target selection for Mafia Kill -->
-                        ${actionType === 'kill' ? `
-                            <div class="mb-4">
-                                <label for="target-player-2" class="block text-gray-300 text-lg font-bold mb-2">Select Target 2:</label>
-                                <select id="target-player-2" class="shadow border rounded w-full py-3 px-4 text-lg leading-tight focus:outline-none focus:shadow-outline bg-gray-700 border-gray-600 text-white" required>
-                                    <option value="">-- Select a player --</option>
-                                    ${targets.map(p => `<option value="${p.PlayerID}">${p.Name}</option>`).join('')}
-                                </select>
-                            </div>
-                        ` : ''}
-                        <div class="flex flex-col md:flex-row gap-4">
-                            <button type="submit" class="bg-red-700 hover:bg-red-800 text-white font-bold py-3 px-6 rounded-lg w-full md:w-1/2 text-xl">
-                                ${buttonText}
-                            </button>
-                            <button type="button" id="back-to-dashboard" class="bg-gray-600 hover:bg-gray-700 text-white font-bold py-3 px-6 rounded-lg w-full md:w-1/2 text-xl">
-                                Cancel
-                            </button>
-                        </div>
-                    </form>
-                </div>
-            `,
+                <div class="bg-gray-900 p-5 rounded-lg mt-4">
+                    <h2 class="text-2xl font-semibold mb-4 text-red-400">${title}</h2>
+                    <form id="action-form" data-action-type="${actionType}">
+                        <div class="mb-4">
+                            <label for="target-player-1" class="block text-gray-300 text-lg font-bold mb-2">Select Target 1:</label>
+                            <select id="target-player-1" class="shadow border rounded w-full py-3 px-4 text-lg leading-tight focus:outline-none focus:shadow-outline bg-gray-700 border-gray-600 text-white" required>
+                                <option value="">-- Select a player --</option>
+                                ${targets.map(p => `<option value="${p.PlayerID}">${p.Name}</option>`).join('')}
+                            </select>
+                        </div>
+                        <!-- Conditional second target selection for Mafia Kill OR Doctor Protect -->
+                        ${actionType === 'kill' || (actionType === 'protect' && state.currentUser.DoctorCanSaveMore === 'TRUE') ? `
+                            <div class="mb-4">
+                                <label for="target-player-2" class="block text-gray-300 text-lg font-bold mb-2">Select Target 2:</label>
+                                <select id="target-player-2" class="shadow border rounded w-full py-3 px-4 text-lg leading-tight focus:outline-none focus:shadow-outline bg-gray-700 border-gray-600 text-white" required>
+                                    <option value="">-- Select a player --</option>
+                                    ${targets.map(p => `<option value="${p.PlayerID}">${p.Name}</option>`).join('')}
+                                </select>
+                            </div>
+                        ` : ''}
+                        <div class="flex flex-col md:flex-row gap-4">
+                            <button type="submit" class="bg-red-700 hover:bg-red-800 text-white font-bold py-3 px-6 rounded-lg w-full md:w-1/2 text-xl">
+                                ${buttonText}
+                            </button>
+                            <button type="button" id="back-to-dashboard" class="bg-gray-600 hover:bg-gray-700 text-white font-bold py-3 px-6 rounded-lg w-full md:w-1/2 text-xl">
+                                Cancel
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            `,
         accusationForm: ({ targets }) => `
             <div class="bg-gray-900 p-5 rounded-lg mt-4">
                 <h2 class="text-2xl font-semibold mb-4 text-red-400">Submit Accusation</h2>
@@ -1065,21 +1065,46 @@ function updateDashboardActions(currentPhase) {
                     payload = { mafiaPlayerId: state.currentUserId, targetPlayerId1: targetPlayerId1_kill, targetPlayerId2: targetPlayerId2_kill };
                     break;
 
-                case 'protect':
-                    const targetPlayerElement_protect = document.getElementById('target-player-1'); // Get from target-player-1
-                    if (!targetPlayerElement_protect) {
-                        showMessage("Error: Target selection field not found. Please refresh.");
-                        console.error("Missing target selection element for protect action.");
+case 'protect':
+                    const doctorCanSaveMore = state.currentUser.DoctorCanSaveMore === 'TRUE';
+                    let targetPlayerId_protect_1 = null;
+                    let targetPlayerId_protect_2 = null;
+
+                    const targetPlayer1Element_protect = document.getElementById('target-player-1');
+                    if (!targetPlayer1Element_protect) {
+                        showMessage("Error: Target selection field 1 not found. Please refresh.");
+                        console.error("Missing target selection element 1 for protect action.");
                         return;
                     }
-                    const targetPlayerId_protect = targetPlayerElement_protect.value;
-                    if (!targetPlayerId_protect) {
-                        showMessage("Please select a target player.");
+                    targetPlayerId_protect_1 = targetPlayer1Element_protect.value;
+
+                    if (doctorCanSaveMore) {
+                        const targetPlayer2Element_protect = document.getElementById('target-player-2');
+                        if (!targetPlayer2Element_protect) {
+                            showMessage("Error: Target selection field 2 not found. Please refresh.");
+                            console.error("Missing target selection element 2 for protect action with DoctorCanSaveMore.");
+                            return;
+                        }
+                        targetPlayerId_protect_2 = targetPlayer2Element_protect.value;
+                    }
+
+                    if (!targetPlayerId_protect_1 || (doctorCanSaveMore && !targetPlayerId_protect_2)) {
+                        showMessage("Please select the player(s) to protect.");
                         return;
                     }
-                    endpoint = '/.netlify/functions/protect-player';
-                    payload = { doctorPlayerId: state.currentUserId, targetPlayerId: targetPlayerId_protect };
-                    break;
+                    if (doctorCanSaveMore && targetPlayerId_protect_1 === targetPlayerId_protect_2) {
+                        showMessage("You must select two different players to protect.");
+                        return;
+                    }
+
+                    endpoint = '/.netlify/functions/protect-player';
+                    payload = {
+                        doctorPlayerId: state.currentUserId,
+                        targetPlayerId1: targetPlayerId_protect_1, // Send first target
+                        targetPlayerId2: doctorCanSaveMore ? targetPlayerId_protect_2 : null, // Send second target only if ability is true
+                        doctorCanSaveMoreUsed: doctorCanSaveMore // Inform backend if ability was used
+                    };
+                    break;
 
                 case 'check':
                     const targetPlayerElement_check = document.getElementById('target-player-1'); // Get from target-player-1

@@ -28,12 +28,12 @@ exports.handler = async (event, context) => {
     console.log(`protect-player: Sheet ID: ${sheetId}`); // LOG 4
 
     try {
-        const { doctorPlayerId, targetPlayerId } = JSON.parse(event.body); // Renamed protectedPlayerId to targetPlayerId for consistency with frontend
+const { doctorPlayerId, targetPlayerId1, targetPlayerId2, doctorCanSaveMoreUsed } = JSON.parse(event.body); // NEW: Receive two targets and ability usage
         console.log(`protect-player: Received - Doctor: ${doctorPlayerId}, Target: ${targetPlayerId}`); // LOG 5
-        if (!doctorPlayerId || !targetPlayerId) {
-            console.log("protect-player: Missing doctorPlayerId or targetPlayerId."); // LOG 6
-            return { statusCode: 400, body: JSON.stringify({ error: 'Missing doctorPlayerId or targetPlayerId.' }) };
-        }
+if (!doctorPlayerId || !targetPlayerId1 || (doctorCanSaveMoreUsed && !targetPlayerId2)) { // Validate based on ability usage
+            console.log("protect-player: Missing doctorPlayerId or targetPlayerId(s).");
+            return { statusCode: 400, body: JSON.stringify({ error: 'Missing doctorPlayerId or targetPlayerId(s).' }) };
+        }
 
         const sheets = await getSheetsService();
         console.log("protect-player: Sheets service initialized."); // LOG 7
@@ -52,14 +52,15 @@ exports.handler = async (event, context) => {
         const playerHeaders = players[0];
         const playerRows = players.slice(1);
         const idCol = playerHeaders.indexOf('PlayerID');
-        const mainUsedCol = playerHeaders.indexOf('MainUsed');
+const mainUsedCol = playerHeaders.indexOf('MainUsed');
+        const doctorCanSaveMoreCol = playerHeaders.indexOf('DoctorCanSaveMore'); // NEW column index
 
         console.log(`protect-player: PlayerID column index: ${idCol}, MainUsed column index: ${mainUsedCol}`); // LOG 10
 
-        if (idCol === -1 || mainUsedCol === -1) {
-            console.error("protect-player: Required columns 'PlayerID' or 'MainUsed' not found in Players sheet."); // LOG 11
-            throw new Error("Required columns 'PlayerID' or 'MainUsed' not found in Players sheet.");
-        }
+if (idCol === -1 || mainUsedCol === -1 || doctorCanSaveMoreCol === -1) { // NEW: Check for DoctorCanSaveMore
+            console.error("protect-player: Required columns 'PlayerID', 'MainUsed', or 'DoctorCanSaveMore' not found in Players sheet.");
+            throw new Error("Required columns 'PlayerID', 'MainUsed', or 'DoctorCanSaveMore' not found in Players sheet.");
+        }
 
         let doctorPlayerRowIndex = -1;
         let doctorMainUsedStatus = 'FALSE'; // Default
@@ -90,16 +91,57 @@ exports.handler = async (event, context) => {
         const currentDay = gameStateResponse.data.values && gameStateResponse.data.values[0] ? gameStateResponse.data.values[0][0] : 'Unknown';
         console.log(`protect-player: Current Day: ${currentDay}`); // LOG 16
 
-        // 3. Log the action
-        console.log("protect-player: Appending action to Actions_Doctor sheet."); // LOG 17
-        const newActionRow = [`ACT_PROTECT_${Date.now()}`, currentDay, doctorPlayerId, targetPlayerId, new Date().toISOString(), null, 'Logged'];
-        await sheets.spreadsheets.values.append({
-            spreadsheetId: sheetId,
-            range: 'Actions_Doctor!A:G', // Ensure this range covers all columns you're writing
-            valueInputOption: 'USER_ENTERED',
-            resource: { values: [newActionRow] },
-        });
-        console.log("protect-player: Action logged to Actions_Doctor sheet."); // LOG 18
+// 3. Log the action(s)
+     const timestamp = new Date().toISOString();
+     const actionsToLog = [];
+
+     actionsToLog.push([`ACT_PROTECT_${Date.now()}_1`, currentDay, doctorPlayerId, targetPlayerId1, timestamp, null, 'Logged']);
+     console.log(`protect-player: Appending action for Target 1 (${targetPlayerId1}) to Actions_Doctor sheet.`);
+
+     if (doctorCanSaveMoreUsed && targetPlayerId2) {
+         actionsToLog.push([`ACT_PROTECT_${Date.now()}_2`, currentDay, doctorPlayerId, targetPlayerId2, timestamp, null, 'Logged']);
+         console.log(`protect-player: Appending action for Target 2 (${targetPlayerId2}) to Actions_Doctor sheet.`);
+     }
+
+     // Append all actions in one batch for efficiency
+     await sheets.spreadsheets.values.append({
+         spreadsheetId: sheetId,
+         range: 'Actions_Doctor!A:G',
+         valueInputOption: 'USER_ENTERED',
+         resource: { values: actionsToLog },
+     });
+     console.log("protect-player: Doctor action(s) logged to Actions_Doctor sheet.");
+
+     // 4. Update the Doctor's MainUsed status to TRUE and DoctorCanSaveMore to FALSE
+     const updateRangeMainUsed = `Players!${String.fromCharCode(65 + mainUsedCol)}${doctorPlayerRowIndex}`;
+     const updateRangeCanSaveMore = `Players!${String.fromCharCode(65 + doctorCanSaveMoreCol)}${doctorPlayerRowIndex}`;
+
+     const updateRequests = [
+         {
+             range: updateRangeMainUsed,
+             values: [['TRUE']]
+         }
+     ];
+
+     if (doctorCanSaveMoreUsed) {
+         updateRequests.push({
+             range: updateRangeCanSaveMore,
+             values: [['FALSE']]
+         });
+     }
+
+     // Use batchUpdate to update both fields in one API call
+     await sheets.spreadsheets.values.batchUpdate({
+         spreadsheetId: sheetId,
+         resource: {
+             valueInputOption: 'USER_ENTERED',
+             data: updateRequests
+         }
+     });
+     console.log(`protect-player: Doctor's MainUsed status updated to TRUE.`);
+     if (doctorCanSaveMoreUsed) {
+         console.log(`protect-player: DoctorCanSaveMore status updated to FALSE.`);
+     }
 
         // 4. Update the player's MainUsed status to TRUE
         const updateRange = `Players!${String.fromCharCode(65 + mainUsedCol)}${doctorPlayerRowIndex}`;
