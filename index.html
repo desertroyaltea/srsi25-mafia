@@ -1355,30 +1355,34 @@ appRoot.addEventListener('click', async (e) => {
             } else {
                 showMessage('Missing trial ID or voting power to submit vote.');
             }
-        } else if (e.target.id === 'start-game-button') { // Handle "Start Game" button
-            loadingOverlay.style.display = 'flex';
-            try {
-                const response = await fetch('/.netlify/functions/update-player-welcome-status', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ playerId: state.currentUserId }),
-                });
-                if (response.ok) {
-                    showMessage("Welcome to the game!");
-                    state.currentUser.Welcome = 'TRUE'; // Update local state immediately
-                    await fetchPlayers(true); // Re-fetch players to ensure state is fresh
-                    await initializeGame(state.currentUserId); // Re-initialize to proceed to dashboard
-                } else {
-                    throw new Error(`Failed to update welcome status: ${response.statusText}`);
+} else if (e.target.id === 'start-game-button') { // Handle "Start Game" button
+                loadingOverlay.style.display = 'flex';
+                try {
+                    const response = await fetch('/.netlify/functions/update-player-welcome-status', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ playerId: state.currentUserId }),
+                    });
+                    if (response.ok) {
+                        showMessage("Welcome to the game!");
+                        // CRITICAL FIX: Ensure state.currentUser is fully refreshed after fetchPlayers
+                        await fetchPlayers(true); // Re-fetch players to ensure state.allPlayers is fresh
+                        // Re-derive state.currentUser from the fresh state.allPlayers
+                        state.currentUser = state.allPlayers.find(p => p.PlayerID === state.currentUserId);
+                        
+                        // Now, initializeGame will correctly see the updated state.currentUser.Welcome
+                        await initializeGame(state.currentUserId);
+                    } else {
+                        throw new Error(`Failed to update welcome status: ${response.statusText}`);
+                    }
+                } catch (error) {
+                    console.error("Error starting game:", error);
+                    showMessage(`Failed to start game: ${error.message}`);
+                    renderView('login'); // Fallback to login on error
+                } finally {
+                    loadingOverlay.style.display = 'none';
                 }
-            } catch (error) {
-                console.error("Error starting game:", error);
-                showMessage(`Failed to start game: ${error.message}`);
-                renderView('login'); // Fallback to login on error
-            } finally {
-                loadingOverlay.style.display = 'none';
-            }
-        } else if (e.target.id === 'logout-button') { // Logout button (from dead page and universal)
+            } else if (e.target.id === 'logout-button') { // Logout button (from dead page and universal)
             localStorage.removeItem('mafiaGameUserId'); // Clear saved user ID
             state.currentUserId = null;
             state.currentUser = null;
