@@ -566,6 +566,34 @@ async function initializeGame(userId) {
     state.isCurrentUserAdmin = state.currentUser.IsAdmin === 'TRUE';
     await fetchGameState();
 
+    // NEW: Fetch current player's mission
+        let currentUserMissionTimeout;
+        showLoadingOverlay(); // Show loading while fetching mission
+
+        currentUserMissionTimeout = setTimeout(() => {
+            hideLoadingOverlay();
+            showMessage('Failed to load your mission data (timeout). Please refresh.');
+            console.warn("initializeGame: Current user mission fetch timeout occurred.");
+        }, 10000); // 10 seconds timeout for mission fetch
+
+        try {
+            console.log(`initializeGame: Attempting to fetch mission for player: ${state.currentUserId}`); // DEBUG LOG Frontend Mission 1
+            const missionResponse = await fetch(`/.netlify/functions/get-player-mission?playerId=${state.currentUserId}`);
+            if (missionResponse.ok) {
+                const missionResult = await missionResponse.json();
+                state.currentMission = missionResult.currentMission;
+                console.log("initializeGame: Fetched current mission data:", state.currentMission); // DEBUG LOG Frontend Mission 2
+            } else {
+                console.error("Error fetching player mission:", await missionResponse.text());
+                state.currentMission = null;
+            }
+        } catch (error) {
+            console.error("Error fetching player mission:", error);
+            state.currentMission = null;
+        } finally {
+            clearTimeout(currentUserMissionTimeout);
+            hideLoadingOverlay(); // Hide loading after mission fetch
+        }
 
     const currentUserWelcomeStatus = state.currentUser.Welcome?.toString().toUpperCase();
 
