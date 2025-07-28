@@ -887,11 +887,10 @@ function updateDashboardActions(currentPhase) {
 
         const isNight = currentPhase && currentPhase.toLowerCase() !== 'day';
         const isDay = currentPhase && currentPhase.toLowerCase() === 'day';
-        const isOff = currentPhase && currentPhase.toLowerCase() === 'off'; // NEW: Check for 'Off' phase
+        const isOff = currentPhase && currentPhase.toLowerCase() === 'off';
 
         console.log(`updateDashboardActions: Phase is Day: ${isDay}, Nightly Recap Data exists: ${!!state.nightlyRecap}, Phase is Off: ${isOff}`);
 
-        // Populate nightly recap story if it's Day and data exists
         const recapStoryDiv = document.getElementById('nightly-recap-story');
         if (recapStoryDiv) {
             if (isDay && state.nightlyRecap) {
@@ -903,25 +902,22 @@ function updateDashboardActions(currentPhase) {
             }
         }
 
-        // CRITICAL CHANGE: Hide all actions if phase is 'Off'
         if (isOff) {
-            playerActions.innerHTML = ''; // Ensure no buttons are displayed
+            playerActions.innerHTML = '';
             const adminActions = document.getElementById('admin-dashboard-actions');
-            if (adminActions) adminActions.classList.add('hidden'); // Hide admin actions too
-            return; // Exit function, no buttons or story will be rendered
+            if (adminActions) adminActions.classList.add('hidden');
+            return;
         } else {
-            // Ensure admin actions are visible if not 'Off' and is admin
             const adminActions = document.getElementById('admin-dashboard-actions');
             if (adminActions) {
                 if (state.isCurrentUserAdmin) {
                     adminActions.classList.remove('hidden');
-                    adminActions.classList.add('grid'); // Re-add grid display
+                    adminActions.classList.add('grid');
                 } else {
                     adminActions.classList.add('hidden');
                 }
             }
         }
-
 
         const createButton = (id, text, style, onClick) => {
             const button = document.createElement('button');
@@ -932,14 +928,20 @@ function updateDashboardActions(currentPhase) {
             playerActions.appendChild(button);
         };
 
+        // Helper to filter out dead players and admins from target lists
+        const getAliveNonAdminTargets = (includeSelf = false) => {
+            return state.allPlayers.filter(p =>
+                p.Status && typeof p.Status === 'string' && p.Status.toLowerCase() === 'alive' &&
+                p.IsAdmin !== 'TRUE' && // CRITICAL FIX: Exclude Admins
+                (includeSelf || p.PlayerID !== state.currentUserId) // Exclude self unless specified
+            );
+        };
+
         // --- ALL ROLES ---
-        // Allow "Submit Accusation" only during the Day phase
         if (isDay) {
             createButton('btn-submit-accusation', 'Submit Accusation', 'bg-gray-700 hover:bg-gray-800', () => {
-                const targets = state.allPlayers.filter(p =>
-                    p.Status && typeof p.Status === 'string' && p.Status.toLowerCase() === 'alive' &&
-                    p.PlayerID !== state.currentUserId
-                );
+                // Accusations should not be sent to admins
+                const targets = getAliveNonAdminTargets(); // Uses new helper
                 renderView('accusationForm', { targets });
             });
         }
@@ -966,9 +968,8 @@ function updateDashboardActions(currentPhase) {
                 createButton('btn-kill', 'Kill Player', 'bg-red-700 hover:bg-red-800', () => {
                     if (!isNight) return showMessage("You can only use this action at night.");
                     if (state.currentUser.MainUsed === 'TRUE') return showMessage("You have already used your main action tonight.");
-                    const targets = state.allPlayers.filter(p =>
-                        p.Status && typeof p.Status === 'string' && p.Status.toLowerCase() === 'alive'
-                    );
+                    // Mafia targets should be all alive non-admins
+                    const targets = getAliveNonAdminTargets(true); // Mafia can target self for testing, but not admins
                     renderView('actionModal', { title: 'Choose a Target to Kill', buttonText: 'Confirm Kill', targets, actionType: 'kill' });
                 });
                 createButton('btn-convert', 'Convert Villager', 'bg-red-900', () => {
@@ -993,7 +994,8 @@ function updateDashboardActions(currentPhase) {
                 createButton('btn-protect', 'Protect Player', 'bg-blue-700 hover:bg-blue-800', () => {
                     if (!isNight) return showMessage("You can only use this action at night.");
                     if (state.currentUser.MainUsed === 'TRUE') return showMessage("You have already used your main action tonight.");
-                    const targets = state.allPlayers.filter(p => p.Status && typeof p.Status === 'string' && p.Status.toLowerCase() === 'alive');
+                    // Doctors protect alive non-admins (can protect self)
+                    const targets = getAliveNonAdminTargets(true); // Doctors can protect self, but not admins
                     renderView('actionModal', { title: 'Choose a Player to Protect', buttonText: 'Confirm Protection', targets, actionType: 'protect' });
                 });
                 createButton('btn-revive', 'Revive Player', 'bg-blue-900', () => {
@@ -1018,10 +1020,8 @@ function updateDashboardActions(currentPhase) {
                 createButton('btn-check', 'Investigate Player', 'bg-yellow-600 hover:bg-yellow-700', async () => {
                     if (!isNight) return showMessage("You can only use this action at night.");
                     if (state.currentUser.MainUsed === 'TRUE') return showMessage("You have already used your main action tonight.");
-                    const targets = state.allPlayers.filter(p =>
-                        p.Status && typeof p.Status === 'string' && p.Status.toLowerCase() === 'alive' &&
-                        p.PlayerID !== state.currentUserId
-                    );
+                    // Detectives investigate alive non-admins (cannot investigate self)
+                    const targets = getAliveNonAdminTargets(); // Uses new helper
                     renderView('actionModal', {
                         title: 'Choose a Player to Investigate',
                         buttonText: 'Confirm Investigation',
@@ -1062,10 +1062,8 @@ function updateDashboardActions(currentPhase) {
                     if (!isNight) return showMessage("You can only use this action at night.");
                     if (state.currentUser.MainUsed === 'TRUE') return showMessage("You have already used your main action tonight.");
                     if (state.currentUser.SheriffShotUsed === 'TRUE') return showMessage("You have already used your one-time shot.");
-                    const targets = state.allPlayers.filter(p =>
-                        p.Status && typeof p.Status === 'string' && p.Status.toLowerCase() === 'alive' &&
-                        p.PlayerID !== state.currentUserId
-                    );
+                    // Sheriff shoots alive non-admins (cannot shoot self)
+                    const targets = getAliveNonAdminTargets(); // Uses new helper
                     renderView('actionModal', { title: 'Choose Your Target', buttonText: 'Fire!', targets, actionType: 'shoot' });
                 });
             }
