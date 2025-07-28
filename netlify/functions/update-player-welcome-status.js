@@ -58,12 +58,14 @@ exports.handler = async (event, context) => {
         const playerRows = playersData.slice(1);
 
         const idCol = playerHeaders.indexOf('PlayerID');
-        const welcomeCol = playerHeaders.indexOf('Welcome'); // NEW column index
+        const welcomeCol = 26; // NEW column index
 
-        if (idCol === -1 || welcomeCol === -1) {
-            console.error("update-player-welcome-status: Required columns 'PlayerID' or 'Welcome' not found in Players sheet.");
-            throw new Error("Required columns 'PlayerID' or 'Welcome' not found in Players sheet.");
+// Ensure PlayerID column is found (Welcome is now hardcoded)
+        if (idCol === -1) {
+            console.error("update-player-welcome-status: Required column 'PlayerID' not found in Players sheet.");
+            throw new Error("Required column 'PlayerID' not found in Players sheet.");
         }
+        // welcomeCol is now hardcoded to 26, so no need to check its indexOf result here.
 
         let playerRowIndex = -1;
         for(let i = 0; i < playerRows.length; i++) {

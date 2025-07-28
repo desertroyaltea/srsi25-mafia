@@ -327,22 +327,20 @@ actionModal: ({ title, buttonText, targets, actionType }) => `
 // NEW WELCOME PAGE TEMPLATE
             welcomePage: () => `
                 <div class="bg-gray-900 p-5 rounded-lg mt-4 text-center flex flex-col justify-center items-center min-h-[80vh]">
-                    <h2 class="text-4xl font-bold text-red-500 mb-6 animate-pulse">Welcome, Wanderer.</h2>
-                    <div class="text-xl text-gray-300 mb-8 leading-relaxed max-w-2xl">
-                        <p class="mb-4">
+                    <h2 class="text-3xl font-bold text-red-500 mb-4 animate-pulse md:text-4xl">Welcome, Wanderer.</h2> <!-- text-4xl to text-3xl, mb-6 to mb-4 -->
+                    <div class="text-lg text-gray-300 mb-6 leading-relaxed max-w-2xl md:text-xl"> <!-- text-xl to text-lg, mb-8 to mb-6 -->
+                        <p class="mb-3"> <!-- mb-4 to mb-3 -->
                             The whispers have reached you, drawing you into the shadowed heart of <span class="text-yellow-400 font-bold">Building 9</span>. Here, under the watchful eyes of your beloved <span class="text-blue-400 font-bold">EXCORs</span>, a different kind of lesson awaits.
                         </p>
-                        <p class="mb-4">
-                            <span class="text-red-500 font-bold">SRSI Mafia</span> is not merely a game; it is a showdown of trust and betrayal. Tonight, the lines blur between friend and foe, as secrets are kept, and lives are at stake.
+                        <p class="mb-3"> <!-- mb-4 to mb-3 -->
+                            <span class="text-red-500 font-bold">SRSI Mafia</span> is not merely a game; it is a showdown of <span class="text-green-400 font-bold">trust</span> and <span class="text-red-500 font-bold">betrayal</span>. Tonight, the lines blur between <span class="text-green-400 font-bold">friend</span> and <span class="text-red-500 font-bold">foe</span>, as <span class="text-purple-400 font-bold">secrets</span> are kept, and lives are at stake.
                         </p>
                         <p>
-                            Are you ready to uncover the truth, or will you become another victim of the night?
+                            Are you ready to uncover the <span class="text-green-400 font-bold">truth</span>, or will you become another <span class="text-red-500 font-bold">victim</span> of the night?
                         </p>
                     </div>
-                    <!-- NEW CREDIT LINE MOVED ABOVE BUTTON -->
-                    <p class="text-sm text-gray-500 mb-4">2025 EXCORS & Abdulelah AlHarbi</p> <!-- Changed mt-8 to mb-4 -->
-                    <!-- END NEW CREDIT LINE -->
-                    <button type="button" id="start-game-button" class="bg-red-700 hover:bg-red-800 text-white font-bold py-3 px-8 rounded-lg text-2xl animate-bounce-slow mt-4"> <!-- Added mt-4 -->
+                    <p class="text-sm text-gray-500 mb-4">2025 EXCORS & Abdulelah AlHarbi</p>
+                    <button type="button" id="start-game-button" class="bg-red-700 hover:bg-red-800 text-white font-bold py-2 px-6 rounded-lg text-xl animate-bounce-slow mt-4 md:text-2xl md:py-3 md:px-8"> <!-- py-3 px-8 to py-2 px-6, text-2xl to text-xl -->
                         Enter the Shadows
                     </button>
                 </div>
