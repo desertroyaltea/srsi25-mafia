@@ -140,7 +140,7 @@ exports.handler = async (event, context) => {
         return {
             statusCode: 200,
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ message: 'Kill action has been successfully logged.' }),
+            body: JSON.stringify({ message: 'Done!' }),
         };
 
     } catch (error) {

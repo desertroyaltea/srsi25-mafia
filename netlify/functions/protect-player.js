@@ -151,7 +151,7 @@ exports.handler = async (event, context) => {
         return {
             statusCode: 200,
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ message: 'Protection action(s) successfully logged and action marked as used.' }),
+            body: JSON.stringify({ message: 'Done!' }),
         };
 
     } catch (error) {

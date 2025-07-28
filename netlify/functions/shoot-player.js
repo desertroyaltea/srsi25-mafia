@@ -87,7 +87,7 @@ exports.handler = async (event, context) => {
         return {
             statusCode: 200,
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ message: 'Sheriff shot has been logged and confirmed.' }),
+            body: JSON.stringify({ message: 'Sheriff shot has been confirmed.' }),
         };
 
     } catch (error) {
