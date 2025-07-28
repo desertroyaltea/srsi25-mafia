@@ -34,7 +34,7 @@ exports.handler = async (event, context) => {
 
      const playersResponse = await sheets.spreadsheets.values.get({
          spreadsheetId: sheetId,
-         range: 'Players!A:Z', // Fetch all columns as per previous setup
+         range: 'Players!A:AA', // Fetch all columns as per previous setup
      });
 
      const allPlayersData = playersResponse.data.values || [];
