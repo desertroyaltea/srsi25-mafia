@@ -305,18 +305,19 @@ actionModal: ({ title, buttonText, targets, actionType }) => `
             `,
 
 // NEW OFF LIMITS PAGE TEMPLATE
-            offLimitsPage: () => `
-                <div class="bg-gray-900 p-5 rounded-lg mt-4 text-center">
+offLimitsPage: () => `
+                <div class="bg-gray-900 p-5 rounded-lg mt-4 text-center flex flex-col justify-center items-center min-h-[80vh]">
                     <h2 class="text-4xl font-bold text-yellow-500 mb-6">GAME PAUSED</h2>
                     <p class="text-xl text-gray-300 mb-4">
-                        These are dedicated mentorship and tutoring times.
-                        The game is currently PAUSED.
+                        The town's fate hangs in the balance, but for now, the whispers have calmed.
+                        All actions are suspended as you all gather your strengths.
+                        <br><span class="font-bold text-red-400">Nigh is the Time of the Sword and Axe.</span>
                     </p>
                     <p class="text-2xl font-bold text-yellow-300 mb-6">
-                        Please come back later to play!
+                        Return when the hour is right, for the game awaits your presence!
                     </p>
                     <p class="text-lg text-gray-400">
-                        Good luck :)
+                        We await yous.
                     </p>
                     <button type="button" id="logout-button" class="mt-8 bg-gray-600 hover:bg-gray-700 text-white font-bold py-3 px-6 rounded-lg w-full md:w-1/2 text-xl mx-auto block">
                         Logout
