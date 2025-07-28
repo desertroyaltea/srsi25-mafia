@@ -82,7 +82,17 @@ exports.handler = async (event, context) => {
         }
 
         // 2. Update the player's Welcome status to TRUE
-        const updateRange = `Players!${String.fromCharCode(65 + welcomeCol)}${playerRowIndex}`;
+ // CRITICAL FIX: Use a helper function to correctly convert column index to A1 notation letter
+        function getColumnLetter(colIndex) {
+            let letter = '';
+            while (colIndex >= 0) {
+                letter = String.fromCharCode(65 + (colIndex % 26)) + letter;
+                colIndex = Math.floor(colIndex / 26) - 1;
+            }
+            return letter;
+        }
+        const welcomeColumnLetter = getColumnLetter(welcomeCol);
+        const updateRange = `Players!${welcomeColumnLetter}${playerRowIndex}`;
         console.log(`update-player-welcome-status: Updating Welcome status for ${playerId} at range: ${updateRange}`);
         await sheets.spreadsheets.values.update({
             spreadsheetId: sheetId,
