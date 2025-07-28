@@ -91,6 +91,17 @@
             border: 1px solid #555555;
             color: #e2e8f0;
         }
+        @keyframes bounce-slow {
+            0%, 100% {
+                transform: translateY(0);
+            }
+            50% {
+                transform: translateY(-5px); /* Smaller bounce */
+            }
+        }
+        .animate-bounce-slow {
+            animation: bounce-slow 2s infinite; /* Slower animation */
+        }
     </style>
 </head>
 <body>
@@ -313,6 +324,27 @@ actionModal: ({ title, buttonText, targets, actionType }) => `
                 </div>
             `,
 
+// NEW WELCOME PAGE TEMPLATE
+            welcomePage: () => `
+                <div class="bg-gray-900 p-5 rounded-lg mt-4 text-center flex flex-col justify-center items-center min-h-[80vh]">
+                    <h2 class="text-4xl font-bold text-red-500 mb-6 animate-pulse">Welcome, Initiate.</h2>
+                    <div class="text-xl text-gray-300 mb-8 leading-relaxed max-w-2xl">
+                        <p class="mb-4">
+                            The whispers have reached you, drawing you into the shadowed heart of <span class="text-yellow-400 font-bold">Building 9</span>, nestled within the sprawling <span class="text-green-400 font-bold">KAUST Campus</span>. Here, under the watchful eyes of your <span class="text-blue-400 font-bold">EXCORs</span>, a different kind of lesson awaits.
+                        </p>
+                        <p class="mb-4">
+                            The <span class="text-red-500 font-bold">SRSI Mafia</span> is not merely a game; it is a crucible of trust and betrayal. Tonight, the lines blur between friend and foe, as secrets are kept, and lives are at stake.
+                        </p>
+                        <p>
+                            Are you ready to uncover the truth, or will you become another victim of the night?
+                        </p>
+                    </div>
+                    <button type="button" id="start-game-button" class="bg-red-700 hover:bg-red-800 text-white font-bold py-3 px-8 rounded-lg text-2xl animate-bounce-slow">
+                        Enter the Shadows
+                    </button>
+                </div>
+            `,
+
 
 // NEW TRIAL PAGE TEMPLATE
             trialPage: ({ trial }) => `
@@ -493,13 +525,15 @@ async function initializeGame(userId) {
             loadingOverlay.style.display = 'none'; // Hide loading after mission fetch
         }
 
-// Check if the current user is dead or if the game is off limits
+// Check if the current user is dead, if the game is off limits, or if they need to see the welcome message
     if (state.currentUser.Status && state.currentUser.Status.toLowerCase() === 'dead') {
         renderView('deadPage'); // Show the dead page
-    } else if (state.gameState?.CurrentPhase === 'Off') { // NEW: Check for 'Off' phase
+    } else if (state.gameState?.CurrentPhase === 'Off') {
         renderView('offLimitsPage'); // Show the off limits page
+    } else if (state.currentUser.Welcome !== 'TRUE') { // NEW: Check Welcome status
+        renderView('welcomePage'); // Show the welcome page
     } else {
-        // If alive and game is not off limits, render dashboard and fetch recap if it's Day
+        // If alive, game is not off limits, and welcome message seen, render dashboard and fetch recap if it's Day
         renderView('dashboard'); // Initial render of dashboard
         updateDashboardActions(state.gameState?.CurrentPhase || 'Day'); // Update actions based on phase
 
@@ -1320,7 +1354,30 @@ appRoot.addEventListener('click', async (e) => {
             } else {
                 showMessage('Missing trial ID or voting power to submit vote.');
             }
-        } else if (e.target.id === 'logout-button') { // Logout button (from dead page)
+        } else if (e.target.id === 'start-game-button') { // Handle "Start Game" button
+            loadingOverlay.style.display = 'flex';
+            try {
+                const response = await fetch('/.netlify/functions/update-player-welcome-status', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ playerId: state.currentUserId }),
+                });
+                if (response.ok) {
+                    showMessage("Welcome to the game!");
+                    state.currentUser.Welcome = 'TRUE'; // Update local state immediately
+                    await fetchPlayers(true); // Re-fetch players to ensure state is fresh
+                    await initializeGame(state.currentUserId); // Re-initialize to proceed to dashboard
+                } else {
+                    throw new Error(`Failed to update welcome status: ${response.statusText}`);
+                }
+            } catch (error) {
+                console.error("Error starting game:", error);
+                showMessage(`Failed to start game: ${error.message}`);
+                renderView('login'); // Fallback to login on error
+            } finally {
+                loadingOverlay.style.display = 'none';
+            }
+        } else if (e.target.id === 'logout-button') { // Logout button (from dead page and universal)
             localStorage.removeItem('mafiaGameUserId'); // Clear saved user ID
             state.currentUserId = null;
             state.currentUser = null;
@@ -1328,6 +1385,8 @@ appRoot.addEventListener('click', async (e) => {
             state.gameState = null;
             state.pendingAccusations = [];
             state.currentTrial = null;
+            state.currentMission = null; // Reset mission too
+            state.nightlyRecap = null; // Reset recap too
             renderView('login'); // Go back to login page
             showMessage('You have been logged out.');
         }
