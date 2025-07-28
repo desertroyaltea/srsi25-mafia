@@ -325,7 +325,6 @@ actionModal: ({ title, buttonText, targets, actionType }) => `
             `,
 
 // NEW WELCOME PAGE TEMPLATE
-// NEW WELCOME PAGE TEMPLATE
             welcomePage: () => `
                 <div class="bg-gray-900 p-5 rounded-lg mt-4 text-center flex flex-col justify-center items-center min-h-[80vh]">
                     <h2 class="text-4xl font-bold text-red-500 mb-6 animate-pulse">Welcome, Wanderer.</h2>
@@ -340,12 +339,12 @@ actionModal: ({ title, buttonText, targets, actionType }) => `
                             Are you ready to uncover the truth, or will you become another victim of the night?
                         </p>
                     </div>
-                    <button type="button" id="start-game-button" class="bg-red-700 hover:bg-red-800 text-white font-bold py-3 px-8 rounded-lg text-2xl animate-bounce-slow">
+                    <!-- NEW CREDIT LINE MOVED ABOVE BUTTON -->
+                    <p class="text-sm text-gray-500 mb-4">2025 EXCORS & Abdulelah AlHarbi</p> <!-- Changed mt-8 to mb-4 -->
+                    <!-- END NEW CREDIT LINE -->
+                    <button type="button" id="start-game-button" class="bg-red-700 hover:bg-red-800 text-white font-bold py-3 px-8 rounded-lg text-2xl animate-bounce-slow mt-4"> <!-- Added mt-4 -->
                         Enter the Shadows
                     </button>
-                    <!-- NEW CREDIT LINE -->
-                    <p class="text-sm text-gray-500 mt-8">2025 EXCORS & Abdulelah AlHarbi</p>
-                    <!-- END NEW CREDIT LINE -->
                 </div>
             `,
 
