@@ -497,48 +497,35 @@ async function handleLogin() {
     }
 
 async function initializeGame(userId) {
-        state.currentUserId = userId;
-        state.currentUser = state.allPlayers.find(p => p.PlayerID === userId);
-        if (!state.currentUser) {
-            localStorage.removeItem('mafiaGameUserId');
-            renderView('login');
-            document.getElementById('login-error').textContent = "Your player data seems outdated. Please log in again.";
-            return;
-        }
-        state.isCurrentUserAdmin = state.currentUser.IsAdmin === 'TRUE';
-        await fetchGameState();
+    state.currentUserId = userId;
+    state.currentUser = state.allPlayers.find(p => p.PlayerID === userId);
+    if (!state.currentUser) {
+        localStorage.removeItem('mafiaGameUserId');
+        renderView('login');
+        document.getElementById('login-error').textContent = "Your player data seems outdated. Please log in again.";
+        return;
+    }
+    state.isCurrentUserAdmin = state.currentUser.IsAdmin === 'TRUE';
+    await fetchGameState();
 
-        // NEW: Fetch current player's mission
-        loadingOverlay.style.display = 'flex'; // Show loading while fetching mission
-        try {
-            const missionResponse = await fetch(`/.netlify/functions/get-player-mission?playerId=${state.currentUserId}`);
-            if (missionResponse.ok) {
-                const missionResult = await missionResponse.json();
-                state.currentMission = missionResult.currentMission;
-            } else {
-                console.error("Error fetching player mission:", await missionResponse.text());
-                state.currentMission = null; // Ensure it's null on error
-            }
-        } catch (error) {
-            console.error("Error fetching player mission:", error);
-            state.currentMission = null;
-        } finally {
-            loadingOverlay.style.display = 'none'; // Hide loading after mission fetch
-        }
+    console.log(`initializeGame: Current User ID: ${state.currentUserId}`); // DEBUG LOG A
+    console.log(`initializeGame: Current User Object (after fetchGameState):`, state.currentUser); // DEBUG LOG B
+    console.log(`initializeGame: Current User Welcome Status (raw): '${state.currentUser.Welcome}' (Type: ${typeof state.currentUser.Welcome})`); // DEBUG LOG C
 
-// Check if the current user is dead, if the game is off limits, or if they need to see the welcome message
+    // Check if the current user is dead, if the game is off limits, or if they need to see the welcome message
+    // CRITICAL FIX: Convert Welcome status to string and then toUpperCase for consistent comparison
     if (state.currentUser.Status && state.currentUser.Status.toLowerCase() === 'dead') {
-        renderView('deadPage'); // Show the dead page
+        renderView('deadPage');
     } else if (state.gameState?.CurrentPhase === 'Off') {
-        renderView('offLimitsPage'); // Show the off limits page
-    } else if (state.currentUser.Welcome !== 'TRUE') { // NEW: Check Welcome status
-        renderView('welcomePage'); // Show the welcome page
+        renderView('offLimitsPage');
+    } else if (state.currentUser.Welcome && state.currentUser.Welcome.toString().toUpperCase() !== 'TRUE') { // Check if Welcome is NOT TRUE (case-insensitive)
+        console.log(`initializeGame: Welcome Status is NOT TRUE (case-insensitive). Showing Welcome Page.`); // DEBUG LOG D
+        renderView('welcomePage');
     } else {
-        // If alive, game is not off limits, and welcome message seen, render dashboard and fetch recap if it's Day
-        renderView('dashboard'); // Initial render of dashboard
-        updateDashboardActions(state.gameState?.CurrentPhase || 'Day'); // Update actions based on phase
+        console.log(`initializeGame: Welcome Status is TRUE (case-insensitive). Proceeding to Dashboard.`); // DEBUG LOG E
+        renderView('dashboard');
+        updateDashboardActions(state.gameState?.CurrentPhase || 'Day');
 
-        // Fetch nightly recap if it's Day phase
         if (state.gameState?.CurrentPhase === 'Day') {
             const previousDay = parseInt(state.gameState.CurrentDay) - 1;
             console.log(`initializeGame: It's DAY. Previous Day for recap: ${previousDay}`);
@@ -550,7 +537,6 @@ async function initializeGame(userId) {
                         const recapResult = await recapResponse.json();
                         state.nightlyRecap = recapResult.recapData;
                         console.log("initializeGame: Fetched Nightly Recap Data:", state.nightlyRecap);
-                        // Re-render the dashboard to display the recap
                         renderView('dashboard');
                         updateDashboardActions(state.gameState?.CurrentPhase || 'Day');
                     } else {
@@ -567,8 +553,8 @@ async function initializeGame(userId) {
                 console.log("initializeGame: Previous Day is 0, no recap for Day 1.");
             }
         }
-                }
-            }
+    }
+}
 
     function getPlayerNameById(playerId) {
         const player = state.allPlayers.find(p => p.PlayerID === playerId);
