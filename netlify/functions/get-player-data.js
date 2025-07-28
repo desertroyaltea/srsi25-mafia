@@ -3,75 +3,131 @@
 const { google } = require('googleapis');
 const { JWT } = require('google-auth-library');
 
-// Helper function to initialize Google Sheets API
 async function getSheetsService() {
- const credentials = JSON.parse(process.env.GOOGLE_SERVICE_ACCOUNT_CREDENTIALS);
- const auth = new JWT({
-     email: credentials.client_email,
-     key: credentials.private_key,
-     scopes: ['https://www.googleapis.com/auth/spreadsheets.readonly']
- });
- return google.sheets({ version: 'v4', auth });
+    const credentials = JSON.parse(process.env.GOOGLE_SERVICE_ACCOUNT_CREDENTIALS);
+    const auth = new JWT({
+        email: credentials.client_email,
+        key: credentials.private_key,
+        scopes: ['https://www.googleapis.com/auth/spreadsheets.readonly'] // Read-only scope
+    });
+    return google.sheets({ version: 'v4', auth });
 }
 
 exports.handler = async (event, context) => {
- console.log("get-player-data: Function started."); // DEBUG LOG O
- if (event.httpMethod !== 'GET') {
-     console.log("get-player-data: Method Not Allowed."); // DEBUG LOG P
-     return { statusCode: 405, body: 'Method Not Allowed' };
- }
+    console.log("get-player-data: Function started.");
+    if (event.httpMethod !== 'GET') {
+        console.log("get-player-data: Method Not Allowed.");
+        return { statusCode: 405, body: 'Method Not Allowed' };
+    }
 
- const sheetId = process.env.GOOGLE_SHEET_ID;
- if (!sheetId) {
-     console.error("get-player-data: Google Sheet ID is not configured."); // DEBUG LOG Q
-     return { statusCode: 500, body: JSON.stringify({ error: 'Server configuration error.' }) };
- }
- console.log(`get-player-data: Sheet ID: ${sheetId}`); // DEBUG LOG R
+    const sheetId = process.env.GOOGLE_SHEET_ID;
+    if (!sheetId) {
+        console.error("get-player-data: Google Sheet ID is not configured.");
+        return { statusCode: 500, body: JSON.stringify({ error: 'Server configuration error.' }) };
+    }
+    console.log(`get-player-data: Sheet ID: ${sheetId}`);
 
- try {
-     const sheets = await getSheetsService();
-     console.log("get-player-data: Sheets service initialized."); // DEBUG LOG S
+    const requestedPlayerId = event.queryStringParameters.playerId; // Check if a specific player ID is requested
+    console.log(`get-player-data: Requested Player ID: ${requestedPlayerId || 'None (fetching all public data)'}`);
 
-     const playersResponse = await sheets.spreadsheets.values.get({
-         spreadsheetId: sheetId,
-         range: 'Players!A:AA', // Fetch all columns as per previous setup
-     });
+    try {
+        const sheets = await getSheetsService();
+        console.log("get-player-data: Sheets service initialized.");
 
-     const allPlayersData = playersResponse.data.values || [];
-     console.log("get-player-data: Raw data fetched from sheet:", JSON.stringify(allPlayersData)); // DEBUG LOG T
+        const playersResponse = await sheets.spreadsheets.values.get({
+            spreadsheetId: sheetId,
+            range: 'Players!A:AA', // Fetch all columns up to AA (Welcome)
+        });
 
-     if (allPlayersData.length < 1) {
-         console.log("get-player-data: Players sheet is empty."); // DEBUG LOG U
-         return { statusCode: 200, body: JSON.stringify([]) };
-     }
+        const allPlayersRawData = playersResponse.data.values || [];
+        if (allPlayersRawData.length < 1) {
+            console.log("get-player-data: Players sheet is empty.");
+            return { statusCode: 200, body: JSON.stringify([]) };
+        }
 
-     const headers = allPlayersData[0];
-     const playerRows = allPlayersData.slice(1);
+        const headers = allPlayersRawData[0];
+        const playerRows = allPlayersRawData.slice(1);
 
-     const players = [];
-     for (const row of playerRows) {
-         const player = {};
-         for (let i = 0; i < headers.length; i++) {
-             // Ensure all values are converted to string for consistent comparison in frontend
-             player[headers[i]] = row[i] !== undefined && row[i] !== null ? String(row[i]) : '';
-         }
-         players.push(player);
-     }
-     console.log("get-player-data: Parsed player data sent to frontend:", JSON.stringify(players)); // DEBUG LOG V
+        const idCol = headers.indexOf('PlayerID');
+        if (idCol === -1) {
+            console.error("get-player-data: 'PlayerID' column not found in Players sheet headers.");
+            throw new Error("Required column 'PlayerID' not found in Players sheet.");
+        }
 
-     return {
-         statusCode: 200,
-         headers: { 'Content-Type': 'application/json' },
-         body: JSON.stringify(players),
-     };
+        const publicPlayerFields = ['PlayerID', 'Name', 'Status', 'IsAdmin']; // Fields always sent publicly
+        const sensitivePlayerFields = [ // Fields only sent for the requested player
+            'Passcode', 'Role', 'CurrentVotingPower', 'MissionsCompleted',
+            'MafiaCanConvert', 'MafiaCanRevealSelf', 'VillagerCanIncreaseVote',
+            'VillagerCanChangeRole', 'DoctorCanSaveMore', 'DoctorCanRevive',
+            'DoctorCanRevealSelf', 'DetectiveCanRevealSelf', 'DoctorSavesRemaining',
+            'SheriffShotUsed', 'IsJuryMember', 'OriginalRole', 'MainUsed',
+            'InvestigationHistory', 'Jury', 'RevealedTeammates', 'NightVoteUsed', 'IsProtected', 'Welcome'
+        ];
 
- } catch (error) {
-     console.error('get-player-data: Error in try-catch block:', error); // DEBUG LOG W
-     return {
-         statusCode: 500,
-         body: JSON.stringify({ error: 'Failed to fetch player data.', details: error.message }),
-     };
- } finally {
-     console.log("get-player-data: Function finished."); // DEBUG LOG X
- }
+        const allPlayers = [];
+        let requestedPlayerData = null;
+
+        for (const row of playerRows) {
+            const player = {};
+            const currentPlayerId = row[idCol];
+
+            // Populate public fields for all players
+            for (const field of publicPlayerFields) {
+                const colIndex = headers.indexOf(field);
+                if (colIndex !== -1) {
+                    player[field] = row[colIndex] !== undefined && row[colIndex] !== null ? String(row[colIndex]) : '';
+                } else {
+                    console.warn(`get-player-data: Public field '${field}' not found in headers.`);
+                    player[field] = ''; // Default empty if not found
+                }
+            }
+
+            // If a specific player is requested, fill in their sensitive data
+            if (requestedPlayerId && currentPlayerId === requestedPlayerId) {
+                for (const field of sensitivePlayerFields) {
+                    const colIndex = headers.indexOf(field);
+                    if (colIndex !== -1) {
+                        player[field] = row[colIndex] !== undefined && row[colIndex] !== null ? String(row[colIndex]) : '';
+                    } else {
+                        console.warn(`get-player-data: Sensitive field '${field}' not found in headers for ${requestedPlayerId}.`);
+                        player[field] = ''; // Default empty if not found
+                    }
+                }
+                requestedPlayerData = player; // Store the full data for the requested player
+            }
+            allPlayers.push(player);
+        }
+
+        if (requestedPlayerId) {
+            // If a specific player was requested, return only their full data
+            if (requestedPlayerData) {
+                console.log(`get-player-data: Returning full data for requested player: ${requestedPlayerId}`);
+                return {
+                    statusCode: 200,
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(requestedPlayerData),
+                };
+            } else {
+                console.log(`get-player-data: Requested player ${requestedPlayerId} not found.`);
+                return { statusCode: 404, body: JSON.stringify({ error: 'Player not found.' }) };
+            }
+        } else {
+            // If no specific player was requested, return public data for all players
+            console.log(`get-player-data: Returning public data for ${allPlayers.length} players.`);
+            return {
+                statusCode: 200,
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(allPlayers),
+            };
+        }
+
+    } catch (error) {
+        console.error('get-player-data: Error in try-catch block:', error);
+        return {
+            statusCode: 500,
+            body: JSON.stringify({ error: 'Failed to fetch player data.', details: error.message }),
+        };
+    } finally {
+        console.log("get-player-data: Function finished.");
+    }
 };

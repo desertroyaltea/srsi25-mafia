@@ -14,92 +14,122 @@ async function getSheetsService() {
 }
 
 exports.handler = async (event, context) => {
+    console.log("submit-jury-vote: Function started.");
     if (event.httpMethod !== 'POST') {
+        console.log("submit-jury-vote: Method Not Allowed.");
         return { statusCode: 405, body: 'Method Not Allowed' };
     }
 
     const sheetId = process.env.GOOGLE_SHEET_ID;
     if (!sheetId) {
+        console.error("submit-jury-vote: Google Sheet ID is not configured.");
         return { statusCode: 500, body: JSON.stringify({ error: 'Server configuration error.' }) };
     }
+    console.log(`submit-jury-vote: Sheet ID: ${sheetId}`);
 
     try {
-        // CRITICAL CHANGE: Receive voteType and votingPower
         const { voterPlayerId, trialId, voteType, votingPower } = JSON.parse(event.body);
+        console.log(`submit-jury-vote: Received vote - Voter: ${voterPlayerId}, Trial: ${trialId}, Type: ${voteType}, Power: ${votingPower}`);
 
         if (!voterPlayerId || !trialId || !voteType || votingPower === undefined) {
+            console.log("submit-jury-vote: Missing required vote parameters.");
             return { statusCode: 400, body: JSON.stringify({ error: 'Missing voterPlayerId, trialId, voteType, or votingPower.' }) };
         }
         if (voteType !== 'GUILTY' && voteType !== 'NOTGUILTY') {
+            console.log("submit-jury-vote: Invalid voteType.");
             return { statusCode: 400, body: JSON.stringify({ error: 'Invalid voteType. Must be GUILTY or NOTGUILTY.' }) };
         }
         const parsedVotingPower = parseInt(votingPower);
         if (isNaN(parsedVotingPower) || parsedVotingPower <= 0) {
+            console.log("submit-jury-vote: Invalid votingPower.");
             return { statusCode: 400, body: JSON.stringify({ error: 'Invalid votingPower. Must be a positive number.' }) };
         }
+        console.log(`submit-jury-vote: Parsed voting power: ${parsedVotingPower}`);
 
         const sheets = await getSheetsService();
+        console.log("submit-jury-vote: Sheets service initialized.");
 
-        // 1. Find the voter in the Players sheet and set their Jury status to FALSE
-        // This logic is for when a player is *done* voting for the current trial.
-        // If they need to vote on *multiple* trials, setting IsJuryMember to FALSE here
-        // would prevent them from voting on subsequent trials.
-        // Let's keep it for now as it was, but note this might need adjustment if IsJuryMember
-        // is meant to control eligibility for *all* trials in a phase.
-const playersResponse = await sheets.spreadsheets.values.get({ spreadsheetId: sheetId, range: 'Players!A:Z' });
-        const playerHeaders = playersResponse.data.values[0];
-        const players = playersResponse.data.values.slice(1);
-        const playerIdCol = playerHeaders.indexOf('PlayerID');
-        const juryCol = playerHeaders.indexOf('IsJuryMember'); // Assuming this is the column name
+        // 1. Fetch player data to validate voter status (alive, not admin)
+        const playersResponse = await sheets.spreadsheets.values.get({
+            spreadsheetId: sheetId,
+            range: 'Players!A:S', // Fetch up to IsAdmin column (S)
+        });
+        const playersData = playersResponse.data.values || [];
+        if (playersData.length < 1) {
+            console.error("submit-jury-vote: Players sheet is empty for voter validation.");
+            return { statusCode: 500, body: JSON.stringify({ error: 'Players sheet is empty.' }) };
+        }
+        const playerHeaders = playersData[0];
+        const playerRows = playersData.slice(1);
 
-        const playerRowIndex = players.findIndex(p => p[playerIdCol] === voterPlayerId) + 2; // +2 for 1-based index and header
-        if (playerRowIndex > 1 && juryCol !== -1) { // Ensure juryCol exists
-            await sheets.spreadsheets.values.update({
-                spreadsheetId: sheetId,
-                range: `Players!${String.fromCharCode(65 + juryCol)}${playerRowIndex}`,
-                valueInputOption: 'USER_ENTERED',
-                resource: { values: [['FALSE']] }, // Set to FALSE after voting
-            });
-            console.log(`submit-jury-vote: Player ${voterPlayerId} IsJuryMember set to FALSE.`);
-        } else if (juryCol === -1) {
-            console.warn("submit-jury-vote: 'IsJuryMember' column not found in Players sheet. Skipping update.");
+        const idColPlayers = playerHeaders.indexOf('PlayerID');
+        const statusColPlayers = playerHeaders.indexOf('Status');
+        const isAdminColPlayers = playerHeaders.indexOf('IsAdmin');
+
+        if ([idColPlayers, statusColPlayers, isAdminColPlayers].includes(-1)) {
+            console.error("submit-jury-vote: Required columns 'PlayerID', 'Status', or 'IsAdmin' not found in Players sheet.");
+            throw new Error("Required columns 'PlayerID', 'Status', or 'IsAdmin' not found in Players sheet.");
         }
 
+        let voterStatus = '';
+        let voterIsAdmin = 'FALSE';
+        for (const row of playerRows) {
+            if (row[idColPlayers] === voterPlayerId) {
+                voterStatus = row[statusColPlayers] || '';
+                voterIsAdmin = row[isAdminColPlayers] || 'FALSE';
+                break;
+            }
+        }
+        console.log(`submit-jury-vote: Voter ${voterPlayerId} Status: ${voterStatus}, IsAdmin: ${voterIsAdmin}`);
+
+        if (voterStatus.toLowerCase() !== 'alive') {
+            console.log("submit-jury-vote: Voter is not alive.");
+            return { statusCode: 403, body: JSON.stringify({ error: 'Only alive players can vote.' }) };
+        }
+        if (voterIsAdmin === 'TRUE') {
+            console.log("submit-jury-vote: Admin player cannot vote.");
+            return { statusCode: 403, body: JSON.stringify({ error: 'Admin players cannot vote in trials.' }) };
+        }
 
 
         // 2. Find the trial and increment the vote count
+        console.log("submit-jury-vote: Fetching all trials from 'Trials!A:Z'.");
         const trialsResponse = await sheets.spreadsheets.values.get({ spreadsheetId: sheetId, range: 'Trials!A:Z' });
         const trialHeaders = trialsResponse.data.values[0];
         const trials = trialsResponse.data.values.slice(1);
-const trialIdCol = trialHeaders.indexOf('TrialID');
-        const guiltyCol = 7; // Assuming GUILTY is always column H (0-indexed)
-        const notGuiltyCol = 8; // Assuming NOTGUILTY is always column I (0-indexed) // This should be column 8 (I) if hardcoded in get-current-trial
+        console.log("submit-jury-vote: Trial Headers:", trialHeaders);
+        console.log(`submit-jury-vote: Processing ${trials.length} trial data rows.`);
 
-        // Ensure columns exist
- // Removed guiltyCol and notGuiltyCol from the -1 check as their indices are now hardcoded.
-        if ([trialIdCol].includes(-1)) {
+        const trialIdCol = trialHeaders.indexOf('TrialID');
+        const guiltyCol = trialHeaders.indexOf('GUILTY');
+        const notGuiltyCol = trialHeaders.indexOf('NOTGUILTY');
+
+        if ([trialIdCol, guiltyCol, notGuiltyCol].includes(-1)) {
             throw new Error('One or more required columns (TrialID, GUILTY, NOTGUILTY) not found in Trials sheet.');
         }
 
         const trialRowIndex = trials.findIndex(t => t[trialIdCol] === trialId) + 2;
+        console.log(`submit-jury-vote: Found trial at row index ${trialRowIndex} for TrialID ${trialId}.`);
+
         if (trialRowIndex > 1) {
             const voteCol = voteType === 'GUILTY' ? guiltyCol : notGuiltyCol;
-            // CRITICAL CHANGE: Use parsedVotingPower
-            const currentVoteCount = parseInt(trials[trialRowIndex - 2][voteCol] || 0); // Get existing value
-            const newVoteCount = currentVoteCount + parsedVotingPower; // Add voting power
+            const currentVoteCount = parseInt(trials[trialRowIndex - 2][voteCol] || 0);
+            const newVoteCount = currentVoteCount + parsedVotingPower;
 
             await sheets.spreadsheets.values.update({
                 spreadsheetId: sheetId,
                 range: `Trials!${String.fromCharCode(65 + voteCol)}${trialRowIndex}`,
                 valueInputOption: 'USER_ENTERED',
-                resource: { values: [[newVoteCount]] }, // Update with new sum
+                resource: { values: [[newVoteCount]] },
             });
             console.log(`submit-jury-vote: Trial ${trialId} ${voteType} count updated by ${parsedVotingPower}. New count: ${newVoteCount}`);
         } else {
+            console.log(`submit-jury-vote: Trial with ID ${trialId} not found or index invalid.`);
             throw new Error(`Trial with ID ${trialId} not found.`);
         }
 
-        // --- NEW: Record individual vote in Trial_Votes sheet ---
+        // --- Record individual vote in Trial_Votes sheet ---
+        console.log("submit-jury-vote: Appending vote to Trial_Votes sheet.");
         const voteId = `VOTE_${Date.now()}_${voterPlayerId}`;
         const voteTimestamp = new Date().toISOString();
         const voteValues = [
@@ -107,17 +137,16 @@ const trialIdCol = trialHeaders.indexOf('TrialID');
             trialId,
             voterPlayerId,
             voteType,
-            parsedVotingPower, // Use parsedVotingPower here
+            parsedVotingPower,
             voteTimestamp
         ];
-        console.log(`submit-jury-vote: Appending new vote ${voteId} to Trial_Votes sheet.`);
         await sheets.spreadsheets.values.append({
             spreadsheetId: sheetId,
-            range: 'Trial_Votes!A:F', // Assuming your Trial_Votes sheet has columns A to F
+            range: 'Trial_Votes!A:F',
             valueInputOption: 'USER_ENTERED',
             resource: { values: [voteValues] },
         });
-        // --- END NEW: Record individual vote ---
+        console.log(`submit-jury-vote: Vote ${voteId} appended to Trial_Votes sheet.`);
 
         return {
             statusCode: 200,
@@ -126,10 +155,12 @@ const trialIdCol = trialHeaders.indexOf('TrialID');
         };
 
     } catch (error) {
-        console.error('Error in submit-jury-vote function:', error);
+        console.error('submit-jury-vote: Error in try-catch block:', error);
         return {
             statusCode: 500,
             body: JSON.stringify({ error: 'Failed to submit vote.', details: error.message }),
         };
+    } finally {
+        console.log("submit-jury-vote: Function finished.");
     }
 };

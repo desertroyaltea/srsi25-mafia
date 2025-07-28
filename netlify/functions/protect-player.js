@@ -29,7 +29,6 @@ exports.handler = async (event, context) => {
 
     try {
         const { doctorPlayerId, targetPlayerId1, targetPlayerId2, doctorCanSaveMoreUsed } = JSON.parse(event.body);
-        // CRITICAL FIX: Log targetPlayerId1 and targetPlayerId2 correctly
         console.log(`protect-player: Received - Doctor: ${doctorPlayerId}, Target 1: ${targetPlayerId1}, Target 2: ${targetPlayerId2 || 'N/A'}, CanSaveMoreUsed: ${doctorCanSaveMoreUsed}`);
         
         if (!doctorPlayerId || !targetPlayerId1 || (doctorCanSaveMoreUsed && !targetPlayerId2)) {
@@ -40,11 +39,11 @@ exports.handler = async (event, context) => {
         const sheets = await getSheetsService();
         console.log("protect-player: Sheets service initialized.");
 
-        // 1. Check if the player has already used their action and get ability status
-        console.log("protect-player: Fetching Players sheet for action usage check and ability status.");
+        // 1. Fetch player data to check role, action usage, and ability status
+        console.log("protect-player: Fetching Players sheet for validation.");
         const playersResponse = await sheets.spreadsheets.values.get({
             spreadsheetId: sheetId,
-            range: 'Players!A:Z', // Fetch all columns to ensure 'MainUsed' and 'DoctorCanSaveMore' are found
+            range: 'Players!A:Z', // Fetch all columns for server-side validation
         });
         const playersData = playersResponse.data.values || [];
         if (playersData.length < 1) {
@@ -53,42 +52,106 @@ exports.handler = async (event, context) => {
         }
         const playerHeaders = playersData[0];
         const playerRows = playersData.slice(1);
+
         const idCol = playerHeaders.indexOf('PlayerID');
+        const roleCol = playerHeaders.indexOf('Role'); // Needed for role validation
+        const statusCol = playerHeaders.indexOf('Status'); // Needed for status validation
         const mainUsedCol = playerHeaders.indexOf('MainUsed');
         const doctorCanSaveMoreCol = playerHeaders.indexOf('DoctorCanSaveMore');
+        const isAdminCol = playerHeaders.indexOf('IsAdmin'); // Needed for admin exemption
 
-        console.log(`protect-player: PlayerID column index: ${idCol}, MainUsed column index: ${mainUsedCol}, DoctorCanSaveMore index: ${doctorCanSaveMoreCol}`);
-
-        if (idCol === -1 || mainUsedCol === -1 || doctorCanSaveMoreCol === -1) {
-            console.error("protect-player: Required columns 'PlayerID', 'MainUsed', or 'DoctorCanSaveMore' not found in Players sheet.");
-            throw new Error("Required columns 'PlayerID', 'MainUsed', or 'DoctorCanSaveMore' not found in Players sheet.");
+        if ([idCol, roleCol, statusCol, mainUsedCol, doctorCanSaveMoreCol, isAdminCol].includes(-1)) {
+            console.error("protect-player: One or more required columns not found in Players sheet.");
+            throw new Error("Required columns (PlayerID, Role, Status, MainUsed, DoctorCanSaveMore, IsAdmin) not found in Players sheet.");
         }
 
         let doctorPlayerRowIndex = -1;
         let doctorMainUsedStatus = 'FALSE';
         let doctorCanSaveMoreStatus = 'FALSE';
-        for(let i = 0; i < playerRows.length; i++) {
-            if(playerRows[i][idCol] === doctorPlayerId) {
-                doctorPlayerRowIndex = i + 2;
-                doctorMainUsedStatus = playerRows[i][mainUsedCol] || 'FALSE';
-                doctorCanSaveMoreStatus = playerRows[i][doctorCanSaveMoreCol] || 'FALSE'; // Get actual status
-                break;
-            }
-        }
-        console.log(`protect-player: Doctor ${doctorPlayerId} found at row ${doctorPlayerRowIndex}. MainUsed status: ${doctorMainUsedStatus}, DoctorCanSaveMore status: ${doctorCanSaveMoreStatus}`);
+        let doctorRole = '';
+        let doctorIsAdmin = 'FALSE';
 
-        if (doctorPlayerRowIndex === -1) {
+        let target1Status = '';
+        let target1IsAdmin = 'FALSE';
+        let target2Status = '';
+        let target2IsAdmin = 'FALSE';
+
+        // Map players for efficient lookup
+        const playerMap = new Map(); // Map<PlayerID, {data: row, index: i+2}>
+        for(let i = 0; i < playerRows.length; i++) {
+            const row = playerRows[i];
+            playerMap.set(row[idCol], {data: row, index: i + 2});
+        }
+
+        // Validate Doctor
+        const doctorInfo = playerMap.get(doctorPlayerId);
+        if (!doctorInfo) {
             console.log("protect-player: Doctor player not found in sheet.");
             return { statusCode: 404, body: JSON.stringify({ error: 'Doctor player not found.' }) };
+        }
+        doctorPlayerRowIndex = doctorInfo.index;
+        doctorMainUsedStatus = doctorInfo.data[mainUsedCol] || 'FALSE';
+        doctorCanSaveMoreStatus = doctorInfo.data[doctorCanSaveMoreCol] || 'FALSE';
+        doctorRole = doctorInfo.data[roleCol];
+        doctorIsAdmin = doctorInfo.data[isAdminCol] || 'FALSE';
+
+        console.log(`protect-player: Doctor ${doctorPlayerId} found. Role: ${doctorRole}, MainUsed: ${doctorMainUsedStatus}, CanSaveMore: ${doctorCanSaveMoreStatus}, IsAdmin: ${doctorIsAdmin}`);
+
+        if (doctorRole.toLowerCase() !== 'doctor') {
+            console.log("protect-player: Player is not a Doctor.");
+            return { statusCode: 403, body: JSON.stringify({ error: 'Only Doctors can use this ability.' }) };
         }
         if (doctorMainUsedStatus === 'TRUE') {
             console.log("protect-player: Doctor has already used action for tonight.");
             return { statusCode: 403, body: JSON.stringify({ error: 'You have already used your action for tonight.' }) };
         }
-        // Frontend should handle this check, but backend can double-check for robustness
         if (doctorCanSaveMoreUsed && doctorCanSaveMoreStatus !== 'TRUE') {
             console.log("protect-player: Doctor tried to save more but does not have the ability.");
             return { statusCode: 403, body: JSON.stringify({ error: 'You do not have the ability to save more players.' }) };
+        }
+        if (doctorIsAdmin === 'TRUE') { // Admin exemption for performing actions
+            console.log("protect-player: Admin player cannot perform Doctor actions.");
+            return { statusCode: 403, body: JSON.stringify({ error: 'Admin players cannot perform game actions.' }) };
+        }
+
+        // Validate Target 1
+        const target1Info = playerMap.get(targetPlayerId1);
+        if (!target1Info) {
+            console.log("protect-player: Target 1 player not found in sheet.");
+            return { statusCode: 404, body: JSON.stringify({ error: 'Target 1 player not found.' }) };
+        }
+        target1Status = target1Info.data[statusCol] || '';
+        target1IsAdmin = target1Info.data[isAdminCol] || 'FALSE';
+        if (target1Status.toLowerCase() !== 'alive') {
+            console.log(`protect-player: Target 1 (${targetPlayerId1}) is not alive.`);
+            return { statusCode: 400, body: JSON.stringify({ error: `Target 1 (${targetPlayerId1}) is not alive.` }) };
+        }
+        if (target1IsAdmin === 'TRUE') {
+            console.log(`protect-player: Target 1 (${targetPlayerId1}) is an Admin and cannot be targeted.`);
+            return { statusCode: 403, body: JSON.stringify({ error: `Target 1 (${targetPlayerId1}) is an Admin and cannot be targeted.` }) };
+        }
+
+        // Validate Target 2 (if applicable)
+        if (doctorCanSaveMoreUsed && targetPlayerId2) {
+            const target2Info = playerMap.get(targetPlayerId2);
+            if (!target2Info) {
+                console.log("protect-player: Target 2 player not found in sheet.");
+                return { statusCode: 404, body: JSON.stringify({ error: 'Target 2 player not found.' }) };
+            }
+            target2Status = target2Info.data[statusCol] || '';
+            target2IsAdmin = target2Info.data[isAdminCol] || 'FALSE';
+            if (target2Status.toLowerCase() !== 'alive') {
+                console.log(`protect-player: Target 2 (${targetPlayerId2}) is not alive.`);
+                return { statusCode: 400, body: JSON.stringify({ error: `Target 2 (${targetPlayerId2}) is not alive.` }) };
+            }
+            if (target2IsAdmin === 'TRUE') {
+                console.log(`protect-player: Target 2 (${targetPlayerId2}) is an Admin and cannot be targeted.`);
+                return { statusCode: 403, body: JSON.stringify({ error: `Target 2 (${targetPlayerId2}) is an Admin and cannot be targeted.` }) };
+            }
+            if (targetPlayerId1 === targetPlayerId2) {
+                console.log("protect-player: Both targets are the same.");
+                return { statusCode: 400, body: JSON.stringify({ error: 'You must select two different players to protect.' }) };
+            }
         }
 
 
@@ -151,7 +214,7 @@ exports.handler = async (event, context) => {
         return {
             statusCode: 200,
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ message: 'Done!' }),
+            body: JSON.stringify({ message: 'Protection action(s) successfully logged and action marked as used.' }),
         };
 
     } catch (error) {

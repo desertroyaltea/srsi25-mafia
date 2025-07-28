@@ -38,11 +38,11 @@ exports.handler = async (event, context) => {
         const sheets = await getSheetsService();
         console.log("kill-player: Sheets service initialized.");
 
-        // 1. Fetch all player data to check action usage and update MainUsed
-        console.log("kill-player: Fetching Players sheet for action usage check.");
+        // 1. Fetch all player data to check role, action usage, and target validity
+        console.log("kill-player: Fetching Players sheet for validation.");
         const playersResponse = await sheets.spreadsheets.values.get({
             spreadsheetId: sheetId,
-            range: 'Players!A:Z', // Fetch all columns to ensure 'MainUsed' and 'Role' are found
+            range: 'Players!A:Z', // Fetch all columns for server-side validation
         });
         const playersData = playersResponse.data.values || [];
         if (playersData.length < 1) {
@@ -50,46 +50,91 @@ exports.handler = async (event, context) => {
             return { statusCode: 500, body: JSON.stringify({ error: 'Players sheet is empty.' }) };
         }
         const playerHeaders = playersData[0];
-        const playerRows = playersData.slice(1); // Actual player data rows
+        const playerRows = playersData.slice(1);
 
         const idCol = playerHeaders.indexOf('PlayerID');
-        const roleCol = playerHeaders.indexOf('Role'); // Needed for other checks
-        const mainUsedCol = 20; // Explicitly set to column U (0-indexed) as requested
+        const roleCol = playerHeaders.indexOf('Role');
+        const statusCol = playerHeaders.indexOf('Status');
+        const mainUsedCol = 20; // Explicitly set to column U (0-indexed)
+        const isAdminCol = playerHeaders.indexOf('IsAdmin'); // Needed for admin exemption
 
-        console.log(`kill-player: PlayerID index: ${idCol}, Role index: ${roleCol}, MainUsed index (hardcoded): ${mainUsedCol}`);
-
-        // Ensure critical dynamic columns are found
-        if (idCol === -1 || roleCol === -1) {
-            console.error("kill-player: Required columns 'PlayerID' or 'Role' not found in Players sheet.");
-            throw new Error("Required columns 'PlayerID' or 'Role' not found in Players sheet.");
+        if (idCol === -1 || roleCol === -1 || statusCol === -1 || isAdminCol === -1) {
+            console.error("kill-player: Required columns 'PlayerID', 'Role', 'Status', or 'IsAdmin' not found in Players sheet.");
+            throw new Error("Required columns 'PlayerID', 'Role', 'Status', or 'IsAdmin' not found in Players sheet.");
         }
-        // No need to check mainUsedCol here as it's hardcoded.
+        // mainUsedCol is hardcoded, so no need to check its indexOf result here.
 
-        // Find the Mafia player's row index and check their MainUsed status
-        let mafiaPlayerRowIndex = -1;
-        let mafiaMainUsedStatus = 'FALSE';
+        // Map players for efficient lookup
+        const playerMap = new Map(); // Map<PlayerID, {data: row, index: i+2}>
         for(let i = 0; i < playerRows.length; i++) {
-            if(playerRows[i][idCol] === mafiaPlayerId) {
-                mafiaPlayerRowIndex = i + 2; // +2 for 0-index and header row
-                // Ensure mainUsedCol is within bounds of the fetched row
-                if (mainUsedCol < playerRows[i].length) {
-                    mafiaMainUsedStatus = playerRows[i][mainUsedCol] || 'FALSE';
-                } else {
-                    console.warn(`kill-player: MainUsed column index ${mainUsedCol} is out of bounds for player row ${i}. Defaulting MainUsed status to FALSE.`);
-                }
-                break;
-            }
+            const row = playerRows[i];
+            playerMap.set(row[idCol], {data: row, index: i + 2});
         }
-        console.log(`kill-player: Mafia player ${mafiaPlayerId} found at row ${mafiaPlayerRowIndex}. MainUsed status: ${mafiaMainUsedStatus}`);
 
-        if (mafiaPlayerRowIndex === -1) {
+        // Validate Mafia player
+        const mafiaInfo = playerMap.get(mafiaPlayerId);
+        if (!mafiaInfo) {
             console.log("kill-player: Mafia player not found in sheet.");
             return { statusCode: 404, body: JSON.stringify({ error: 'Mafia player not found.' }) };
+        }
+        const mafiaPlayerRowIndex = mafiaInfo.index;
+        const mafiaMainUsedStatus = (mainUsedCol < mafiaInfo.data.length ? mafiaInfo.data[mainUsedCol] : '') || 'FALSE';
+        const mafiaRole = mafiaInfo.data[roleCol];
+        const mafiaIsAdmin = mafiaInfo.data[isAdminCol] || 'FALSE';
+
+        console.log(`kill-player: Mafia player ${mafiaPlayerId} found. Role: ${mafiaRole}, MainUsed: ${mafiaMainUsedStatus}, IsAdmin: ${mafiaIsAdmin}`);
+
+        if (mafiaRole.toLowerCase() !== 'mafia') {
+            console.log("kill-player: Player is not Mafia.");
+            return { statusCode: 403, body: JSON.stringify({ error: 'Only Mafia can use this ability.' }) };
         }
         if (mafiaMainUsedStatus === 'TRUE') {
             console.log("kill-player: Mafia has already used action for tonight.");
             return { statusCode: 403, body: JSON.stringify({ error: 'You have already used your action for tonight.' }) };
         }
+        if (mafiaIsAdmin === 'TRUE') { // Admin exemption for performing actions
+            console.log("kill-player: Admin player cannot perform Mafia actions.");
+            return { statusCode: 403, body: JSON.stringify({ error: 'Admin players cannot perform game actions.' }) };
+        }
+
+        // Validate Target 1
+        const target1Info = playerMap.get(targetPlayerId1);
+        if (!target1Info) {
+            console.log("kill-player: Target 1 player not found in sheet.");
+            return { statusCode: 404, body: JSON.stringify({ error: 'Target 1 player not found.' }) };
+        }
+        const target1Status = target1Info.data[statusCol] || '';
+        const target1IsAdmin = target1Info.data[isAdminCol] || 'FALSE';
+        if (target1Status.toLowerCase() !== 'alive') {
+            console.log(`kill-player: Target 1 (${targetPlayerId1}) is not alive.`);
+            return { statusCode: 400, body: JSON.stringify({ error: `Target 1 (${targetPlayerId1}) is not alive.` }) };
+        }
+        if (target1IsAdmin === 'TRUE') { // Admin exemption for targets
+            console.log(`kill-player: Target 1 (${targetPlayerId1}) is an Admin and cannot be targeted.`);
+            return { statusCode: 403, body: JSON.stringify({ error: `Target 1 (${targetPlayerId1}) is an Admin and cannot be targeted.` }) };
+        }
+
+        // Validate Target 2
+        const target2Info = playerMap.get(targetPlayerId2);
+        if (!target2Info) {
+            console.log("kill-player: Target 2 player not found in sheet.");
+            return { statusCode: 404, body: JSON.stringify({ error: 'Target 2 player not found.' }) };
+        }
+        const target2Status = target2Info.data[statusCol] || '';
+        const target2IsAdmin = target2Info.data[isAdminCol] || 'FALSE';
+        if (target2Status.toLowerCase() !== 'alive') {
+            console.log(`kill-player: Target 2 (${targetPlayerId2}) is not alive.`);
+            return { statusCode: 400, body: JSON.stringify({ error: `Target 2 (${targetPlayerId2}) is not alive.` }) };
+        }
+        if (target2IsAdmin === 'TRUE') { // Admin exemption for targets
+            console.log(`kill-player: Target 2 (${targetPlayerId2}) is an Admin and cannot be targeted.`);
+            return { statusCode: 403, body: JSON.stringify({ error: `Target 2 (${targetPlayerId2}) is an Admin and cannot be targeted.` }) };
+        }
+        if (targetPlayerId1 === targetPlayerId2) {
+            console.log("kill-player: Both targets are the same.");
+            return { statusCode: 400, body: JSON.stringify({ error: 'You must select two different players to kill.' }) };
+        }
+
 
         // 2. Get current day
         console.log("kill-player: Fetching current day from Game_State sheet.");
@@ -102,29 +147,21 @@ exports.handler = async (event, context) => {
 
         // 3. Log the action (two separate entries)
         const timestamp = new Date().toISOString();
-        const actionId1 = `ACT_KILL_${Date.now()}_1`;
-        const actionId2 = `ACT_KILL_${Date.now()}_2`;
+        const actionsToLog = [];
 
-        const newActionRow1 = [actionId1, currentDay, mafiaPlayerId, targetPlayerId1, timestamp, null, 'Logged'];
-        const newActionRow2 = [actionId2, currentDay, mafiaPlayerId, targetPlayerId2, timestamp, null, 'Logged'];
+        actionsToLog.push([`ACT_KILL_${Date.now()}_1`, currentDay, mafiaPlayerId, targetPlayerId1, timestamp, null, 'Logged']);
+        console.log(`kill-player: Appending action for Target 1 (${targetPlayerId1}) to Actions_Mafia sheet.`);
 
-        console.log("kill-player: Appending action for Target 1 to Actions_Mafia sheet.");
+        actionsToLog.push([`ACT_KILL_${Date.now()}_2`, currentDay, mafiaPlayerId, targetPlayerId2, timestamp, null, 'Logged']);
+        console.log(`kill-player: Appending action for Target 2 (${targetPlayerId2}) to Actions_Mafia sheet.`);
+        
         await sheets.spreadsheets.values.append({
             spreadsheetId: sheetId,
             range: 'Actions_Mafia!A:G',
             valueInputOption: 'USER_ENTERED',
-            resource: { values: [newActionRow1] },
+            resource: { values: actionsToLog }, // Append both actions in one go
         });
-        console.log("kill-player: Action logged for Target 1.");
-
-        console.log("kill-player: Appending action for Target 2 to Actions_Mafia sheet.");
-        await sheets.spreadsheets.values.append({
-            spreadsheetId: sheetId,
-            range: 'Actions_Mafia!A:G',
-            valueInputOption: 'USER_ENTERED',
-            resource: { values: [newActionRow2] },
-        });
-        console.log("kill-player: Action logged for Target 2.");
+        console.log("kill-player: Mafia actions logged to Actions_Mafia sheet.");
 
         // 4. Update the Mafia player's MainUsed status to TRUE
         const updateRange = `Players!${String.fromCharCode(65 + mainUsedCol)}${mafiaPlayerRowIndex}`;
@@ -140,7 +177,7 @@ exports.handler = async (event, context) => {
         return {
             statusCode: 200,
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ message: 'Done!' }),
+            body: JSON.stringify({ message: 'Kill action has been successfully logged.' }),
         };
 
     } catch (error) {

@@ -14,129 +14,158 @@ async function getSheetsService() {
 }
 
 exports.handler = async (event, context) => {
-    console.log("check-mafia: Function started."); // LOG 1
+    console.log("check-mafia: Function started.");
     if (event.httpMethod !== 'POST') {
-        console.log("check-mafia: Method Not Allowed."); // LOG 2
+        console.log("check-mafia: Method Not Allowed.");
         return { statusCode: 405, body: 'Method Not Allowed' };
     }
 
     const sheetId = process.env.GOOGLE_SHEET_ID;
     if (!sheetId) {
-        console.error("check-mafia: Google Sheet ID is not configured."); // LOG 3
+        console.error("check-mafia: Google Sheet ID is not configured.");
         return { statusCode: 500, body: JSON.stringify({ error: 'Server configuration error.' }) };
     }
-    console.log(`check-mafia: Sheet ID: ${sheetId}`); // LOG 4
+    console.log(`check-mafia: Sheet ID: ${sheetId}`);
 
     try {
-        const { detectivePlayerId, targetPlayerId } = JSON.parse(event.body); // Renamed checkedPlayerId to targetPlayerId for consistency
-        console.log(`check-mafia: Received - Detective: ${detectivePlayerId}, Target: ${targetPlayerId}`); // LOG 5
+        const { detectivePlayerId, targetPlayerId } = JSON.parse(event.body);
+        console.log(`check-mafia: Received - Detective: ${detectivePlayerId}, Target: ${targetPlayerId}`);
         if (!detectivePlayerId || !targetPlayerId) {
-            console.log("check-mafia: Missing detectivePlayerId or targetPlayerId."); // LOG 6
+            console.log("check-mafia: Missing detectivePlayerId or targetPlayerId.");
             return { statusCode: 400, body: JSON.stringify({ error: 'Missing detectivePlayerId or targetPlayerId.' }) };
         }
 
         const sheets = await getSheetsService();
-        console.log("check-mafia: Sheets service initialized."); // LOG 7
+        console.log("check-mafia: Sheets service initialized.");
 
-        // 1. Get all player data
-        console.log("check-mafia: Fetching Players sheet for action usage check and target role."); // LOG 8
+        // 1. Fetch all player data to check role, action usage, and target validity
+        console.log("check-mafia: Fetching Players sheet for validation.");
         const playersResponse = await sheets.spreadsheets.values.get({
             spreadsheetId: sheetId,
-            range: 'Players!A:Z', // Fetch all columns to ensure 'MainUsed' and 'InvestigationHistory' are found
+            range: 'Players!A:Z', // Fetch all columns for server-side validation
         });
-        const playersData = playersResponse.data.values || []; // Renamed to playersData to avoid conflict with players.slice(1)
+        const playersData = playersResponse.data.values || [];
         if (playersData.length < 1) {
-            console.error("check-mafia: Players sheet is empty."); // LOG 9
+            console.error("check-mafia: Players sheet is empty.");
             return { statusCode: 500, body: JSON.stringify({ error: 'Players sheet is empty.' }) };
         }
         const playerHeaders = playersData[0];
-        const playerRows = playersData.slice(1); // Renamed to playerRows for clarity
+        const playerRows = playersData.slice(1);
+
         const idCol = playerHeaders.indexOf('PlayerID');
         const roleCol = playerHeaders.indexOf('Role');
+        const statusCol = playerHeaders.indexOf('Status');
         const mainUsedCol = playerHeaders.indexOf('MainUsed');
         const historyCol = playerHeaders.indexOf('InvestigationHistory');
+        const isAdminCol = playerHeaders.indexOf('IsAdmin'); // Needed for admin exemption
 
-        console.log(`check-mafia: PlayerID index: ${idCol}, Role index: ${roleCol}, MainUsed index: ${mainUsedCol}, History index: ${historyCol}`); // LOG 10
-
-        if ([idCol, roleCol, mainUsedCol, historyCol].includes(-1)) {
-            console.error("check-mafia: One or more required columns (PlayerID, Role, MainUsed, InvestigationHistory) not found in Players sheet."); // LOG 11
-            throw new Error("One or more required columns (PlayerID, Role, MainUsed, InvestigationHistory) not found in Players sheet.");
+        if ([idCol, roleCol, statusCol, mainUsedCol, historyCol, isAdminCol].includes(-1)) {
+            console.error("check-mafia: One or more required columns not found in Players sheet.");
+            throw new Error("Required columns (PlayerID, Role, Status, MainUsed, InvestigationHistory, IsAdmin) not found in Players sheet.");
         }
 
-        // 2. Find the detective and check their status
-        let detectiveRowIndex = -1;
-        let detectiveMainUsedStatus = 'FALSE';
-        let currentHistory = '';
+        // Map players for efficient lookup
+        const playerMap = new Map();
         for(let i = 0; i < playerRows.length; i++) {
-            if(playerRows[i][idCol] === detectivePlayerId) {
-                detectiveRowIndex = i + 2; // +2 for 0-index and header row
-                detectiveMainUsedStatus = playerRows[i][mainUsedCol] || 'FALSE';
-                currentHistory = playerRows[i][historyCol] || '';
-                break;
-            }
+            const row = playerRows[i];
+            playerMap.set(row[idCol], {data: row, index: i + 2});
         }
-        console.log(`check-mafia: Detective ${detectivePlayerId} found at row ${detectiveRowIndex}. MainUsed status: ${detectiveMainUsedStatus}, Current History: ${currentHistory}`); // LOG 12
 
-        if (detectiveRowIndex === -1) {
-            console.log("check-mafia: Detective player not found in sheet."); // LOG 13
+        // Validate Detective player
+        const detectiveInfo = playerMap.get(detectivePlayerId);
+        if (!detectiveInfo) {
+            console.log("check-mafia: Detective player not found in sheet.");
             return { statusCode: 404, body: JSON.stringify({ error: 'Detective player not found.' }) };
         }
+        const detectiveRowIndex = detectiveInfo.index;
+        const detectiveMainUsedStatus = detectiveInfo.data[mainUsedCol] || 'FALSE';
+        const detectiveRole = detectiveInfo.data[roleCol];
+        const detectiveIsAdmin = detectiveInfo.data[isAdminCol] || 'FALSE';
+
+        console.log(`check-mafia: Detective ${detectivePlayerId} found. Role: ${detectiveRole}, MainUsed: ${detectiveMainUsedStatus}, IsAdmin: ${detectiveIsAdmin}`);
+
+        if (detectiveRole.toLowerCase() !== 'detective') {
+            console.log("check-mafia: Player is not a Detective.");
+            return { statusCode: 403, body: JSON.stringify({ error: 'Only Detectives can use this ability.' }) };
+        }
         if (detectiveMainUsedStatus === 'TRUE') {
-            console.log("check-mafia: Detective has already used action for tonight."); // LOG 14
+            console.log("check-mafia: Detective has already used action for tonight.");
             return { statusCode: 403, body: JSON.stringify({ error: 'You have already used your action for tonight.' }) };
         }
-        
-        // 3. Find the target's role
-        let targetRole = null;
-        for (const playerRow of playerRows) { // Iterate over playerRows, not players.slice(1) again
-            if (playerRow[idCol] === targetPlayerId) {
-                targetRole = playerRow[roleCol];
-                break;
-            }
+        if (detectiveIsAdmin === 'TRUE') { // Admin exemption for performing actions
+            console.log("check-mafia: Admin player cannot perform Detective actions.");
+            return { statusCode: 403, body: JSON.stringify({ error: 'Admin players cannot perform game actions.' }) };
         }
-        console.log(`check-mafia: Target ${targetPlayerId} role: ${targetRole}`); // LOG 15
-        if (!targetRole) {
-            console.log("check-mafia: Target player not found."); // LOG 16
+
+        // Validate Target player
+        const targetInfo = playerMap.get(targetPlayerId);
+        if (!targetInfo) {
+            console.log("check-mafia: Target player not found in sheet.");
             return { statusCode: 404, body: JSON.stringify({ error: 'Target player not found.' }) };
         }
+        const targetStatus = targetInfo.data[statusCol] || '';
+        const targetIsAdmin = targetInfo.data[isAdminCol] || 'FALSE';
+        const targetRole = targetInfo.data[roleCol]; // Get target's role for the result
+        if (targetStatus.toLowerCase() !== 'alive') {
+            console.log(`check-mafia: Target (${targetPlayerId}) is not alive.`);
+            return { statusCode: 400, body: JSON.stringify({ error: `Target (${targetPlayerId}) is not alive.` }) };
+        }
+        if (targetIsAdmin === 'TRUE') { // Admin exemption for targets
+            console.log(`check-mafia: Target (${targetPlayerId}) is an Admin and cannot be targeted.`);
+            return { statusCode: 403, body: JSON.stringify({ error: `Target (${targetPlayerId}) is an Admin and cannot be targeted.` }) };
+        }
+        if (detectivePlayerId === targetPlayerId) { // Detective cannot investigate self
+            console.log("check-mafia: Detective cannot investigate self.");
+            return { statusCode: 400, body: JSON.stringify({ error: 'You cannot investigate yourself.' }) };
+        }
+        
         const isMafiaResult = (targetRole.toLowerCase() === 'mafia') ? 'YES' : 'NO';
-        console.log(`check-mafia: Is target Mafia? ${isMafiaResult}`); // LOG 17
+        console.log(`check-mafia: Is target Mafia? ${isMafiaResult}`);
 
-        // 4. Get current day
-        console.log("check-mafia: Fetching current day from Game_State sheet."); // LOG 18
+        // 2. Get current day
+        console.log("check-mafia: Fetching current day from Game_State sheet.");
         const gameStateResponse = await sheets.spreadsheets.values.get({
             spreadsheetId: sheetId,
             range: 'Game_State!A2:A2',
         });
         const currentDay = gameStateResponse.data.values && gameStateResponse.data.values[0] ? gameStateResponse.data.values[0][0] : 'Unknown';
-        console.log(`check-mafia: Current Day: ${currentDay}`); // LOG 19
+        console.log(`check-mafia: Current Day: ${currentDay}`);
 
-        // 5. Log the action in the Actions_Detective sheet
-        console.log("check-mafia: Appending action to Actions_Detective sheet."); // LOG 20
+        // 3. Log the action in the Actions_Detective sheet
+        console.log("check-mafia: Appending action to Actions_Detective sheet.");
         const newActionRow = [`ACT_CHECK_${Date.now()}`, currentDay, detectivePlayerId, targetPlayerId, isMafiaResult, new Date().toISOString(), 'Logged'];
         await sheets.spreadsheets.values.append({
             spreadsheetId: sheetId,
-            range: 'Actions_Detective!A:G', // Ensure this range covers all columns you're writing
+            range: 'Actions_Detective!A:G',
             valueInputOption: 'USER_ENTERED',
             resource: { values: [newActionRow] },
         });
-        console.log("check-mafia: Action logged to Actions_Detective sheet."); // LOG 21
+        console.log("check-mafia: Action logged to Actions_Detective sheet.");
 
-        // 6. Update the detective's MainUsed and InvestigationHistory
+        // 4. Update the detective's MainUsed and InvestigationHistory
         const newHistoryEntry = `${targetPlayerId}:${isMafiaResult}`;
-        const updatedHistory = currentHistory ? `${currentHistory},${newHistoryEntry}` : newHistoryEntry;
-        console.log(`check-mafia: Updating detective's MainUsed and History. New history: ${updatedHistory}`); // LOG 22
+        const updatedHistory = (detectiveInfo.data[historyCol] || '') ? `${(detectiveInfo.data[historyCol] || '')},${newHistoryEntry}` : newHistoryEntry;
+        console.log(`check-mafia: Updating detective's MainUsed and History. New history: ${updatedHistory}`);
 
-        // Assuming 'MainUsed' is before 'InvestigationHistory' in the sheet
-        const updateRange = `Players!${String.fromCharCode(65 + mainUsedCol)}${detectiveRowIndex}:${String.fromCharCode(65 + historyCol)}${detectiveRowIndex}`;
-        console.log(`check-mafia: Updating Players sheet at range: ${updateRange}`); // LOG 23
-        await sheets.spreadsheets.values.update({
+        const updateRequests = [
+            {
+                range: `Players!${String.fromCharCode(65 + mainUsedCol)}${detectiveRowIndex}`,
+                values: [['TRUE']]
+            },
+            {
+                range: `Players!${String.fromCharCode(65 + historyCol)}${detectiveRowIndex}`,
+                values: [[updatedHistory]]
+            }
+        ];
+        
+        await sheets.spreadsheets.values.batchUpdate({
             spreadsheetId: sheetId,
-            range: updateRange,
-            valueInputOption: 'USER_ENTERED',
-            resource: { values: [['TRUE', updatedHistory]] },
+            resource: {
+                valueInputOption: 'USER_ENTERED',
+                data: updateRequests
+            }
         });
-        console.log("check-mafia: Detective's MainUsed and InvestigationHistory updated."); // LOG 24
+        console.log("check-mafia: Detective's MainUsed and InvestigationHistory updated.");
 
         return {
             statusCode: 200,
@@ -148,12 +177,12 @@ exports.handler = async (event, context) => {
         };
 
     } catch (error) {
-        console.error('check-mafia: Error in try-catch block:', error); // LOG 25
+        console.error('check-mafia: Error in try-catch block:', error);
         return {
             statusCode: 500,
             body: JSON.stringify({ error: 'Failed to log investigation.', details: error.message }),
         };
     } finally {
-        console.log("check-mafia: Function finished."); // LOG 26
+        console.log("check-mafia: Function finished.");
     }
 };

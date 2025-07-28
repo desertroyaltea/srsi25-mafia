@@ -3,19 +3,20 @@
 const { google } = require('googleapis');
 const { JWT } = require('google-auth-library');
 
-// Helper function to initialize Google Sheets API
 async function getSheetsService() {
     const credentials = JSON.parse(process.env.GOOGLE_SERVICE_ACCOUNT_CREDENTIALS);
     const auth = new JWT({
         email: credentials.client_email,
         key: credentials.private_key,
-        scopes: ['https://www.googleapis.com/auth/spreadsheets'] // Full access for writing
+        scopes: ['https://www.googleapis.com/auth/spreadsheets']
     });
     return google.sheets({ version: 'v4', auth });
 }
 
 exports.handler = async (event, context) => {
+    console.log("approve-accusation: Function started.");
     if (event.httpMethod !== 'POST') {
+        console.log("approve-accusation: Method Not Allowed.");
         return { statusCode: 405, body: 'Method Not Allowed' };
     }
 
@@ -24,16 +25,56 @@ exports.handler = async (event, context) => {
         console.error("approve-accusation: Google Sheet ID is not configured.");
         return { statusCode: 500, body: JSON.stringify({ error: 'Server configuration error.' }) };
     }
+    console.log(`approve-accusation: Sheet ID: ${sheetId}`);
 
     try {
-        const { accusationId } = JSON.parse(event.body);
-        if (!accusationId) {
-            return { statusCode: 400, body: JSON.stringify({ error: 'Missing accusationId.' }) };
+        const { accusationId, adminPlayerId } = JSON.parse(event.body); // Receive adminPlayerId
+        console.log(`approve-accusation: Received - Accusation ID: ${accusationId}, Admin Player ID: ${adminPlayerId}`);
+        if (!accusationId || !adminPlayerId) {
+            console.log("approve-accusation: Missing accusationId or adminPlayerId.");
+            return { statusCode: 400, body: JSON.stringify({ error: 'Missing accusationId or adminPlayerId.' }) };
         }
 
         const sheets = await getSheetsService();
+        console.log("approve-accusation: Sheets service initialized.");
 
-        // 1. Find the accusation in the sheet
+        // 1. Validate Admin status of the approver
+        const playersResponse = await sheets.spreadsheets.values.get({
+            spreadsheetId: sheetId,
+            range: 'Players!A:S', // Fetch up to IsAdmin column (S)
+        });
+        const playersData = playersResponse.data.values || [];
+        if (playersData.length < 1) {
+            console.error("approve-accusation: Players sheet is empty for admin validation.");
+            return { statusCode: 500, body: JSON.stringify({ error: 'Players sheet is empty.' }) };
+        }
+        const playerHeaders = playersData[0];
+        const playerRows = playersData.slice(1);
+
+        const idColPlayers = playerHeaders.indexOf('PlayerID');
+        const isAdminColPlayers = playerHeaders.indexOf('IsAdmin');
+
+        if (idColPlayers === -1 || isAdminColPlayers === -1) {
+            console.error("approve-accusation: Required columns 'PlayerID' or 'IsAdmin' not found in Players sheet.");
+            throw new Error("Required columns 'PlayerID' or 'IsAdmin' not found in Players sheet.");
+        }
+
+        let isAdmin = 'FALSE';
+        for (const row of playerRows) {
+            if (row[idColPlayers] === adminPlayerId) {
+                isAdmin = row[isAdminColPlayers] || 'FALSE';
+                break;
+            }
+        }
+        console.log(`approve-accusation: Approver ${adminPlayerId} IsAdmin status: ${isAdmin}`);
+
+        if (isAdmin !== 'TRUE') {
+            console.log("approve-accusation: Player is not an Admin.");
+            return { statusCode: 403, body: JSON.stringify({ error: 'Only Admin players can approve accusations.' }) };
+        }
+
+
+        // 2. Find the accusation in the sheet
         console.log(`approve-accusation: Searching for AccusationID ${accusationId}...`);
         const accusationsResponse = await sheets.spreadsheets.values.get({
             spreadsheetId: sheetId,
@@ -46,7 +87,6 @@ exports.handler = async (event, context) => {
         const headers = allAccusations[0];
         const accusationRows = allAccusations.slice(1);
 
-        // Dynamically find column indices
         const idCol = headers.indexOf('AccusationID');
         const statusCol = headers.indexOf('AdminApprovalStatus');
         const timeCol = headers.indexOf('AdminApprovalTime');
@@ -63,7 +103,7 @@ exports.handler = async (event, context) => {
 
         for (let i = 0; i < accusationRows.length; i++) {
             if (accusationRows[i][idCol] === accusationId) {
-                rowIndexToUpdate = i + 2; // +2 for 0-index and header row
+                rowIndexToUpdate = i + 2;
                 accusationData = accusationRows[i];
                 break;
             }
@@ -74,26 +114,25 @@ exports.handler = async (event, context) => {
         }
         console.log(`approve-accusation: Found accusation at row ${rowIndexToUpdate}.`);
 
-        // 2. Modify the row data in memory before writing back
+        // 3. Modify the row data in memory before writing back
         accusationData[statusCol] = 'Approved';
         accusationData[timeCol] = new Date().toISOString();
         accusationData[trialCol] = 'TRUE';
 
-        // 3. Update the entire row in the Accusations sheet
+        // 4. Update the entire row in the Accusations sheet
         const updateRange = `Accusations!A${rowIndexToUpdate}:H${rowIndexToUpdate}`;
         console.log(`approve-accusation: Updating Accusations sheet at range: ${updateRange}`);
         await sheets.spreadsheets.values.update({
             spreadsheetId: sheetId,
             range: updateRange,
             valueInputOption: 'USER_ENTERED',
-            resource: {
-                values: [accusationData], // Write the entire modified row back
-            },
+            resource: { values: [accusationData] },
         });
 
-        // 4. Update Game_State with the ID of the accused player
+        // 5. Update Game_State with the ID of the accused player
         const accusedPlayerId = accusationData[accusedIdCol];
         const gameStateAccusedPlayerRange = 'Game_State!E2'; // Column E for LastAccusedPlayerID
+        const gameStateLastTrialResultRange = 'Game_State!F2'; // Column F for LastTrialResult (to reset it)
         console.log(`approve-accusation: Updating Game_State at ${gameStateAccusedPlayerRange} with PlayerID ${accusedPlayerId}.`);
         await sheets.spreadsheets.values.update({
             spreadsheetId: sheetId,
@@ -101,15 +140,23 @@ exports.handler = async (event, context) => {
             valueInputOption: 'USER_ENTERED',
             resource: { values: [[accusedPlayerId]] },
         });
+        // Reset LastTrialResult to N/A when a new trial is initiated
+        await sheets.spreadsheets.values.update({
+            spreadsheetId: sheetId,
+            range: gameStateLastTrialResultRange,
+            valueInputOption: 'USER_ENTERED',
+            resource: { values: [['N/A']] },
+        });
 
-        // 5. Add a new entry to the Trials sheet
+
+        // 6. Add a new entry to the Trials sheet
         const trialId = `TRL_${Date.now()}`;
         const trialValues = [
             trialId,
             accusedPlayerId,
-            accusationData[audioLinkCol], // AccusationAudioLink
-            new Date().toISOString(), // TrialStartTime
-            new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(), // VotingDeadline (24 hours from now)
+            accusationData[audioLinkCol],
+            new Date().toISOString(),
+            new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
             'Active', // Status
             '' // Result
         ];
@@ -128,10 +175,12 @@ exports.handler = async (event, context) => {
         };
 
     } catch (error) {
-        console.error('Error approving accusation:', error);
+        console.error('approve-accusation: Error approving accusation:', error);
         return {
             statusCode: 500,
             body: JSON.stringify({ error: 'Failed to approve accusation.', details: error.message }),
         };
+    } finally {
+        console.log("approve-accusation: Function finished.");
     }
 };
