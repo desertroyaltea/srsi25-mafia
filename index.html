@@ -546,33 +546,42 @@ async function initializeGame(userId) {
      renderView('dashboard');
      updateDashboardActions(state.gameState?.CurrentPhase || 'Day');
 
-     if (state.gameState?.CurrentPhase === 'Day') {
-         const previousDay = parseInt(state.gameState.CurrentDay) - 1;
-         console.log(`initializeGame: It's DAY. Previous Day for recap: ${previousDay}`);
-         if (previousDay >= 1) {
-             loadingOverlay.style.display = 'flex';
-             try {
-                 const recapResponse = await fetch(`/.netlify/functions/get-nightly-recap?dayNumber=${previousDay}`);
-                 if (recapResponse.ok) {
-                     const recapResult = await recapResponse.json();
-                     state.nightlyRecap = recapResult.recapData;
-                     console.log("initializeGame: Fetched Nightly Recap Data:", state.nightlyRecap);
-                     renderView('dashboard'); // Re-render the dashboard to display the recap
-                     updateDashboardActions(state.gameState?.CurrentPhase || 'Day');
-                 } else {
-                     console.error("Error fetching nightly recap:", await recapResponse.text());
+if (state.gameState?.CurrentPhase === 'Day') {
+             const previousDay = parseInt(state.gameState.CurrentDay) - 1;
+             console.log(`initializeGame: It's DAY. Previous Day for recap: ${previousDay}`);
+             if (previousDay >= 1) {
+                 let recapLoadingTimeout; // New timeout variable for this specific fetch
+                 loadingOverlay.style.display = 'flex';
+
+                 recapLoadingTimeout = setTimeout(() => {
+                     loadingOverlay.style.display = 'none';
+                     showMessage('Nightly recap loading timed out.');
+                     console.warn("initializeGame: Nightly recap fetch timeout occurred.");
+                 }, 15000); // 15 seconds timeout for recap
+
+                 try {
+                     const recapResponse = await fetch(`/.netlify/functions/get-nightly-recap?dayNumber=${previousDay}`);
+                     if (recapResponse.ok) {
+                         const recapResult = await recapResponse.json();
+                         state.nightlyRecap = recapResult.recapData;
+                         console.log("initializeGame: Fetched Nightly Recap Data:", state.nightlyRecap);
+                         renderView('dashboard');
+                         updateDashboardActions(state.gameState?.CurrentPhase || 'Day');
+                     } else {
+                         console.error("Error fetching nightly recap:", await recapResponse.text());
+                         state.nightlyRecap = null;
+                     }
+                 } catch (error) {
+                     console.error("Error fetching nightly recap:", error);
                      state.nightlyRecap = null;
+                 } finally {
+                     clearTimeout(recapLoadingTimeout); // Clear timeout
+                     loadingOverlay.style.display = 'none';
                  }
-             } catch (error) {
-                 console.error("Error fetching nightly recap:", error);
-                 state.nightlyRecap = null;
-             } finally {
-                 loadingOverlay.style.display = 'none';
+             } else {
+                 console.log("initializeGame: Previous Day is 0, no recap for Day 1.");
              }
-         } else {
-             console.log("initializeGame: Previous Day is 0, no recap for Day 1.");
          }
-     }
  }
 }
 
