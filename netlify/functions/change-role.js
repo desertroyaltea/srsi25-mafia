@@ -61,7 +61,7 @@ const { villagerPlayerId, newRole } = JSON.parse(event.body); // NEW: Receive ne
         }
 
 
-if (!newRole || !['BDS342', 'FQP982', 'LAP302'].includes(newRole)) {
+if (!newRole || !['Mafia', 'Doctor', 'Detective'].includes(newRole)) {
             console.log(`change-role: Invalid newRole provided: ${newRole}`);
             return { statusCode: 400, body: JSON.stringify({ error: 'Invalid new role selected.' }) };
         }

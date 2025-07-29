@@ -97,7 +97,7 @@ exports.handler = async (event, context) => {
 
         console.log(`protect-player: Doctor ${doctorPlayerId} found. Role: ${doctorRole}, MainUsed: ${doctorMainUsedStatus}, CanSaveMore: ${doctorCanSaveMoreStatus}, IsAdmin: ${doctorIsAdmin}`);
 
-        if (doctorRole.toLowerCase() !== 'FQP982') {
+        if (doctorRole.toLowerCase() !== 'doctor') {
             console.log("protect-player: Player is not a Doctor.");
             return { statusCode: 403, body: JSON.stringify({ error: 'Only Doctors can use this ability.' }) };
         }

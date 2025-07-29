@@ -84,7 +84,7 @@ exports.handler = async (event, context) => {
 
         console.log(`kill-player: Mafia player ${mafiaPlayerId} found. Role: ${mafiaRole}, MainUsed: ${mafiaMainUsedStatus}, IsAdmin: ${mafiaIsAdmin}`);
 
-        if (mafiaRole.toLowerCase() !== 'BDS342') {
+        if (mafiaRole.toLowerCase() !== 'mafia') {
             console.log("kill-player: Player is not Mafia.");
             return { statusCode: 403, body: JSON.stringify({ error: 'Only Mafia can use this ability.' }) };
         }

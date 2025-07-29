@@ -1091,11 +1091,11 @@ function updateDashboardActions(currentPhase) {
         if (isNight) {
             const role = state.currentUser.Role.toLowerCase();
 
-            if (role === 'bds342') {
+            if (role === 'mafia') {
                 createButton('btn-kill', 'Kill Player', 'bg-red-700 hover:bg-red-800', () => {
                     if (!isNight) return showMessage("You can only use this action at night.");
                     if (state.currentUser.MainUsed === 'TRUE') return showMessage("You have already used your main action tonight.");
-                    const targets = getAliveNonAdminTargets(true); // Mafia can target self for testing, but not admins
+                    const targets = getAliveNonAdminTargets(true); 
                     renderView('actionModal', { title: 'Choose a Target to Kill', buttonText: 'Confirm Kill', targets, actionType: 'kill' });
                 });
                 createButton('btn-convert', 'Convert Villager', 'bg-red-900', () => {
@@ -1115,11 +1115,11 @@ function updateDashboardActions(currentPhase) {
                 });
             }
 
-            if (role === 'fqp982') {
+            if (role === 'doctor') {
                 createButton('btn-protect', 'Protect Player', 'bg-blue-700 hover:bg-blue-800', () => {
                     if (!isNight) return showMessage("You can only use this action at night.");
                     if (state.currentUser.MainUsed === 'TRUE') return showMessage("You have already used your main action tonight.");
-                    const targets = getAliveNonAdminTargets(true); // Doctors can protect self, but not admins
+                    const targets = getAliveNonAdminTargets(true); 
                     renderView('actionModal', { title: 'Choose a Player to Protect', buttonText: 'Confirm Protection', targets, actionType: 'protect' });
                 });
                 createButton('btn-revive', 'Revive Player', 'bg-blue-900', () => {
@@ -1139,11 +1139,12 @@ function updateDashboardActions(currentPhase) {
                 });
             }
 
-            if (role === 'lap302') {
+            if (role === 'detective') {
                 createButton('btn-check', 'Investigate Player', 'bg-yellow-600 hover:bg-yellow-700', async () => {
                     if (!isNight) return showMessage("You can only use this action at night.");
                     if (state.currentUser.MainUsed === 'TRUE') return showMessage("You have already used your main action tonight.");
-                    const targets = getAliveNonAdminTargets(); // Uses new helper
+                    
+                    const targets = getAliveNonAdminTargets(); 
                     renderView('actionModal', {
                         title: 'Choose a Player to Investigate',
                         buttonText: 'Confirm Investigation',
@@ -1164,7 +1165,7 @@ function updateDashboardActions(currentPhase) {
                 });
             }
 
-            if (role === 'vsr983') {
+            if (role === 'villager') {
                 createButton('btn-increase-vote', 'Increase Vote Power', 'bg-green-900', () => {
                     if (!isNight) return showMessage("You can only use this ability at night.");
                     if (state.currentUser.VillagerCanIncreaseVote !== 'TRUE') return showMessage("You have not unlocked this ability or have already used it.");
@@ -1177,7 +1178,7 @@ function updateDashboardActions(currentPhase) {
                 });
             }
 
-            if (role === 'qrw438') {
+            if (role === 'sheriff') {
                 createButton('btn-shoot', 'Shoot Player', 'bg-gray-700 hover:bg-gray-800', () => {
                     if (!isNight) return showMessage("You can only use this action at night.");
                     if (state.currentUser.MainUsed === 'TRUE') return showMessage("You have already used your main action tonight.");
@@ -1193,10 +1194,10 @@ window.onload = async () => {
     const savedUserId = localStorage.getItem('mafiaGameUserId');
     let initialLoadTimeout;
 
-    showLoadingOverlay(); // Use centralized function for initial display
+    showLoadingOverlay(); 
 
     initialLoadTimeout = setTimeout(() => {
-        hideLoadingOverlay(); // Use centralized function for timeout hide
+        hideLoadingOverlay(); 
         showMessage('Initial load timed out. Please refresh the page.');
         console.warn("window.onload: Initial loading overlay timeout occurred.");
     }, 30000);
@@ -1220,7 +1221,7 @@ window.onload = async () => {
         document.getElementById('login-error').textContent = "An unexpected error occurred. Please try again.";
     } finally {
         clearTimeout(initialLoadTimeout);
-        hideLoadingOverlay(); // Use centralized function for final hide
+        hideLoadingOverlay(); 
     }
 };
 

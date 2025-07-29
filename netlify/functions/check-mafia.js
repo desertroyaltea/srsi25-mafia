@@ -119,7 +119,7 @@ exports.handler = async (event, context) => {
             return { statusCode: 400, body: JSON.stringify({ error: 'You cannot investigate yourself.' }) };
         }
         
-        const isMafiaResult = (targetRole.toLowerCase() === 'BDS342') ? 'YES' : 'NO';
+        const isMafiaResult = (targetRole.toLowerCase() === 'mafia') ? 'YES' : 'NO';
         console.log(`check-mafia: Is target Mafia? ${isMafiaResult}`);
 
         // 2. Get current day
