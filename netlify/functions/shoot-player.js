@@ -85,7 +85,7 @@ exports.handler = async (event, context) => {
 
         console.log(`shoot-player: Sheriff ${sheriffPlayerId} found. Role: ${sheriffRole}, MainUsed: ${sheriffMainUsedStatus}, ShotUsed: ${sheriffShotUsedStatus}, IsAdmin: ${sheriffIsAdmin}`);
 
-        if (sheriffRole.toLowerCase() !== 'sheriff') {
+        if (sheriffRole.toLowerCase() !== 'QRW438') {
             console.log("shoot-player: Player is not a Sheriff.");
             return { statusCode: 403, body: JSON.stringify({ error: 'Only Sheriffs can use this ability.' }) };
         }

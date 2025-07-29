@@ -1088,16 +1088,13 @@ function updateDashboardActions(currentPhase) {
         }
 
 
-        // --- NIGHT ACTIONS (Only visible during Night Phase) ---
         if (isNight) {
             const role = state.currentUser.Role.toLowerCase();
 
-            // --- MAFIA ---
-            if (role === 'mafia') {
+            if (role === 'bds342') {
                 createButton('btn-kill', 'Kill Player', 'bg-red-700 hover:bg-red-800', () => {
                     if (!isNight) return showMessage("You can only use this action at night.");
                     if (state.currentUser.MainUsed === 'TRUE') return showMessage("You have already used your main action tonight.");
-                    // Mafia targets should be all alive non-admins
                     const targets = getAliveNonAdminTargets(true); // Mafia can target self for testing, but not admins
                     renderView('actionModal', { title: 'Choose a Target to Kill', buttonText: 'Confirm Kill', targets, actionType: 'kill' });
                 });
@@ -1118,12 +1115,10 @@ function updateDashboardActions(currentPhase) {
                 });
             }
 
-            // --- DOCTOR ---
-            if (role === 'doctor') {
+            if (role === 'fqp982') {
                 createButton('btn-protect', 'Protect Player', 'bg-blue-700 hover:bg-blue-800', () => {
                     if (!isNight) return showMessage("You can only use this action at night.");
                     if (state.currentUser.MainUsed === 'TRUE') return showMessage("You have already used your main action tonight.");
-                    // Doctors protect alive non-admins (can protect self)
                     const targets = getAliveNonAdminTargets(true); // Doctors can protect self, but not admins
                     renderView('actionModal', { title: 'Choose a Player to Protect', buttonText: 'Confirm Protection', targets, actionType: 'protect' });
                 });
@@ -1144,12 +1139,10 @@ function updateDashboardActions(currentPhase) {
                 });
             }
 
-            // --- DETECTIVE ---
-            if (role === 'detective') {
+            if (role === 'lap302') {
                 createButton('btn-check', 'Investigate Player', 'bg-yellow-600 hover:bg-yellow-700', async () => {
                     if (!isNight) return showMessage("You can only use this action at night.");
                     if (state.currentUser.MainUsed === 'TRUE') return showMessage("You have already used your main action tonight.");
-                    // Detectives investigate alive non-admins (cannot investigate self)
                     const targets = getAliveNonAdminTargets(); // Uses new helper
                     renderView('actionModal', {
                         title: 'Choose a Player to Investigate',
@@ -1171,8 +1164,7 @@ function updateDashboardActions(currentPhase) {
                 });
             }
 
-            // --- VILLAGER ---
-            if (role === 'villager') {
+            if (role === 'vsr983') {
                 createButton('btn-increase-vote', 'Increase Vote Power', 'bg-green-900', () => {
                     if (!isNight) return showMessage("You can only use this ability at night.");
                     if (state.currentUser.VillagerCanIncreaseVote !== 'TRUE') return showMessage("You have not unlocked this ability or have already used it.");
@@ -1185,18 +1177,16 @@ function updateDashboardActions(currentPhase) {
                 });
             }
 
-            // --- SHERIFF ---
-            if (role === 'sheriff') {
+            if (role === 'qrw438') {
                 createButton('btn-shoot', 'Shoot Player', 'bg-gray-700 hover:bg-gray-800', () => {
                     if (!isNight) return showMessage("You can only use this action at night.");
                     if (state.currentUser.MainUsed === 'TRUE') return showMessage("You have already used your main action tonight.");
                     if (state.currentUser.SheriffShotUsed === 'TRUE') return showMessage("You have already used your one-time shot.");
-                    // Sheriff shoots alive non-admins (cannot shoot self)
                     const targets = getAliveNonAdminTargets(); // Uses new helper
                     renderView('actionModal', { title: 'Choose Your Target', buttonText: 'Fire!', targets, actionType: 'shoot' });
                 });
             }
-        } // END of if(isNight) block
+        } 
     }
 
 window.onload = async () => {
