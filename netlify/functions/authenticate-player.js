@@ -8,7 +8,7 @@ async function getSheetsService() {
     const auth = new JWT({
         email: credentials.client_email,
         key: credentials.private_key,
-        scopes: ['https://www.googleapis.com/auth/spreadsheets.readonly'] // Read-only scope for authentication
+        scopes: ['https://www.googleapis.com/auth/spreadsheets'] // Changed to full access for writing to Sessions
     });
     return google.sheets({ version: 'v4', auth });
 }
@@ -71,16 +71,43 @@ exports.handler = async (event, context) => {
         }
 
         if (authenticatedPlayerId) {
+
+            // --- NEW: Log session to Sessions sheet ---
+            const sessionId = `SESS_${Date.now()}_${authenticatedPlayerId}`;
+            const loginTime = new Date().toISOString();
+            const userAgent = event.headers['user-agent'] || 'Unknown';
+            const ipAddress = event.headers['x-nf-client-connection-ip'] || 'Unknown'; // Netlify specific header for client IP
+
+            const sessionEntry = [
+                sessionId,
+                authenticatedPlayerId,
+                loginTime,
+                loginTime, // LastActivityTime starts as LoginTime
+                '',        // LogoutTime (empty initially)
+                'Active',
+                userAgent,
+                ipAddress
+            ];
+
+            await sheets.spreadsheets.values.append({
+                spreadsheetId: sheetId,
+                range: 'Sessions!A:H', // Assuming Sessions sheet has columns A to H
+                valueInputOption: 'USER_ENTERED',
+                resource: { values: [sessionEntry] },
+            });
+            // --- END NEW ---
+
             return {
                 statusCode: 200,
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ message: 'Authentication successful.', playerId: authenticatedPlayerId }),
+                body: JSON.stringify({ message: 'Authentication successful.', playerId: authenticatedPlayerId, sessionId: sessionId }), // Return sessionId
             };
         } else {
             return { statusCode: 401, body: JSON.stringify({ error: 'Invalid Passcode.' }) };
         }
 
     } catch (error) {
+        console.error('authenticate-player: Error in try-catch block:', error);
         return {
             statusCode: 500,
             body: JSON.stringify({ error: 'Authentication failed.', details: error.message }),

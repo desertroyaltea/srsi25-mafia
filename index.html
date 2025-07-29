@@ -122,6 +122,7 @@ const state = { allPlayers: [], currentUserId: null, currentUser: null, isCurren
     let audioChunks = [];
     let recordedAudioBlob = null;
     let audioPlayer;
+    let sessionActivityIntervalId;
 
     const templates = {
 login: () => `
@@ -314,7 +315,7 @@ offLimitsPage: () => `
                         <br><span class="font-bold text-red-400">Nigh is the Time of the Sword and Axe.</span>
                     </p>
                     <p class="text-2xl font-bold text-yellow-300 mb-6">
-                        Return when the hour is right, for the game awaits your presence!
+                        Return when the hour is right, and may the odds forever be in your favor!
                     </p>
                     <button type="button" id="logout-button" class="mt-8 bg-gray-600 hover:bg-gray-700 text-white font-bold py-3 px-6 rounded-lg w-full md:w-1/2 text-xl mx-auto block">
                         Logout
@@ -451,23 +452,21 @@ async function handleLogin() {
         if (!passcodeInputElement) {
             console.error("handleLogin: 'passcode-input' element not found in the DOM. This is the source of the TypeError.");
             loginError.textContent = 'Login form element missing. Please refresh the page.';
-            hideLoadingOverlay(); // Ensure hidden if error
+            hideLoadingOverlay();
             return;
         }
 
         const passcodeInput = passcodeInputElement.value.trim();
-
         if (!passcodeInput) {
             loginError.textContent = 'Please enter your passcode.';
-            hideLoadingOverlay(); // Ensure hidden if validation fails
+            hideLoadingOverlay();
             return;
         }
 
         loginError.textContent = '';
-        showLoadingOverlay(); // Use centralized function
+        showLoadingOverlay();
 
         try {
-            // CRITICAL CHANGE: Call the new authentication Netlify Function
             const response = await fetch('/.netlify/functions/authenticate-player', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -478,9 +477,10 @@ async function handleLogin() {
 
             if (response.ok && result.playerId) {
                 const authenticatedPlayerId = result.playerId;
+                const sessionId = result.sessionId; // NEW: Get sessionId from response
                 localStorage.setItem('mafiaGameUserId', authenticatedPlayerId);
+                localStorage.setItem('mafiaGameSessionId', sessionId); // NEW: Store sessionId
                 showMessage('Login successful!');
-                // Now initialize the game with the authenticated player ID
                 await initializeGame(authenticatedPlayerId);
             } else {
                 loginError.textContent = result.error || 'Login failed. Please try again.';
@@ -490,7 +490,7 @@ async function handleLogin() {
             console.error("handleLogin: Error during authentication:", error);
             loginError.textContent = 'An error occurred during login. Please try again.';
         } finally {
-            hideLoadingOverlay(); // Use centralized function
+            hideLoadingOverlay();
         }
     }
 
@@ -528,70 +528,39 @@ async function fetchPlayers(forceRefresh = false) {
 
 
 async function initializeGame(userId) {
-    state.currentUserId = userId; // Set currentUserId from the authenticated ID
+    state.currentUserId = userId;
+    const sessionId = localStorage.getItem('mafiaGameSessionId'); // NEW: Get sessionId from localStorage
 
-    // CRITICAL CHANGE: Fetch current user's FULL data using the provided userId
     let currentUserFetchTimeout;
-    showLoadingOverlay(); // Show loader for this fetch
+    showLoadingOverlay();
 
     currentUserFetchTimeout = setTimeout(() => {
         hideLoadingOverlay();
         showMessage('Failed to load your player data (timeout). Please refresh.');
-        console.warn("initializeGame: Current user data fetch timeout occurred.");
     }, 10000);
 
     try {
-        const response = await fetch(`/.netlify/functions/get-player-data?playerId=${userId}`); // Fetch specific user's full data
+        const response = await fetch(`/.netlify/functions/get-player-data?playerId=${userId}`);
         if (!response.ok) {
             const errorText = await response.text();
             console.error('initializeGame: Failed to fetch current user data:', response.status, errorText);
             throw new Error(`Failed to fetch your player data: ${response.statusText}`);
         }
-        state.currentUser = await response.json(); // This now contains the FULL data for the current user
+        state.currentUser = await response.json();
 
     } catch (error) {
         console.error("initializeGame: Error fetching current user data:", error);
         showMessage(`Failed to load your player data: ${error.message}. Please try logging in again.`);
-        localStorage.removeItem('mafiaGameUserId'); // Clear invalid login
+        localStorage.removeItem('mafiaGameUserId');
+        localStorage.removeItem('mafiaGameSessionId'); // NEW: Clear sessionId on error
         renderView('login');
         return;
     } finally {
         clearTimeout(currentUserFetchTimeout);
-        // hideLoadingOverlay() will be called by subsequent renders or the main onload finally
     }
 
-    // Now proceed with game initialization using state.currentUser (full data)
     state.isCurrentUserAdmin = state.currentUser.IsAdmin === 'TRUE';
     await fetchGameState();
-
-    // NEW: Fetch current player's mission
-        let currentUserMissionTimeout;
-        showLoadingOverlay(); // Show loading while fetching mission
-
-        currentUserMissionTimeout = setTimeout(() => {
-            hideLoadingOverlay();
-            showMessage('Failed to load your mission data (timeout). Please refresh.');
-            console.warn("initializeGame: Current user mission fetch timeout occurred.");
-        }, 10000); // 10 seconds timeout for mission fetch
-
-        try {
-            console.log(`initializeGame: Attempting to fetch mission for player: ${state.currentUserId}`); // DEBUG LOG Frontend Mission 1
-            const missionResponse = await fetch(`/.netlify/functions/get-player-mission?playerId=${state.currentUserId}`);
-            if (missionResponse.ok) {
-                const missionResult = await missionResponse.json();
-                state.currentMission = missionResult.currentMission;
-                console.log("initializeGame: Fetched current mission data:", state.currentMission); // DEBUG LOG Frontend Mission 2
-            } else {
-                console.error("Error fetching player mission:", await missionResponse.text());
-                state.currentMission = null;
-            }
-        } catch (error) {
-            console.error("Error fetching player mission:", error);
-            state.currentMission = null;
-        } finally {
-            clearTimeout(currentUserMissionTimeout);
-            hideLoadingOverlay(); // Hide loading after mission fetch
-        }
 
     const currentUserWelcomeStatus = state.currentUser.Welcome?.toString().toUpperCase();
 
@@ -603,11 +572,17 @@ async function initializeGame(userId) {
         hideLoadingOverlay();
     } else if (currentUserWelcomeStatus !== 'TRUE') {
         localStorage.removeItem('mafiaGameUserId');
+        localStorage.removeItem('mafiaGameSessionId'); // NEW: Clear sessionId if Welcome is FALSE
         renderView('welcomePage');
         hideLoadingOverlay();
     } else {
         renderView('dashboard');
         updateDashboardActions(state.gameState?.CurrentPhase || 'Day');
+
+        // NEW: Start periodic session activity update
+        if (sessionId) { // Only update if a session ID exists
+            startSessionActivityUpdate(sessionId);
+        }
 
         if (state.gameState?.CurrentPhase === 'Day') {
             const previousDay = parseInt(state.gameState.CurrentDay) - 1;
@@ -618,7 +593,6 @@ async function initializeGame(userId) {
                 recapLoadingTimeout = setTimeout(() => {
                     hideLoadingOverlay();
                     showMessage('Nightly recap loading timed out.');
-                    console.warn("initializeGame: Nightly recap fetch timeout occurred.");
                 }, 15000);
 
                 try {
@@ -639,7 +613,6 @@ async function initializeGame(userId) {
                     clearTimeout(recapLoadingTimeout);
                     hideLoadingOverlay();
                 }
-            } else {
             }
         }
     }
@@ -681,6 +654,43 @@ function showMessage(message) {
  // Centralized function to hide loading overlay
  function hideLoadingOverlay() {
      loadingOverlay.style.display = 'none';
+ }
+
+ // --- Session Activity Tracking ---
+ async function updateSessionActivity(sessionId) {
+     try {
+         // No loading overlay for background activity updates
+         const response = await fetch('/.netlify/functions/update-session-activity', {
+             method: 'POST',
+             headers: { 'Content-Type': 'application/json' },
+             body: JSON.stringify({ sessionId: sessionId }),
+         });
+         if (!response.ok) {
+             const errorText = await response.text();
+             console.error('updateSessionActivity: Failed to update session activity:', errorText);
+         }
+     } catch (error) {
+         console.error('updateSessionActivity: Error sending session activity:', error);
+     }
+ }
+
+ function startSessionActivityUpdate(sessionId) {
+     // Clear any existing interval to prevent duplicates
+     if (sessionActivityIntervalId) {
+         clearInterval(sessionActivityIntervalId);
+     }
+     // Update immediately, then every 5 minutes
+     updateSessionActivity(sessionId);
+     sessionActivityIntervalId = setInterval(() => {
+         updateSessionActivity(sessionId);
+     }, 5 * 60 * 1000); // Every 5 minutes (5 * 60 seconds * 1000 milliseconds)
+ }
+
+ function stopSessionActivityUpdate() {
+     if (sessionActivityIntervalId) {
+         clearInterval(sessionActivityIntervalId);
+         sessionActivityIntervalId = null;
+     }
  }
 
 
@@ -1482,19 +1492,38 @@ appRoot.addEventListener('click', async (e) => {
                 clearTimeout(startGameTimeout);
                 hideLoadingOverlay(); // Use centralized function
             }
-            } else if (e.target.id === 'logout-button') { // Logout button (from dead page and universal)
-            localStorage.removeItem('mafiaGameUserId'); // Clear saved user ID
-            state.currentUserId = null;
-            state.currentUser = null;
-            state.isCurrentUserAdmin = false;
-            state.gameState = null;
-            state.pendingAccusations = [];
-            state.currentTrial = null;
-            state.currentMission = null; // Reset mission too
-            state.nightlyRecap = null; // Reset recap too
-            renderView('login'); // Go back to login page
-            showMessage('You have been logged out.');
-        }
+} else if (e.target.id === 'logout-button') {
+                const sessionId = localStorage.getItem('mafiaGameSessionId'); // Get sessionId for logout
+                if (sessionId) {
+                    stopSessionActivityUpdate(); // Stop periodic updates
+                    try {
+                        const response = await fetch('/.netlify/functions/log-logout', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ sessionId: sessionId }),
+                        });
+                        if (!response.ok) {
+                            console.error('logout-button: Failed to log logout:', await response.text());
+                        }
+                    } catch (error) {
+                        console.error('logout-button: Error sending logout log:', error);
+                    }
+                }
+
+                localStorage.removeItem('mafiaGameUserId');
+                localStorage.removeItem('mafiaGameSessionId'); // Clear sessionId from localStorage
+                state.currentUserId = null;
+                state.currentUser = null;
+                state.isCurrentUserAdmin = false;
+                state.gameState = null;
+                state.pendingAccusations = [];
+                state.currentTrial = null;
+                state.currentMission = null;
+                state.nightlyRecap = null;
+                renderView('login');
+                showMessage('You have been logged out.');
+                hideLoadingOverlay();
+            }
     });
 </script>
 </body>
