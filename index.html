@@ -122,7 +122,6 @@ const state = { allPlayers: [], currentUserId: null, currentUser: null, isCurren
     let audioChunks = [];
     let recordedAudioBlob = null;
     let audioPlayer;
-    const VAPID_PUBLIC_KEY = 'BMMMgjTjUxtzbmrWhjvFB1mwqumRGyPm6ZfC1lYhnMh1gCtU2KPUrQYUtHkNgDzrjLNF0HVon9ccjfBawVLdNGY'; // Replace with YOUR generated Public Key
     let sessionActivityIntervalId;
 
     const templates = {
@@ -614,35 +613,6 @@ async function initializeGame(userId) {
             startSessionActivityUpdate(sessionId);
         }
 
-// NEW: Register Service Worker and ask for Push Notification permission
-     if ('serviceWorker' in navigator) {
-         navigator.serviceWorker.register('/sw.js')
-             .then(function(registration) {
-                 console.log('Service Worker registered with scope:', registration.scope);
-                 // Prompt for notification permission after successful login
-                 if (Notification.permission === 'default') {
-                     Notification.requestPermission().then(function(permission) {
-                         if (permission === 'granted') {
-                             console.log('Notification permission granted.');
-                             subscribeUserToPush(state.currentUserId); // Subscribe user
-                         } else {
-                             console.warn('Notification permission denied.');
-                             showMessage('Notifications are blocked. You can enable them in browser settings.');
-                         }
-                     });
-                 } else if (Notification.permission === 'granted') {
-                     console.log('Notification permission already granted.');
-                     subscribeUserToPush(state.currentUserId); // Ensure user is subscribed
-                 } else {
-                     console.warn('Notification permission already denied.');
-                     showMessage('Notifications are blocked. You can enable them in browser settings.');
-                 }
-             })
-             .catch(function(error) {
-                 console.error('Service Worker registration failed:', error);
-             });
-     }
-
         if (state.gameState?.CurrentPhase === 'Day') {
             const previousDay = parseInt(state.gameState.CurrentDay) - 1;
             if (previousDay >= 1) {
@@ -713,80 +683,6 @@ function showMessage(message) {
  // Centralized function to hide loading overlay
  function hideLoadingOverlay() {
      loadingOverlay.style.display = 'none';
- }
-
-// --- Push Notification Subscription Logic ---
- async function subscribeUserToPush(playerId) {
-     if (!('serviceWorker' in navigator) || !('PushManager' in window)) {
-         console.warn('Push messaging is not supported.');
-         return;
-     }
-
-     try {
-         const registration = await navigator.serviceWorker.ready; // Wait for Service Worker to be active
-         const existingSubscription = await registration.pushManager.getSubscription();
-
-         if (existingSubscription) {
-             console.log('Existing push subscription found:', existingSubscription);
-             // Optionally, resend existing subscription to backend to ensure it's up-to-date
-             await sendSubscriptionToBackend(playerId, existingSubscription);
-             return;
-         }
-
-         console.log('No existing subscription, attempting to subscribe...');
-         const subscribeOptions = {
-             userVisibleOnly: true,
-             applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY),
-         };
-
-         const subscription = await registration.pushManager.subscribe(subscribeOptions);
-         console.log('New push subscription:', subscription);
-
-         await sendSubscriptionToBackend(playerId, subscription);
-
-     } catch (error) {
-         console.error('Failed to subscribe the user:', error);
-         showMessage('Failed to enable notifications. Please try again later.');
-     }
- }
-
- // Helper function to convert base64 string to Uint8Array for applicationServerKey
- function urlBase64ToUint8Array(base64String) {
-     const padding = '='.repeat((4 - base64String.length % 4) % 4);
-     const base64 = (base64String + padding)
-         .replace(/\-/g, '+')
-         .replace(/_/g, '/');
-
-     const rawData = window.atob(base64);
-     const outputArray = new Uint8Array(rawData.length);
-
-     for (let i = 0; i < rawData.length; ++i) {
-         outputArray[i] = rawData.charCodeAt(i);
-     }
-     return outputArray;
- }
-
- async function sendSubscriptionToBackend(playerId, subscription) {
-     try {
-         const response = await fetch('/.netlify/functions/save-push-subscription', {
-             method: 'POST',
-             headers: { 'Content-Type': 'application/json' },
-             body: JSON.stringify({
-                 playerId: playerId,
-                 subscription: subscription
-             }),
-         });
-
-         if (response.ok) {
-             console.log('Push subscription successfully sent to backend.');
-         } else {
-             console.error('Failed to send push subscription to backend:', await response.text());
-             showMessage('Failed to save notification settings.');
-         }
-     } catch (error) {
-         console.error('Error sending subscription to backend:', error);
-         showMessage('Error saving notification settings.');
-     }
  }
 
  // --- Session Activity Tracking ---
