@@ -3,21 +3,20 @@
 const { google } = require('googleapis');
 const { JWT } = require('google-auth-library');
 
-// Helper function to initialize Google Sheets API
 async function getSheetsService() {
     const credentials = JSON.parse(process.env.GOOGLE_SERVICE_ACCOUNT_CREDENTIALS);
     const auth = new JWT({
         email: credentials.client_email,
         key: credentials.private_key,
-        scopes: ['https://www.googleapis.com/auth/spreadsheets.readonly'] // Read-only scope is sufficient for this function
+        scopes: ['https://www.googleapis.com/auth/spreadsheets.readonly']
     });
     return google.sheets({ version: 'v4', auth });
 }
 
 exports.handler = async (event, context) => {
-    console.log("get-current-trial: Function started."); // LOG 1
+    console.log("get-current-trial: Function started.");
     if (event.httpMethod !== 'GET') {
-        console.log("get-current-trial: Method not allowed."); // LOG 2
+        console.log("get-current-trial: Method Not Allowed.");
         return { statusCode: 405, body: 'Method Not Allowed' };
     }
 
@@ -26,107 +25,75 @@ exports.handler = async (event, context) => {
         console.error("get-current-trial: Google Sheet ID is not configured.");
         return { statusCode: 500, body: JSON.stringify({ error: 'Server configuration error.' }) };
     }
-    console.log(`get-current-trial: Sheet ID: ${sheetId}`); // LOG 3
+    console.log(`get-current-trial: Sheet ID: ${sheetId}`);
 
     try {
         const sheets = await getSheetsService();
-        console.log("get-current-trial: Sheets service initialized."); // LOG 4
+        console.log("get-current-trial: Sheets service initialized.");
 
-        // 1. Get LastAccusedPlayerID from Game_State sheet (this part is actually not strictly needed for finding *any* active trial, but keeping for context)
-        const gameStateResponse = await sheets.spreadsheets.values.get({
-            spreadsheetId: sheetId,
-            range: 'Game_State!E2', // Assuming E2 contains LastAccusedPlayerID
-        });
-        const lastAccusedPlayerID = gameStateResponse.data.values && gameStateResponse.data.values[0] ? gameStateResponse.data.values[0][0] : null;
-        console.log(`get-current-trial: LastAccusedPlayerID from Game_State: ${lastAccusedPlayerID}`); // LOG 5
+        // CRITICAL FIX: Remove the Game_State fetch if LastAccusedPlayerID is not used by this function's core logic
+        // The frontend fetches Game_State separately. This function's job is to find active trials.
+        // const gameStateResponse = await sheets.spreadsheets.values.get({ ... });
+        // const lastAccusedPlayerID = ...;
 
-        // The frontend logic should check if a trial is found, this function's primary job is to find an 'Active' one.
-        // The previous check for lastAccusedPlayerID here was causing the "No active trial found" message prematurely
-        // if Game_State!E2 was empty/N/A, even if an 'Active' trial existed.
-        // Let's remove this early return here to allow the function to search for 'Active' trials regardless.
-        // If the frontend needs to know about lastAccusedPlayerID, it should fetch Game_State separately.
-
-        // 2. Fetch all trials to find the one with 'Active' status
-        console.log("get-current-trial: Fetching all trials from 'Trials!A:H'."); // LOG 6
+        // 1. Fetch all trials to find the ones with 'Active' status
+        console.log("get-current-trial: Fetching all trials from 'Trials!A:H'.");
         const trialsResponse = await sheets.spreadsheets.values.get({
             spreadsheetId: sheetId,
-            range: 'Trials!A:H', // Fetch all relevant columns
+            range: 'Trials!A:I', // Fetch up to Column I (NOTGUILTY)
         });
 
         const allTrials = trialsResponse.data.values || [];
-        console.log(`get-current-trial: Fetched ${allTrials.length} rows from Trials sheet.`); // LOG 7
+        console.log(`get-current-trial: Fetched ${allTrials.length} rows from Trials sheet.`);
 
-        if (allTrials.length < 2) { // Less than 2 means only headers or no data
-            console.log("get-current-trial: Trials sheet is empty or has no data rows."); // LOG 8
+        if (allTrials.length < 2) {
+            console.log("get-current-trial: Trials sheet is empty or has no data rows.");
             return {
                 statusCode: 200,
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ message: 'No trials data available.', currentTrial: null }),
+                body: JSON.stringify({ message: 'No trials data available.', activeTrials: [] }),
             };
         }
 
         const headers = allTrials[0];
         const trialRows = allTrials.slice(1);
-        console.log("get-current-trial: Headers:", headers); // LOG 9
-        console.log(`get-current-trial: Processing ${trialRows.length} trial data rows.`); // LOG 10
+        console.log("get-current-trial: Headers:", headers);
+        console.log(`get-current-trial: Processing ${trialRows.length} trial data rows.`);
 
         const trialIdCol = headers.indexOf('TrialID');
         const accusedPlayerIdCol = headers.indexOf('AccusedPlayerID');
         const audioLinkCol = headers.indexOf('AccusationAudioLink');
-        const trialStartTimeCol = headers.indexOf('TrialStartTime'); // Added for completeness
-        const votingDeadlineCol = headers.indexOf('VotingDeadline'); // Added for completeness
+        const trialStartTimeCol = headers.indexOf('TrialStartTime');
+        const votingDeadlineCol = headers.indexOf('VotingDeadline');
         const statusCol = headers.indexOf('Status');
-        const guiltyCol = headers.indexOf('GUILTY');
-        const notGuiltyCol = 8;
+        const guiltyCol = headers.indexOf('GUILTY'); // Column H, index 7
+        const notGuiltyCol = headers.indexOf('NOTGUILTY'); // Column I, index 8
 
-        console.log(`get-current-trial: Column indices: TrialID=${trialIdCol}, AccusedPlayerID=${accusedPlayerIdCol}, AudioLink=${audioLinkCol}, Status=${statusCol}, Guilty=${guiltyCol}, NotGuilty=${notGuiltyCol}`); // LOG 11
+        console.log(`get-current-trial: Column indices: TrialID=${trialIdCol}, AccusedPlayerID=${accusedPlayerIdCol}, AudioLink=${audioLinkCol}, Status=${statusCol}, Guilty=${guiltyCol}, NotGuilty=${notGuiltyCol}, TrialStartTime=${trialStartTimeCol}, VotingDeadline=${votingDeadlineCol}`);
 
-        if ([trialIdCol, accusedPlayerIdCol, audioLinkCol, statusCol, guiltyCol, trialStartTimeCol, votingDeadlineCol].includes(-1)) {
-            console.error('get-current-trial: One or more required columns not found in Trials sheet. Check headers.'); // LOG 12
+        if ([trialIdCol, accusedPlayerIdCol, audioLinkCol, statusCol, guiltyCol, notGuiltyCol, trialStartTimeCol, votingDeadlineCol].includes(-1)) {
+            console.error('get-current-trial: One or more required columns not found in Trials sheet. Check headers.');
             throw new Error('One or more required columns not found in Trials sheet.');
         }
 
-        let currentTrialData = null;
-        for (let i = 0; i < trialRows.length; i++) {
-            const trial = trialRows[i];
-            const currentStatus = trial[statusCol];
-            console.log(`get-current-trial: Checking row ${i + 2}. Status found: '${currentStatus}'. Expected: 'Active'`); // LOG 13
-
-            if (currentStatus === 'Active') { // CRITICAL: Looking for 'Active' status
-                console.log(`get-current-trial: Found active trial at row ${i + 2}.`); // LOG 14
-                currentTrialData = {
-                    TrialID: trial[trialIdCol],
-                    AccusedPlayerID: trial[accusedPlayerIdCol],
-                    AccusationAudioLink: trial[audioLinkCol],
-                    TrialStartTime: trial[trialStartTimeCol],
-                    VotingDeadline: trial[votingDeadlineCol],
-                    Status: trial[statusCol],
-                    GUILTY: parseInt(trial[guiltyCol] || '0'),
-                    NOTGUILTY: parseInt(trial[notGuiltyCol] || '0'),
-                    rowIndex: i + 2 // Store original row index for potential updates later
-                };
-            }
-        }
-
-// CRITICAL CHANGE: Return all active trials, not just the first one
         const activeTrials = [];
         for (let i = 0; i < trialRows.length; i++) {
             const trial = trialRows[i];
-            const currentStatus = trial[statusCol];
+            const currentStatus = String(trial[statusCol]).trim(); // Ensure string and trim for comparison
             console.log(`get-current-trial: Checking row ${i + 2}. Status found: '${currentStatus}'. Expected: 'Active'`);
 
             if (currentStatus === 'Active') {
                 console.log(`get-current-trial: Found active trial at row ${i + 2}.`);
                 activeTrials.push({
-                    TrialID: trial[trialIdCol],
-                    AccusedPlayerID: trial[accusedPlayerIdCol],
-                    AccusationAudioLink: trial[audioLinkCol],
-                    TrialStartTime: trial[trialStartTimeCol],
-                    VotingDeadline: trial[votingDeadlineCol],
-                    Status: trial[statusCol],
+                    TrialID: String(trial[trialIdCol]).trim(),
+                    AccusedPlayerID: String(trial[accusedPlayerIdCol]).trim(),
+                    AccusationAudioLink: String(trial[audioLinkCol]).trim(),
+                    TrialStartTime: String(trial[trialStartTimeCol]).trim(),
+                    VotingDeadline: String(trial[votingDeadlineCol]).trim(),
+                    Status: String(trial[statusCol]).trim(),
                     GUILTY: parseInt(trial[guiltyCol] || '0'),
                     NOTGUILTY: parseInt(trial[notGuiltyCol] || '0'),
-                    rowIndex: i + 2 // Store original row index for potential updates later
+                    rowIndex: i + 2
                 });
             }
         }
@@ -136,22 +103,24 @@ exports.handler = async (event, context) => {
             return {
                 statusCode: 200,
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ message: 'Active trials found.', activeTrials: activeTrials }), // Changed currentTrial to activeTrials
+                body: JSON.stringify({ message: 'Active trials found.', activeTrials: activeTrials }),
             };
         } else {
             console.log("get-current-trial: No active trials found after checking all rows.");
             return {
                 statusCode: 200,
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ message: 'No active trials found.', activeTrials: [] }), // Changed currentTrial to activeTrials
+                body: JSON.stringify({ message: 'No active trials found.', activeTrials: [] }),
             };
         }
 
     } catch (error) {
-        console.error('get-current-trial: Error in try-catch block:', error); // LOG 17
+        console.error('get-current-trial: Error in try-catch block:', error);
         return {
             statusCode: 500,
             body: JSON.stringify({ error: 'Failed to fetch current trial data.', details: error.message }),
         };
+    } finally {
+        console.log("get-current-trial: Function finished.");
     }
 };
