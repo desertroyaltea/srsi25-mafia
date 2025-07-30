@@ -305,6 +305,37 @@ actionModal: ({ title, buttonText, targets, actionType }) => `
                 </div>
             `,
 
+
+// NEW JESTER WIN PAGE TEMPLATE
+            jesterWinPage: () => `
+                <div class="bg-gray-900 p-5 rounded-lg mt-4 text-center flex flex-col justify-center items-center min-h-[80vh]">
+                    <h2 class="text-5xl font-bold text-purple-500 mb-8 animate-pulse">GAME OVER!</h2>
+                    <p class="text-3xl text-yellow-300 mb-6">
+                        The <span class="font-bold text-yellow-500">Jester</span> has fooled you all!
+                    </p>
+                    <div class="text-xl text-gray-300 mb-8 leading-relaxed max-w-2xl">
+                        <p class="mb-4">
+                            SRSI, blinded by its own suspicions, has committed the ultimate blunder.
+                        </p>
+                        <p class="mb-4">
+                            Through a masterful display of <span class="text-purple-400 font-bold">cunning</span> and <span class="text-purple-400 font-bold">ragebait</span>, the Jester successfully manipulated everyone, drawing their anger and their votes.
+                        </p>
+                        <p class="mb-4">
+                            The gallows, meant for the guilty, instead became the stage for the Jester's final, twisted performance. As their last breath escaped, a triumphant, mocking laughter echoed through the campus.
+                        </p>
+                        <p>
+                            The true villains may yet walk free, but tonight, the <span class="font-bold text-red-500">Jester</span> stands as the sole victor.
+                        </p>
+                    </div>
+                    <p class="text-2xl font-bold text-red-500 mb-6">
+                        The Jester wins!
+                    </p>
+                    <button type="button" id="logout-button" class="mt-8 bg-gray-600 hover:bg-gray-700 text-white font-bold py-3 px-6 rounded-lg w-full md:w-1/2 text-xl mx-auto block">
+                        Logout
+                    </button>
+                </div>
+            `,
+
 // NEW OFF LIMITS PAGE TEMPLATE
 offLimitsPage: () => `
                 <div class="bg-gray-900 p-5 rounded-lg mt-4 text-center flex flex-col justify-center items-center min-h-[80vh]">
@@ -593,58 +624,57 @@ async function initializeGame(userId) {
 
     const currentUserWelcomeStatus = state.currentUser.Welcome?.toString().toUpperCase();
 
-    if (state.currentUser.Status && state.currentUser.Status.toLowerCase() === 'dead') {
-        renderView('deadPage');
-        hideLoadingOverlay();
-    } else if (state.gameState?.CurrentPhase === 'Off') {
-        renderView('offLimitsPage');
-        hideLoadingOverlay();
-    } else if (currentUserWelcomeStatus !== 'TRUE') {
-        localStorage.removeItem('mafiaGameUserId');
-        localStorage.removeItem('mafiaGameSessionId'); // NEW: Clear sessionId if Welcome is FALSE
-        renderView('welcomePage');
-        hideLoadingOverlay();
-    } else {
-        renderView('dashboard');
-        updateDashboardActions(state.gameState?.CurrentPhase || 'Day');
+// Check for Game Over conditions first
+    if (state.gameState?.Winner === 'Jester') { // NEW: Check for Jester win
+        renderView('jesterWinPage');
+        hideLoadingOverlay();
+    } else if (state.currentUser.Status && state.currentUser.Status.toLowerCase() === 'dead') {
+        renderView('deadPage');
+        hideLoadingOverlay();
+    } else if (state.gameState?.CurrentPhase === 'Off') {
+        renderView('offLimitsPage');
+        hideLoadingOverlay();
+    } else if (currentUserWelcomeStatus !== 'TRUE') {
+        localStorage.removeItem('mafiaGameUserId');
+        localStorage.removeItem('mafiaGameSessionId');
+        renderView('welcomePage');
+        hideLoadingOverlay();
+    } else {
+        renderView('dashboard');
+        updateDashboardActions(state.gameState?.CurrentPhase || 'Day');
 
-        // NEW: Start periodic session activity update
-        if (sessionId) { // Only update if a session ID exists
-            startSessionActivityUpdate(sessionId);
-        }
+        if (state.gameState?.CurrentPhase === 'Day') {
+            const previousDay = parseInt(state.gameState.CurrentDay) - 1;
+            if (previousDay >= 1) {
+                let recapLoadingTimeout;
+                showLoadingOverlay();
 
-        if (state.gameState?.CurrentPhase === 'Day') {
-            const previousDay = parseInt(state.gameState.CurrentDay) - 1;
-            if (previousDay >= 1) {
-                let recapLoadingTimeout;
-                showLoadingOverlay();
+                recapLoadingTimeout = setTimeout(() => {
+                    hideLoadingOverlay();
+                    showMessage('Nightly recap loading timed out.');
+                }, 15000);
 
-                recapLoadingTimeout = setTimeout(() => {
-                    hideLoadingOverlay();
-                    showMessage('Nightly recap loading timed out.');
-                }, 15000);
-
-                try {
-                    const recapResponse = await fetch(`/.netlify/functions/get-nightly-recap?dayNumber=${previousDay}`);
-                    if (recapResponse.ok) {
-                        const recapResult = await recapResponse.json();
-                        state.nightlyRecap = recapResult.recapData;
-                        renderView('dashboard');
-                        updateDashboardActions(state.gameState?.CurrentPhase || 'Day');
-                    } else {
-                        console.error("Error fetching nightly recap:", await recapResponse.text());
-                        state.nightlyRecap = null;
-                    }
-                } catch (error) {
-                    console.error("Error fetching nightly recap:", error);
-                    state.nightlyRecap = null;
-                } finally {
-                    clearTimeout(recapLoadingTimeout);
-                    hideLoadingOverlay();
-                }
-            }
-        }
-    }
+                try {
+                    const recapResponse = await fetch(`/.netlify/functions/get-nightly-recap?dayNumber=${previousDay}`);
+                    if (recapResponse.ok) {
+                        const recapResult = await recapResponse.json();
+                        state.nightlyRecap = recapResult.recapData;
+                        renderView('dashboard');
+                        updateDashboardActions(state.gameState?.CurrentPhase || 'Day');
+                    } else {
+                        console.error("Error fetching nightly recap:", await recapResponse.text());
+                        state.nightlyRecap = null;
+                    }
+                } catch (error) {
+                    console.error("Error fetching nightly recap:", error);
+                    state.nightlyRecap = null;
+                } finally {
+                    clearTimeout(recapLoadingTimeout);
+                    hideLoadingOverlay();
+                }
+            }
+        }
+    }
 }
 
 
@@ -653,11 +683,23 @@ async function initializeGame(userId) {
         return player ? player.Name : 'N/A';
     }
 
-    async function fetchGameState() {
+async function fetchGameState() {
         try {
+            // CRITICAL FIX: Fetch Winner column (H2) as well
             const response = await fetch('/.netlify/functions/get-game-state');
             if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
-            state.gameState = await response.json();
+            const rawGameState = await response.json(); // Get raw object
+
+            // Map raw data to state.gameState, including Winner
+            state.gameState = {
+                CurrentDay: rawGameState.CurrentDay,
+                CurrentPhase: rawGameState.CurrentPhase,
+                PhaseDeadline: rawGameState.PhaseDeadline,
+                LastAccusedPlayerID: rawGameState.LastAccusedPlayerID,
+                LastTrialResult: rawGameState.LastTrialResult,
+                JesterKilledByVote: rawGameState.JesterKilledByVote,
+                Winner: rawGameState.Winner // NEW: Map Winner from H2
+            };
         } catch (error) {
             console.error("Error fetching game state:", error);
             showMessage("Failed to load game state.");

@@ -3,7 +3,6 @@
 const { google } = require('googleapis');
 const { JWT } = require('google-auth-library');
 
-// Helper function to initialize Google Sheets API
 async function getSheetsService() {
     const credentials = JSON.parse(process.env.GOOGLE_SERVICE_ACCOUNT_CREDENTIALS);
     const auth = new JWT({
@@ -15,38 +14,42 @@ async function getSheetsService() {
 }
 
 exports.handler = async (event, context) => {
+    console.log("get-game-state: Function started.");
+    if (event.httpMethod !== 'GET') {
+        console.log("get-game-state: Method Not Allowed.");
+        return { statusCode: 405, body: 'Method Not Allowed' };
+    }
+
     const sheetId = process.env.GOOGLE_SHEET_ID;
     if (!sheetId) {
         console.error("get-game-state: Google Sheet ID is not configured.");
         return { statusCode: 500, body: JSON.stringify({ error: 'Server configuration error.' }) };
     }
+    console.log(`get-game-state: Sheet ID: ${sheetId}`);
 
     try {
         const sheets = await getSheetsService();
+        console.log("get-game-state: Sheets service initialized.");
 
-        // 1. Fetch all data from the Game_State sheet to find the last row.
-        const response = await sheets.spreadsheets.values.get({
+        // CRITICAL FIX: Fetch the Winner cell (H2) as well
+        const gameStateResponse = await sheets.spreadsheets.values.get({
             spreadsheetId: sheetId,
-            range: 'Game_State!A:G',
+            range: 'Game_State!A2:H2', // Fetch from A2 to H2 to get all relevant cells
         });
 
-        const allRows = response.data.values || [];
-        if (allRows.length < 2) {
-            throw new Error("Game_State sheet is empty or has no data headers.");
-        }
-
-        const headers = allRows[0];
-        // 2. The definitive current state is the LAST row in the sheet.
-        const latestRow = allRows[allRows.length - 1];
-
-        // 3. Parse the correct row into a game state object
-        const gameState = {};
-        headers.forEach((header, index) => {
-            const cleanHeader = header.replace(/[^a-zA-Z0-9]/g, '');
-            gameState[cleanHeader] = latestRow[index] || null;
-        });
+        const row = gameStateResponse.data.values ? gameStateResponse.data.values[0] : [];
         
-        console.log('Parsed game state object from the last row:', gameState);
+        // Ensure mapping matches the order of columns in Game_State!A2:H2
+        const gameState = {
+            CurrentDay: row[0] || '1', // A2
+            CurrentPhase: row[1] || 'Day', // B2
+            PhaseDeadline: row[2] || '', // C2 (assuming C2 is PhaseDeadline)
+            LastAccusedPlayerID: row[4] || 'N/A', // E2
+            LastTrialResult: row[5] || 'N/A', // F2
+            JesterKilledByVote: row[6] || 'FALSE', // G2
+            Winner: row[7] || '' // H2 - NEW: Winner column
+        };
+        console.log("get-game-state: Fetched game state:", gameState);
 
         return {
             statusCode: 200,
@@ -55,10 +58,12 @@ exports.handler = async (event, context) => {
         };
 
     } catch (error) {
-        console.error('Error in get-game-state function:', error);
+        console.error('get-game-state: Error in try-catch block:', error);
         return {
             statusCode: 500,
             body: JSON.stringify({ error: 'Failed to fetch game state.', details: error.message }),
         };
+    } finally {
+        console.log("get-game-state: Function finished.");
     }
 };
