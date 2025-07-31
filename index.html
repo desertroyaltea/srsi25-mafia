@@ -273,6 +273,13 @@ dashboard: () => `
                 </div>
                 <!-- END NEW ROLE REVEAL SECTION -->
 
+<!-- NEW NOTIFICATION OPT-IN BUTTON -->
+             <div id="notification-opt-in-container" class="bg-gray-800 p-4 rounded-lg mb-0 mt-0 border border-gray-700 text-center">
+                 <p class="text-gray-300 mb-4">Stay updated with game events!</p>
+                 <button id="btn-enable-notifications" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg">Enable Notifications</button>
+             </div>
+             <!-- END NEW NOTIFICATION OPT-IN BUTTON -->
+
                 <div id="player-dashboard-actions" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4"></div>
                 <div id="admin-dashboard-actions" class="grid-cols-1 md:grid-cols-2 gap-4 ${state.isCurrentUserAdmin ? 'grid' : 'hidden'}">
                     <button id="btn-review-accusations" class="bg-green-700 hover:bg-green-800 text-white font-bold py-3 px-6 rounded-lg">Review Accusations</button>
@@ -732,42 +739,44 @@ async function initializeGame(userId) {
         updateDashboardActions(state.gameState?.CurrentPhase || 'Day');
 
 
-// NEW: Register Service Worker and ask for Push Notification permission
-            if ('serviceWorker' in navigator) {
-                console.log('Service Worker: Navigator supports serviceWorker.'); // DEBUG LOG SW 1
-                navigator.serviceWorker.register('/sw.js')
-                    .then(function(registration) {
-                        console.log('Service Worker: Registration successful with scope:', registration.scope); // DEBUG LOG SW 2
-                        // Check if notifications are already denied
-                        if (Notification.permission === 'denied') {
-                            console.warn('Notification permission already denied by user.'); // DEBUG LOG SW 3
-                            showMessage('Notifications are blocked. You can enable them in browser settings.');
-                            return; // Exit if already denied
-                        }
-                        
-                        // Prompt for notification permission if not already granted
-                        if (Notification.permission === 'default') {
-                            console.log('Notification: Permission status is default, requesting permission...'); // DEBUG LOG SW 4
-                            Notification.requestPermission().then(function(permission) {
-                                if (permission === 'granted') {
-                                    console.log('Notification: Permission granted.'); // DEBUG LOG SW 5
-                                    subscribeUserToPush(state.currentUserId); // Subscribe user
-                                } else {
-                                    console.warn('Notification: Permission denied by user.'); // DEBUG LOG SW 6
-                                    showMessage('Notifications are blocked. You can enable them in browser settings.');
-                                }
-                            });
-                        } else if (Notification.permission === 'granted') {
-                            console.log('Notification: Permission already granted.'); // DEBUG LOG SW 7
-                            subscribeUserToPush(state.currentUserId); // Ensure user is subscribed
-                        }
-                    })
-                    .catch(function(error) {
-                        console.error('Service Worker: Registration failed:', error); // DEBUG LOG SW 8
-                    });
-            } else {
-                console.warn('Service Worker: Browser does not support serviceWorker.'); // DEBUG LOG SW 9
-            }
+// NEW: Register Service Worker (without immediate permission request)
+     if ('serviceWorker' in navigator) {
+         navigator.serviceWorker.register('/sw.js')
+             .then(function(registration) {
+                 console.log('Service Worker: Registration successful with scope:', registration.scope);
+                 // Check current permission status to show/hide button
+                 if (Notification.permission === 'granted') {
+                     console.log('Notification: Permission already granted.');
+                     // Ensure user is subscribed if permission is granted
+                     subscribeUserToPush(state.currentUserId);
+                     // Hide the enable notifications button if already granted
+                     const optInContainer = document.getElementById('notification-opt-in-container');
+                     if (optInContainer) optInContainer.classList.add('hidden');
+                 } else if (Notification.permission === 'denied') {
+                     console.warn('Notification: Permission already denied.');
+                     showMessage('Notifications are blocked. You can enable them in browser settings.');
+                     // Hide the enable notifications button if denied
+                     const optInContainer = document.getElementById('notification-opt-in-container');
+                     if (optInContainer) optInContainer.classList.add('hidden');
+                 } else { // 'default'
+                     console.log('Notification: Permission status is default, user can click button to request.');
+                     // Show the enable notifications button
+                     const optInContainer = document.getElementById('notification-opt-in-container');
+                     if (optInContainer) optInContainer.classList.remove('hidden');
+                 }
+             })
+             .catch(function(error) {
+                 console.error('Service Worker: Registration failed:', error);
+                 showMessage('Notification service unavailable.');
+                 const optInContainer = document.getElementById('notification-opt-in-container');
+                 if (optInContainer) optInContainer.classList.add('hidden');
+             });
+     } else {
+         console.warn('Service Worker: Browser does not support serviceWorker.');
+         showMessage('Notifications are not supported by your browser.');
+         const optInContainer = document.getElementById('notification-opt-in-container');
+         if (optInContainer) optInContainer.classList.add('hidden');
+     }
 
         if (state.gameState?.CurrentPhase === 'Day') {
             const previousDay = parseInt(state.gameState.CurrentDay) - 1;
@@ -1826,6 +1835,30 @@ appRoot.addEventListener('click', async (e) => {
                     overlay.style.display = 'none'; // Hide the overlay
                 }
             
+} else if (e.target.id === 'btn-enable-notifications') { // NEW: Handle Enable Notifications button
+             if ('Notification' in window && Notification.permission === 'default') {
+                 Notification.requestPermission().then(function(permission) {
+                     if (permission === 'granted') {
+                         console.log('Notification: Permission granted by user click.');
+                         subscribeUserToPush(state.currentUserId);
+                         const optInContainer = document.getElementById('notification-opt-in-container');
+                         if (optInContainer) optInContainer.classList.add('hidden'); // Hide button
+                     } else {
+                         console.warn('Notification: Permission denied by user click.');
+                         showMessage('Notifications are blocked. You can enable them in browser settings.');
+                     }
+                 });
+             } else if ('Notification' in window && Notification.permission === 'granted') {
+                 showMessage('Notifications are already enabled!');
+                 subscribeUserToPush(state.currentUserId); // Ensure subscribed
+                 const optInContainer = document.getElementById('notification-opt-in-container');
+                 if (optInContainer) optInContainer.classList.add('hidden');
+             } else {
+                 showMessage('Notifications are not supported or blocked by your browser.');
+                 const optInContainer = document.getElementById('notification-opt-in-container');
+                 if (optInContainer) optInContainer.classList.add('hidden');
+             }
+         
 
 } else if (e.target.id === 'logout-button') {
                 const sessionId = localStorage.getItem('mafiaGameSessionId'); // Get sessionId for logout
