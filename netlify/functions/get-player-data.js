@@ -49,12 +49,15 @@ exports.handler = async (event, context) => {
         const playerRows = allPlayersRawData.slice(1);
 
         const idCol = headers.indexOf('PlayerID');
-        if (idCol === -1) {
-            console.error("get-player-data: 'PlayerID' column not found in Players sheet headers.");
-            throw new Error("Required column 'PlayerID' not found in Players sheet.");
+        const nameCol = headers.indexOf('Name'); // Ensure Name column is found
+        const statusCol = headers.indexOf('Status'); // Ensure Status column is found
+        const isAdminCol = headers.indexOf('IsAdmin'); // Ensure IsAdmin column is found
+
+        if ([idCol, nameCol, statusCol, isAdminCol].includes(-1)) {
+            console.error("get-player-data: Required public columns not found in Players sheet (PlayerID, Name, Status, IsAdmin).");
+            throw new Error("Required public columns not found in Players sheet.");
         }
 
-        const publicPlayerFields = ['PlayerID', 'Name', 'Status', 'IsAdmin']; // Fields always sent publicly
         const sensitivePlayerFields = [ // Fields only sent for the requested player
             'Passcode', 'Role', 'CurrentVotingPower', 'MissionsCompleted',
             'MafiaCanConvert', 'MafiaCanRevealSelf', 'VillagerCanIncreaseVote',
@@ -64,38 +67,40 @@ exports.handler = async (event, context) => {
             'InvestigationHistory', 'Jury', 'RevealedTeammates', 'NightVoteUsed', 'IsProtected', 'Welcome'
         ];
 
-        const allPlayers = [];
-        let requestedPlayerData = null;
+        const allPublicPlayersData = []; // Store public data for all players
+        let requestedPlayerData = null; // Store full data for the requested player
 
         for (const row of playerRows) {
-            const player = {};
-            const currentPlayerId = row[idCol];
+            const currentPlayerId = row[idCol] ? String(row[idCol]).trim() : '';
+            const playerName = row[nameCol] ? String(row[nameCol]).trim() : '';
+            const playerStatus = row[statusCol] ? String(row[statusCol]).trim() : '';
+            const playerIsAdmin = row[isAdminCol] ? String(row[isAdminCol]).trim() : '';
 
-            // Populate public fields for all players
-            for (const field of publicPlayerFields) {
-                const colIndex = headers.indexOf(field);
-                if (colIndex !== -1) {
-                    player[field] = row[colIndex] !== undefined && row[colIndex] !== null ? String(row[colIndex]) : '';
-                } else {
-                    console.warn(`get-player-data: Public field '${field}' not found in headers.`);
-                    player[field] = ''; // Default empty if not found
-                }
-            }
+            const publicPlayerInfo = { // Only public fields for all players
+                Name: playerName,
+                Status: playerStatus,
+                IsAdmin: playerIsAdmin
+            };
+            allPublicPlayersData.push(publicPlayerInfo);
 
-            // If a specific player is requested, fill in their sensitive data
+            // If a specific player is requested, build their full data object
             if (requestedPlayerId && currentPlayerId === requestedPlayerId) {
+                requestedPlayerData = {
+                    PlayerID: currentPlayerId, // Include PlayerID for the requested user
+                    Name: playerName,
+                    Status: playerStatus,
+                    IsAdmin: playerIsAdmin
+                };
                 for (const field of sensitivePlayerFields) {
                     const colIndex = headers.indexOf(field);
                     if (colIndex !== -1) {
-                        player[field] = row[colIndex] !== undefined && row[colIndex] !== null ? String(row[colIndex]) : '';
+                        requestedPlayerData[field] = row[colIndex] !== undefined && row[colIndex] !== null ? String(row[colIndex]) : '';
                     } else {
                         console.warn(`get-player-data: Sensitive field '${field}' not found in headers for ${requestedPlayerId}.`);
-                        player[field] = ''; // Default empty if not found
+                        requestedPlayerData[field] = '';
                     }
                 }
-                requestedPlayerData = player; // Store the full data for the requested player
             }
-            allPlayers.push(player);
         }
 
         if (requestedPlayerId) {
@@ -113,11 +118,11 @@ exports.handler = async (event, context) => {
             }
         } else {
             // If no specific player was requested, return public data for all players
-            console.log(`get-player-data: Returning public data for ${allPlayers.length} players.`);
+            console.log(`get-player-data: Returning public data for ${allPublicPlayersData.length} players.`);
             return {
                 statusCode: 200,
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(allPlayers),
+                body: JSON.stringify(allPublicPlayersData), // CRITICAL: Only public data
             };
         }
 

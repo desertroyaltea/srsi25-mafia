@@ -1,14 +1,14 @@
-// netlify/functions/authenticate-player.js
 
 const { google } = require('googleapis');
 const { JWT } = require('google-auth-library');
+const bcrypt = require('bcryptjs');
 
 async function getSheetsService() {
     const credentials = JSON.parse(process.env.GOOGLE_SERVICE_ACCOUNT_CREDENTIALS);
     const auth = new JWT({
         email: credentials.client_email,
         key: credentials.private_key,
-        scopes: ['https://www.googleapis.com/auth/spreadsheets'] // Changed to full access for writing to Sessions
+        scopes: ['https://www.googleapis.com/auth/spreadsheets']
     });
     return google.sheets({ version: 'v4', auth });
 }
@@ -42,11 +42,11 @@ exports.handler = async (event, context) => {
 
         const playersResponse = await sheets.spreadsheets.values.get({
             spreadsheetId: sheetId,
-            range: 'Players!A:C', // Fetch only PlayerID (A), Name (B), Passcode (C) for efficiency
+            range: 'Players!A:C',
         });
 
         const allPlayersData = playersResponse.data.values || [];
-        if (allPlayersData.length < 2) { // At least headers + one player
+        if (allPlayersData.length < 2) {
             return { statusCode: 401, body: JSON.stringify({ error: 'No players registered.' }) };
         }
 
@@ -63,27 +63,28 @@ exports.handler = async (event, context) => {
 
         let authenticatedPlayerId = null;
         for (const row of playerRows) {
-            const playerPasscode = row[passcodeCol] ? String(row[passcodeCol]).trim() : ''; // Ensure string and trim
-            if (playerPasscode === passcodeInput.trim()) { // Compare trimmed passcodes
+            const storedHashedPasscode = row[passcodeCol] ? String(row[passcodeCol]).trim() : '';
+            
+            const isMatch = await bcrypt.compare(passcodeInput.trim(), storedHashedPasscode);
+
+            if (isMatch) {
                 authenticatedPlayerId = row[playerIdCol];
                 break;
             }
         }
 
         if (authenticatedPlayerId) {
-
-            // --- NEW: Log session to Sessions sheet ---
             const sessionId = `SESS_${Date.now()}_${authenticatedPlayerId}`;
             const loginTime = new Date().toISOString();
             const userAgent = event.headers['user-agent'] || 'Unknown';
-            const ipAddress = event.headers['x-nf-client-connection-ip'] || 'Unknown'; // Netlify specific header for client IP
+            const ipAddress = event.headers['x-nf-client-connection-ip'] || 'Unknown';
 
             const sessionEntry = [
                 sessionId,
                 authenticatedPlayerId,
                 loginTime,
-                loginTime, // LastActivityTime starts as LoginTime
-                '',        // LogoutTime (empty initially)
+                loginTime,
+                '',
                 'Active',
                 userAgent,
                 ipAddress
@@ -91,16 +92,15 @@ exports.handler = async (event, context) => {
 
             await sheets.spreadsheets.values.append({
                 spreadsheetId: sheetId,
-                range: 'Sessions!A:H', // Assuming Sessions sheet has columns A to H
+                range: 'Sessions!A:H',
                 valueInputOption: 'USER_ENTERED',
                 resource: { values: [sessionEntry] },
             });
-            // --- END NEW ---
 
             return {
                 statusCode: 200,
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ message: 'Authentication successful.', playerId: authenticatedPlayerId, sessionId: sessionId }), // Return sessionId
+                body: JSON.stringify({ message: 'Authentication successful.', playerId: authenticatedPlayerId, sessionId: sessionId }),
             };
         } else {
             return { statusCode: 401, body: JSON.stringify({ error: 'Invalid Passcode.' }) };
