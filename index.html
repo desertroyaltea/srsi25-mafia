@@ -124,6 +124,74 @@ const appRoot = document.getElementById('app-root');
     let audioPlayer;
     let sessionActivityIntervalId;
 
+// --- Role Descriptions and Actions Data ---
+    const ROLE_DATA = {
+        'Mafia': { // Mafia
+            description: "You are a member of the Mafia, a secret society working to eliminate the innocent. Your strength lies in deception and coordinated attacks.",
+            actions: [
+                "Kill Player: Choose two targets each night to eliminate.",
+                "Convert Villager: Attempt to convert a Villager to your cause (unlockable ability).",
+                "Reveal Mafia: Reveal yourself as Mafia to other players (unlockable ability).",
+                "List Mafia: See who your fellow Mafia members are."
+            ],
+            color: 'text-red-500'
+        },
+        'Villager': { // Villager
+            description: "You are a loyal Villager, striving to uncover the hidden Mafia and bring justice to the town. Your power lies in your vote and collective action.",
+            actions: [
+                "Submit Accusation: Accuse a player you suspect of being Mafia.",
+                "The Trial: Vote Guilty or Not Guilty on accused players.",
+                "Increase Vote Power: Permanently increase your voting strength (unlockable ability).",
+                "Change Role: Transform into a new role (unlockable ability)."
+            ],
+            color: 'text-gray-300'
+        },
+        'Doctor': { // Doctor
+            description: "You are the town's Doctor, dedicated to protecting the innocent and healing the wounded. Your medical skills are vital for survival.",
+            actions: [
+                "Protect Player: Choose one player to protect from death each night. If DoctorCanSaveMore is TRUE, protect two players.",
+                "Revive Player: Bring a dead player back to life (unlockable ability).",
+                "Reveal Doctor: Reveal yourself as a Doctor (unlockable ability).",
+                "List Doctors: See who your fellow Doctors are."
+            ],
+            color: 'text-blue-400'
+        },
+        'Detective': { // Detective
+            description: "You are the town's Detective, tasked with investigating suspects and uncovering their true allegiances. Your keen intellect is essential for rooting out the Mafia.",
+            actions: [
+                "Investigate Player: Choose a player to investigate and learn if they are Mafia.",
+                "Investigation History: Review your past investigation results.",
+                "Reveal Detective: Reveal yourself as a Detective (unlockable ability)."
+            ],
+            color: 'text-yellow-400'
+        },
+        'Jester': { // Jester
+            description: "You are the Jester, a mischievous wildcard. Your goal is to be accused and executed by the town during a trial. If you succeed, you win the game!",
+            actions: [
+                "Submit Accusation: Accuse a player (even yourself) to draw attention.",
+                "The Trial: Vote Guilty or Not Guilty on accused players."
+            ],
+            color: 'text-purple-400'
+        },
+        'Sheriff': { // Sheriff
+            description: "You are the Sheriff, a lone enforcer of justice. You have one chance to eliminate a player you believe is Mafia, without trial.",
+            actions: [
+                "Shoot Player: Choose one player to eliminate instantly (one-time ability).",
+                "Submit Accusation: Accuse a player you suspect of being Mafia.",
+                "The Trial: Vote Guilty or Not Guilty on accused players."
+            ],
+            color: 'text-yellow-500'
+        },
+        'ADMIN': { // Admin (for display purposes, though they don't have game actions)
+            description: "You are an Admin. You oversee the game, manage accusations, and ensure fair play. You are exempt from all game actions.",
+            actions: [
+                "Review Accusations: Approve or deny pending accusations."
+            ],
+            color: 'text-green-500'
+        }
+    };
+
+
     const templates = {
 login: () => `
             <div class="container">
@@ -143,7 +211,7 @@ gameLayout: (viewHtml) => `
                 <p class="text-sm text-gray-400 text-center mb-4">Made by: Abdulelah AlHarbi | EXCOR 23'24'</p> <!-- mb-6 to mb-4 -->
                 <div class="bg-gray-900 p-4 rounded-lg flex justify-between items-center mb-4">
                     <p class="text-base text-gray-400">Logged in as:</p>
-                    <span class="font-mono text-blue-400 text-base">${state.currentUser.Name} (${state.currentUser.Role})</span>
+<span class="font-mono text-blue-400 text-base">${state.currentUser.Name}</span> <!-- Removed role display here -->
                 </div>
              <!-- NEW UNIVERSAL LOGOUT BUTTON -->
              <button type="button" id="logout-button" class="bg-gray-600 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded-lg w-full mb-4"> <!-- mb-6 to mb-4 -->
@@ -186,6 +254,23 @@ dashboard: () => `
                  </div>
              ` : ''}
              <!-- END NEW NIGHTLY RECAP SECTION -->
+
+<!-- NEW ROLE REVEAL SECTION -->
+                <div id="role-reveal-container" class="relative bg-gray-800 p-4 rounded-lg mb-0 mt-0 border border-gray-700 overflow-hidden">
+                    <div id="role-info-content" class="relative z-10">
+                        <h3 class="text-xl font-semibold mb-2 ${ROLE_DATA[state.currentUser.Role]?.color || 'text-gray-300'}">Your Role: ${getDisplayRoleName(state.currentUser.Role)}</h3>
+                        <p class="text-gray-300 text-sm mb-3">${ROLE_DATA[state.currentUser.Role]?.description || 'No description available.'}</p>
+                        <h4 class="text-lg font-semibold text-gray-400 mb-1">Your Actions:</h4>
+                        <ul class="list-disc list-inside text-gray-300 text-sm space-y-1">
+                            ${ROLE_DATA[state.currentUser.Role]?.actions.map(action => `<li>${action}</li>`).join('') || '<li>No specific actions listed.</li>'}
+                        </ul>
+                    </div>
+                    <!-- Black overlay -->
+                    <div id="role-reveal-overlay" class="absolute inset-0 bg-black flex items-center justify-center z-20 cursor-pointer">
+                        <p class="text-white text-2xl font-bold animate-pulse">CLICK TO REVEAL ROLE</p>
+                    </div>
+                </div>
+                <!-- END NEW ROLE REVEAL SECTION -->
 
                 <div id="player-dashboard-actions" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4"></div>
                 <div id="admin-dashboard-actions" class="grid-cols-1 md:grid-cols-2 gap-4 ${state.isCurrentUserAdmin ? 'grid' : 'hidden'}">
@@ -467,6 +552,9 @@ investigationHistory: ({ formattedHistory }) => `
                 <button type="button" id="back-to-dashboard" class="mt-6 bg-gray-600 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded-lg w-full">Back to Dashboard</button>
             </div>`,
     };
+
+
+    
 
     function renderView(viewName, data = {}) {
         if (viewName === 'login') {
@@ -806,17 +894,17 @@ async function generateNightlyRecapStory(recapData) { // Make async
     storyParts.push(`As the first rays of dawn pierced through the darkness, <span class="font-bold text-gray-300">Building 9</span> slowly awoke from a restless night.`);
 
     if (successfullyProtectedNames.length > 0) {
-        storyParts.push(`The <span class="text-blue-400 font-bold">${getDisplayRoleName('FQP982')}s</span> worked tirelessly, their healing touch safeguarding ${successfullyProtectedNames} from harm.`);
+        storyParts.push(`The <span class="text-blue-400 font-bold">${getDisplayRoleName('Doctor')}s</span> worked tirelessly, their healing touch safeguarding ${successfullyProtectedNames} from harm.`);
     } else {
-        storyParts.push(`The <span class="text-blue-400 font-bold">${getDisplayRoleName('FQP982')}s</span> watched over the town, but their skills were either not needed or, sadly, not enough to prevent all tragedies.`);
+        storyParts.push(`The <span class="text-blue-400 font-bold">${getDisplayRoleName('Doctor')}s</span> watched over the town, but their skills were either not needed or, sadly, not enough to prevent all tragedies.`);
     }
 
     if (mafiaKilledNames.length > 0) {
-        storyParts.push(`But the chilling silence was broken by the grim news: the <span class="text-red-500 font-bold">${getDisplayRoleName('BDS342')}</span> had claimed ${mafiaKilledNames}.`);
+        storyParts.push(`But the chilling silence was broken by the grim news: the <span class="text-red-500 font-bold">${getDisplayRoleName('Mafia')}</span> had claimed ${mafiaKilledNames}.`);
     } else if (successfullyProtectedNames.length > 0) {
-         storyParts.push(`The <span class="text-red-500 font-bold">${getDisplayRoleName('BDS342')}'s</span> deadly aim was thwarted, as their targets managed to escape their grasp.`);
+         storyParts.push(`The <span class="text-red-500 font-bold">${getDisplayRoleName('Mafia')}'s</span> deadly aim was thwarted, as their targets managed to escape their grasp.`);
     } else {
-        storyParts.push(`Remarkably, the <span class="text-red-500 font-bold">${getDisplayRoleName('BDS342')}</span> seemed to have missed their mark, or perhaps, chose to lay low.`);
+        storyParts.push(`Remarkably, the <span class="text-red-500 font-bold">${getDisplayRoleName('Mafia')}</span> seemed to have missed their mark, or perhaps, chose to lay low.`);
     }
 
     if (guiltyAccusedNames.length > 0) {
@@ -828,9 +916,9 @@ async function generateNightlyRecapStory(recapData) { // Make async
     }
 
     if (sheriffKilledNames.length > 0) {
-        storyParts.push(`Amidst the chaos, the vigilant <span class="text-yellow-500 font-bold">${getDisplayRoleName('QRW438')}</span> exacted their own brand of justice, eliminating ${sheriffKilledNames}.`);
+        storyParts.push(`Amidst the chaos, the vigilant <span class="text-yellow-500 font-bold">${getDisplayRoleName('Sheriff')}</span> exacted their own brand of justice, eliminating ${sheriffKilledNames}.`);
     } else {
-        storyParts.push(`The <span class="text-yellow-500 font-bold">${getDisplayRoleName('QRW438')}'s</span> gun remained silent, their target perhaps elusive or their moment yet to come.`);
+        storyParts.push(`The <span class="text-yellow-500 font-bold">${getDisplayRoleName('Sheriff')}'s</span> gun remained silent, their target perhaps elusive or their moment yet to come.`);
     }
 
     storyParts.push(`<span class="font-bold text-blue-400">SRSI25 Cohort</span> now faces a new day, with new questions and old suspicions lingering in the air.`);
@@ -1601,6 +1689,14 @@ appRoot.addEventListener('click', async (e) => {
                 clearTimeout(startGameTimeout);
                 hideLoadingOverlay(); // Use centralized function
             }
+
+            } else if (e.target.id === 'role-reveal-overlay') { // NEW: Handle role reveal click
+                const overlay = document.getElementById('role-reveal-overlay');
+                if (overlay) {
+                    overlay.style.display = 'none'; // Hide the overlay
+                }
+            
+
 } else if (e.target.id === 'logout-button') {
                 const sessionId = localStorage.getItem('mafiaGameSessionId'); // Get sessionId for logout
                 if (sessionId) {
