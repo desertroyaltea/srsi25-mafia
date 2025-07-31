@@ -828,6 +828,21 @@ function showMessage(message) {
      loadingOverlay.style.display = 'none';
  }
 
+// Helper function to convert encrypted role codes to display names
+    function getDisplayRoleName(encryptedRoleCode) {
+        switch (encryptedRoleCode) {
+            case 'BDS342': return 'Mafia';
+            case 'VSR983': return 'Villager';
+            case 'FQP982': return 'Doctor';
+            case 'LAP302': return 'Detective';
+            case 'MPA081': return 'Jester';
+            case 'QRW438': return 'Sheriff';
+            case 'ADMIN': return 'Admin'; // Added ADMIN for completeness
+            default: return 'Unknown Role';
+        }
+    }
+
+
  // --- Session Activity Tracking ---
  async function updateSessionActivity(sessionId) {
      try {
