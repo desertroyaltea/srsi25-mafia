@@ -123,7 +123,7 @@ const appRoot = document.getElementById('app-root');
     let recordedAudioBlob = null;
     let audioPlayer;
     let sessionActivityIntervalId;
-    const VAPID_PUBLIC_KEY = 'BMMMgjTjUxtzbmrWhjvFB1mwqumRGyPm6ZfC1lYhnMh1gCtU2KPUrQYUtHkNgDzrjLNF0HVon9ccjfBawVLdNGY'; // REPLACE WITH YOUR GENERATED PUBLIC KEY
+    const VAPID_PUBLIC_KEY = 'BEBsGsp9ZbUak2wYi2TfitM3ppeqeb4bvXWIIXfn3XvKLYuogGRYcJuJ1KownLa6zvqce8zSjuN-QisMYJw3wFw'; // REPLACE WITH YOUR GENERATED PUBLIC KEY
 
 // --- Role Descriptions and Actions Data ---
     const ROLE_DATA = {
@@ -739,43 +739,39 @@ async function initializeGame(userId) {
         updateDashboardActions(state.gameState?.CurrentPhase || 'Day');
 
 
-// NEW: Register Service Worker (without immediate permission request)
+// NEW: Register Service Worker and manage Push Notification permission UI
      if ('serviceWorker' in navigator) {
+         console.log('Service Worker: Navigator supports serviceWorker.');
          navigator.serviceWorker.register('/sw.js')
              .then(function(registration) {
                  console.log('Service Worker: Registration successful with scope:', registration.scope);
+                 const optInContainer = document.getElementById('notification-opt-in-container'); // Get container here
+
                  // Check current permission status to show/hide button
                  if (Notification.permission === 'granted') {
                      console.log('Notification: Permission already granted.');
-                     // Ensure user is subscribed if permission is granted
-                     subscribeUserToPush(state.currentUserId);
-                     // Hide the enable notifications button if already granted
-                     const optInContainer = document.getElementById('notification-opt-in-container');
-                     if (optInContainer) optInContainer.classList.add('hidden');
+                     subscribeUserToPush(state.currentUserId); // Ensure user is subscribed
+                     if (optInContainer) optInContainer.classList.add('hidden'); // Hide button if already granted
                  } else if (Notification.permission === 'denied') {
                      console.warn('Notification: Permission already denied.');
                      showMessage('Notifications are blocked. You can enable them in browser settings.');
-                     // Hide the enable notifications button if denied
-                     const optInContainer = document.getElementById('notification-opt-in-container');
-                     if (optInContainer) optInContainer.classList.add('hidden');
+                     if (optInContainer) optInContainer.classList.add('hidden'); // Hide button if denied
                  } else { // 'default'
                      console.log('Notification: Permission status is default, user can click button to request.');
-                     // Show the enable notifications button
-                     const optInContainer = document.getElementById('notification-opt-in-container');
-                     if (optInContainer) optInContainer.classList.remove('hidden');
+                     if (optInContainer) optInContainer.classList.remove('hidden'); // Show the button if default
                  }
              })
              .catch(function(error) {
                  console.error('Service Worker: Registration failed:', error);
                  showMessage('Notification service unavailable.');
                  const optInContainer = document.getElementById('notification-opt-in-container');
-                 if (optInContainer) optInContainer.classList.add('hidden');
+                 if (optInContainer) optInContainer.classList.add('hidden'); // Hide button on error
              });
      } else {
          console.warn('Service Worker: Browser does not support serviceWorker.');
          showMessage('Notifications are not supported by your browser.');
          const optInContainer = document.getElementById('notification-opt-in-container');
-         if (optInContainer) optInContainer.classList.add('hidden');
+         if (optInContainer) optInContainer.classList.add('hidden'); // Hide button if not supported
      }
 
         if (state.gameState?.CurrentPhase === 'Day') {
