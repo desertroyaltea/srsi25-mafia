@@ -258,10 +258,7 @@ dashboard: () => `
 <!-- NEW ROLE REVEAL SECTION -->
                 <div id="role-reveal-container" class="relative bg-gray-800 p-4 rounded-lg mb-0 mt-0 border border-gray-700 overflow-hidden">
                     <div id="role-info-content" class="relative z-10">
-                        <!-- DEBUG LOG: Check role value in dashboard template -->
-                 <script>console.log("Dashboard Template Render: state.currentUser.Role is", state.currentUser.Role);</script>
-                 <h3 class="text-xl font-semibold mb-2 ${ROLE_DATA[state.currentUser.Role]?.color || 'text-gray-300'}">Your Role:</h3>
-                        <h3 class="text-xl font-semibold mb-2 ${ROLE_DATA[state.currentUser.Role]?.color || 'text-gray-300'}">Your Role:</h3>
+                        <h3 class="text-xl font-semibold mb-2 ${ROLE_DATA[state.currentUser.Role]?.color || 'text-gray-300'}">Your Role: ${getDisplayRoleName(state.currentUser.Role)}</h3>
                         <p class="text-gray-300 text-sm mb-3">${ROLE_DATA[state.currentUser.Role]?.description || 'No description available.'}</p>
                         <h4 class="text-lg font-semibold text-gray-400 mb-1">Your Actions:</h4>
                         <ul class="list-disc list-inside text-gray-300 text-sm space-y-1">
@@ -681,9 +678,6 @@ async function initializeGame(userId) {
     }
 
     state.isCurrentUserAdmin = state.currentUser.IsAdmin === 'TRUE';
-    state.isCurrentUserAdmin = state.currentUser.IsAdmin === 'TRUE';
-     console.log("initializeGame: state.currentUser.Role (raw):", state.currentUser.Role); // DEBUG LOG Role 1
-     await fetchGameState();
     await fetchGameState();
 
 // NEW: Fetch current player's mission
