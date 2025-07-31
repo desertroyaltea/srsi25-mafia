@@ -44,7 +44,7 @@ exports.handler = async (event, context) => {
         // Fetch all player data to validate
         const playersResponse = await sheets.spreadsheets.values.get({
             spreadsheetId: sheetId,
-            range: 'Players!A:Z', // Fetch all columns needed for validation
+            range: 'Players!A:ZZ', // Fetch all columns needed for validation
         });
         const playersData = playersResponse.data.values || [];
         if (playersData.length < 1) {
@@ -88,7 +88,7 @@ exports.handler = async (event, context) => {
         if (!detectiveInfo) {
             return { statusCode: 404, body: JSON.stringify({ error: 'Detective player not found.' }) };
         }
-        if (detectiveInfo.playerRole !== 'LAP302') {
+        if (detectiveInfo.playerRole !== 'Detective') {
             return { statusCode: 403, body: JSON.stringify({ error: 'Only Detectives can use this ability.' }) };
         }
         if (detectiveInfo.playerMainUsed === 'TRUE') {
@@ -113,7 +113,7 @@ exports.handler = async (event, context) => {
             return { statusCode: 400, body: JSON.stringify({ error: 'You cannot investigate yourself.' }) };
         }
         
-        const isMafiaResult = (targetInfo.playerRole === 'BDS342') ? 'YES' : 'NO';
+        const isMafiaResult = (targetInfo.playerRole === 'Mafia') ? 'YES' : 'NO';
         
         // Get current day
         const gameStateResponse = await sheets.spreadsheets.values.get({

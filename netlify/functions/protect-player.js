@@ -93,7 +93,7 @@ exports.handler = async (event, context) => {
         if (!doctorInfo) {
             return { statusCode: 404, body: JSON.stringify({ error: 'Doctor player not found.' }) };
         }
-        if (doctorInfo.playerRole !== 'FQP982') {
+        if (doctorInfo.playerRole !== 'Doctor') {
             return { statusCode: 403, body: JSON.stringify({ error: 'Only Doctors can use this ability.' }) };
         }
         if (doctorInfo.playerMainUsed === 'TRUE') {

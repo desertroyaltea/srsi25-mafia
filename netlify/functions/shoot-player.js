@@ -88,7 +88,7 @@ exports.handler = async (event, context) => {
         if (!sheriffInfo) {
             return { statusCode: 404, body: JSON.stringify({ error: 'Sheriff player not found.' }) };
         }
-        if (sheriffInfo.playerRole !== 'QRW438') {
+        if (sheriffInfo.playerRole !== 'Sheriff') {
             return { statusCode: 403, body: JSON.stringify({ error: 'Only Sheriffs can use this ability.' }) };
         }
         if (sheriffInfo.playerMainUsed === 'TRUE') {
