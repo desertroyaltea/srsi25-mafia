@@ -123,7 +123,6 @@ const appRoot = document.getElementById('app-root');
     let recordedAudioBlob = null;
     let audioPlayer;
     let sessionActivityIntervalId;
-    const VAPID_PUBLIC_KEY = 'BEBsGsp9ZbUak2wYi2TfitM3ppeqeb4bvXWIIXfn3XvKLYuogGRYcJuJ1KownLa6zvqce8zSjuN-QisMYJw3wFw'; // REPLACE WITH YOUR GENERATED PUBLIC KEY
 
 // --- Role Descriptions and Actions Data ---
     const ROLE_DATA = {
@@ -272,13 +271,6 @@ dashboard: () => `
                     </div>
                 </div>
                 <!-- END NEW ROLE REVEAL SECTION -->
-
-<!-- NEW NOTIFICATION OPT-IN BUTTON -->
-             <div id="notification-opt-in-container" class="bg-gray-800 p-4 rounded-lg mb-0 mt-0 border border-gray-700 text-center">
-                 <p class="text-gray-300 mb-4">Stay updated with game events!</p>
-                 <button id="btn-enable-notifications" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg">Enable Notifications</button>
-             </div>
-             <!-- END NEW NOTIFICATION OPT-IN BUTTON -->
 
                 <div id="player-dashboard-actions" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4"></div>
                 <div id="admin-dashboard-actions" class="grid-cols-1 md:grid-cols-2 gap-4 ${state.isCurrentUserAdmin ? 'grid' : 'hidden'}">
@@ -738,42 +730,6 @@ async function initializeGame(userId) {
         renderView('dashboard');
         updateDashboardActions(state.gameState?.CurrentPhase || 'Day');
 
-
-// NEW: Register Service Worker and manage Push Notification permission UI
-     if ('serviceWorker' in navigator) {
-         console.log('Service Worker: Navigator supports serviceWorker.');
-         navigator.serviceWorker.register('/sw.js')
-             .then(function(registration) {
-                 console.log('Service Worker: Registration successful with scope:', registration.scope);
-                 const optInContainer = document.getElementById('notification-opt-in-container'); // Get container here
-
-                 // Check current permission status to show/hide button
-                 if (Notification.permission === 'granted') {
-                     console.log('Notification: Permission already granted.');
-                     subscribeUserToPush(state.currentUserId); // Ensure user is subscribed
-                     if (optInContainer) optInContainer.classList.add('hidden'); // Hide button if already granted
-                 } else if (Notification.permission === 'denied') {
-                     console.warn('Notification: Permission already denied.');
-                     showMessage('Notifications are blocked. You can enable them in browser settings.');
-                     if (optInContainer) optInContainer.classList.add('hidden'); // Hide button if denied
-                 } else { // 'default'
-                     console.log('Notification: Permission status is default, user can click button to request.');
-                     if (optInContainer) optInContainer.classList.remove('hidden'); // Show the button if default
-                 }
-             })
-             .catch(function(error) {
-                 console.error('Service Worker: Registration failed:', error);
-                 showMessage('Notification service unavailable.');
-                 const optInContainer = document.getElementById('notification-opt-in-container');
-                 if (optInContainer) optInContainer.classList.add('hidden'); // Hide button on error
-             });
-     } else {
-         console.warn('Service Worker: Browser does not support serviceWorker.');
-         showMessage('Notifications are not supported by your browser.');
-         const optInContainer = document.getElementById('notification-opt-in-container');
-         if (optInContainer) optInContainer.classList.add('hidden'); // Hide button if not supported
-     }
-
         if (state.gameState?.CurrentPhase === 'Day') {
             const previousDay = parseInt(state.gameState.CurrentDay) - 1;
             if (previousDay >= 1) {
@@ -871,82 +827,6 @@ function showMessage(message) {
  function hideLoadingOverlay() {
      loadingOverlay.style.display = 'none';
  }
-
-// Helper function to convert base64 string to Uint8Array for applicationServerKey
- function urlBase64ToUint8Array(base64String) {
-     const padding = '='.repeat((4 - base64String.length % 4) % 4);
-     const base64 = (base64String + padding)
-         .replace(/\-/g, '+')
-         .replace(/_/g, '/');
-
-     const rawData = window.atob(base64);
-     const outputArray = new Uint8Array(rawData.length);
-
-     for (let i = 0; i < rawData.length; ++i) {
-         outputArray[i] = rawData.charCodeAt(i);
-     }
-     return outputArray;
- }
-
- // Sends the PushSubscription object to your backend to be saved
- async function sendSubscriptionToBackend(playerId, subscription) {
-     try {
-         const response = await fetch('/.netlify/functions/save-push-subscription', {
-             method: 'POST',
-             headers: { 'Content-Type': 'application/json' },
-             body: JSON.stringify({
-                 playerId: playerId,
-                 subscription: subscription
-             }),
-         });
-
-         if (response.ok) {
-             console.log('Push subscription successfully sent to backend.');
-         } else {
-             console.error('Failed to send push subscription to backend:', await response.text());
-             showMessage('Failed to save notification settings.');
-         }
-     } catch (error) {
-         console.error('Error sending subscription to backend:', error);
-         showMessage('Error saving notification settings.');
-     }
- }
-
- // Registers Service Worker and subscribes user to push notifications
- async function subscribeUserToPush(playerId) {
-     if (!('serviceWorker' in navigator) || !('PushManager' in window)) {
-         console.warn('Push messaging is not supported.');
-         return;
-     }
-
-     try {
-         const registration = await navigator.serviceWorker.ready; // Wait for Service Worker to be active
-         const existingSubscription = await registration.pushManager.getSubscription();
-
-         if (existingSubscription) {
-             console.log('Existing push subscription found:', existingSubscription);
-             // Optionally, resend existing subscription to backend to ensure it's up-to-date
-             await sendSubscriptionToBackend(playerId, existingSubscription);
-             return;
-         }
-
-         console.log('No existing subscription, attempting to subscribe...');
-         const subscribeOptions = {
-             userVisibleOnly: true,
-             applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY),
-         };
-
-         const subscription = await registration.pushManager.subscribe(subscribeOptions);
-         console.log('New push subscription:', subscription);
-
-         await sendSubscriptionToBackend(playerId, subscription);
-
-     } catch (error) {
-         console.error('Failed to subscribe the user:', error);
-         showMessage('Failed to enable notifications. Please try again later.');
-     }
- }
-
 
 // Helper function to convert encrypted role codes to display names
     function getDisplayRoleName(encryptedRoleCode) {
@@ -1831,30 +1711,6 @@ appRoot.addEventListener('click', async (e) => {
                     overlay.style.display = 'none'; // Hide the overlay
                 }
             
-} else if (e.target.id === 'btn-enable-notifications') { // NEW: Handle Enable Notifications button
-             if ('Notification' in window && Notification.permission === 'default') {
-                 Notification.requestPermission().then(function(permission) {
-                     if (permission === 'granted') {
-                         console.log('Notification: Permission granted by user click.');
-                         subscribeUserToPush(state.currentUserId);
-                         const optInContainer = document.getElementById('notification-opt-in-container');
-                         if (optInContainer) optInContainer.classList.add('hidden'); // Hide button
-                     } else {
-                         console.warn('Notification: Permission denied by user click.');
-                         showMessage('Notifications are blocked. You can enable them in browser settings.');
-                     }
-                 });
-             } else if ('Notification' in window && Notification.permission === 'granted') {
-                 showMessage('Notifications are already enabled!');
-                 subscribeUserToPush(state.currentUserId); // Ensure subscribed
-                 const optInContainer = document.getElementById('notification-opt-in-container');
-                 if (optInContainer) optInContainer.classList.add('hidden');
-             } else {
-                 showMessage('Notifications are not supported or blocked by your browser.');
-                 const optInContainer = document.getElementById('notification-opt-in-container');
-                 if (optInContainer) optInContainer.classList.add('hidden');
-             }
-         
 
 } else if (e.target.id === 'logout-button') {
                 const sessionId = localStorage.getItem('mafiaGameSessionId'); // Get sessionId for logout
