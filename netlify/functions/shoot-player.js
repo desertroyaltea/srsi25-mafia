@@ -24,27 +24,43 @@ exports.handler = async (event, context) => {
         return { statusCode: 500, body: JSON.stringify({ error: 'Server configuration error.' }) };
     }
 
-    let sheriffPlayerId, targetPlayerId; // CRITICAL FIX: Receive PlayerID
+    let sheriffPlayerId, targetPlayerId, sessionId; // NEW: Receive sessionId
     try {
         const body = JSON.parse(event.body);
         sheriffPlayerId = body.sheriffPlayerId;
         targetPlayerId = body.targetPlayerId;
+        sessionId = body.sessionId; // NEW: Get sessionId
     } catch (e) {
         console.error("shoot-player: Invalid JSON body:", e.message);
         return { statusCode: 400, body: JSON.stringify({ error: 'Invalid request format.' }) };
     }
 
-    if (!sheriffPlayerId || !targetPlayerId) {
-        return { statusCode: 400, body: JSON.stringify({ error: 'Missing sheriffPlayerId or targetPlayerId.' }) };
+    if (!sheriffPlayerId || !targetPlayerId || !sessionId) { // NEW: Validate sessionId
+        return { statusCode: 400, body: JSON.stringify({ error: 'Missing required parameters.' }) };
     }
 
     try {
         const sheets = await getSheetsService();
 
+        // CRITICAL FIX: Session Authorization
+        const authResponse = await fetch('https://' + event.headers.host + '/.netlify/functions/authorize-session', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ sessionId: sessionId }),
+        });
+        const authResult = await authResponse.json();
+
+        if (!authResponse.ok || authResult.authorizedPlayerId !== sheriffPlayerId) { // Check if session ID matches player ID
+            console.warn(`shoot-player: Unauthorized attempt by ${authResult.authorizedPlayerId || 'Unknown'} to act as ${sheriffPlayerId}. Session: ${sessionId}`);
+            return { statusCode: 403, body: JSON.stringify({ error: 'Unauthorized action. Session mismatch.' }) };
+        }
+        // If we reach here, sheriffPlayerId is confirmed to be the authenticated user.
+
+
         // Fetch all player data to validate
         const playersResponse = await sheets.spreadsheets.values.get({
             spreadsheetId: sheetId,
-            range: 'Players!A:Z', // Fetch all columns needed for validation
+            range: 'Players!A:Z',
         });
         const playersData = playersResponse.data.values || [];
         if (playersData.length < 1) {
@@ -83,10 +99,10 @@ exports.handler = async (event, context) => {
             return null;
         };
 
-        // Validate Sheriff player
+        // Validate Sheriff player (already authorized by session check above)
         const sheriffInfo = getPlayerInfoById(sheriffPlayerId);
-        if (!sheriffInfo) {
-            return { statusCode: 404, body: JSON.stringify({ error: 'Sheriff player not found.' }) };
+        if (!sheriffInfo) { // Should not happen if authorization passed, but good fallback
+            return { statusCode: 404, body: JSON.stringify({ error: 'Sheriff player not found (after auth).' }) };
         }
         if (sheriffInfo.playerRole !== 'Sheriff') {
             return { statusCode: 403, body: JSON.stringify({ error: 'Only Sheriffs can use this ability.' }) };
@@ -133,6 +149,8 @@ exports.handler = async (event, context) => {
         });
 
         // Update the Sheriff's MainUsed and SheriffShotUsed status
+        if (mainUsedCol === -1 || sheriffShotUsedCol === -1) throw new Error("Required columns for update not found.");
+
         const updateRequests = [
             {
                 range: `Players!${String.fromCharCode(65 + mainUsedCol)}${sheriffInfo.rowIndex}`,

@@ -285,7 +285,7 @@ actionModal: ({ title, buttonText, targets, actionType }) => `
                         <label for="target-player-1" class="block text-gray-300 text-lg font-bold mb-2">Select Target 1:</label>
                         <select id="target-player-1" class="shadow border rounded w-full py-3 px-4 text-lg leading-tight focus:outline-none focus:shadow-outline bg-gray-700 border-gray-600 text-white" required>
                             <option value="">-- Select a player --</option>
-                            ${targets.map(p => `<option value="${p.PlayerID}">${p.Name}</option>`).join('')} <!-- CRITICAL FIX: Value is PlayerID -->
+                            ${targets.map(p => `<option value="${p.PlayerID}">${p.Name}</option>`).join('')}
                         </select>
                     </div>
                     ${actionType === 'kill' || (actionType === 'protect' && state.currentUser.DoctorCanSaveMore === 'TRUE') ? `
@@ -293,7 +293,7 @@ actionModal: ({ title, buttonText, targets, actionType }) => `
                             <label for="target-player-2" class="block text-gray-300 text-lg font-bold mb-2">Select Target 2:</label>
                             <select id="target-player-2" class="shadow border rounded w-full py-3 px-4 text-lg leading-tight focus:outline-none focus:shadow-outline bg-gray-700 border-gray-600 text-white" required>
                                 <option value="">-- Select a player --</option>
-                                ${targets.map(p => `<option value="${p.PlayerID}">${p.Name}</option>`).join('')} <!-- CRITICAL FIX: Value is PlayerID -->
+                                ${targets.map(p => `<option value="${p.PlayerID}">${p.Name}</option>`).join('')}
                             </select>
                         </div>
                     ` : ''}
@@ -309,37 +309,37 @@ actionModal: ({ title, buttonText, targets, actionType }) => `
             </div>
         `,
 accusationForm: ({ targets }) => `
-            <div class="bg-gray-900 p-5 rounded-lg mt-4">
-                <h2 class="text-2xl font-semibold mb-4 text-red-400">Submit Accusation</h2>
-                <form id="accusation-submission-form">
-                    <div class="mb-4">
-                        <label for="accuser-name" class="block text-gray-300 text-lg font-bold mb-2">Accuser (Your Name):</label>
-                        <input type="text" id="accuser-name" class="shadow appearance-none border rounded w-full py-3 px-4 text-lg text-gray-200 leading-tight focus:outline-none focus:shadow-outline bg-gray-700 border-gray-600 cursor-not-allowed" value="${state.currentUser.Name}" readonly>
-                    </div>
-                    <div class="mb-4">
-                        <label for="accused-player-select" class="block text-gray-300 text-lg font-bold mb-2">Accused Player:</label>
-                        <select id="accused-player-select" class="shadow border rounded w-full py-3 px-4 text-lg leading-tight focus:outline-none focus:shadow-outline bg-gray-700 border-gray-600 text-white" required>
-                            <option value="">-- Select accused player --</option>
-                            ${targets.map(p => `<option value="${p.PlayerID}">${p.Name}</option>`).join('')} <!-- CRITICAL FIX: Value is PlayerID -->
-                        </select>
-                    </div>
+         <div class="bg-gray-900 p-5 rounded-lg mt-4">
+             <h2 class="text-2xl font-semibold mb-4 text-red-400">Submit Accusation</h2>
+             <form id="accusation-submission-form">
+                 <div class="mb-4">
+                     <label for="accuser-name" class="block text-gray-300 text-lg font-bold mb-2">Accuser (Your Name):</label>
+                     <input type="text" id="accuser-name" class="shadow appearance-none border rounded w-full py-3 px-4 text-lg text-gray-200 leading-tight focus:outline-none focus:shadow-outline bg-gray-700 border-gray-600 cursor-not-allowed" value="${state.currentUser.Name}" readonly>
+                 </div>
+                 <div class="mb-4">
+                     <label for="accused-player-select" class="block text-gray-300 text-lg font-bold mb-2">Accused Player:</label>
+                     <select id="accused-player-select" class="shadow border rounded w-full py-3 px-4 text-lg leading-tight focus:outline-none focus:shadow-outline bg-gray-700 border-gray-600 text-white" required>
+                         <option value="">-- Select accused player --</option>
+                         ${targets.map(p => `<option value="${p.PlayerID}">${p.Name}</option>`).join('')}
+                     </select>
+                 </div>
 
-                    <div class="mb-6">
-                        <label class="block text-gray-300 text-lg font-bold mb-2">Record Accusation:</label>
-                        <div class="flex flex-wrap items-center gap-4 mb-4">
-                            <button type="button" id="start-recording" class="bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-4 rounded-lg">Start Recording</button>
-                            <button type="button" id="stop-recording" class="bg-gray-600 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded-lg" disabled>Stop Recording</button>
-                        </div>
-                        <audio id="audio-playback" controls class="w-full hidden"></audio>
-                    </div>
+                 <div class="mb-6">
+                     <label class="block text-gray-300 text-lg font-bold mb-2">Record Accusation:</label>
+                     <div class="flex flex-wrap items-center gap-4 mb-4">
+                         <button type="button" id="start-recording" class="bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-4 rounded-lg">Start Recording</button>
+                         <button type="button" id="stop-recording" class="bg-gray-600 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded-lg" disabled>Stop Recording</button>
+                     </div>
+                     <audio id="audio-playback" controls class="w-full hidden"></audio>
+                 </div>
 
-                    <div class="flex flex-col md:flex-row gap-4">
-                        <button type="submit" id="submit-accusation-btn" class="bg-green-700 hover:bg-green-800 text-white font-bold py-3 px-6 rounded-lg w-full md:w-1/2 text-xl" disabled>Submit Accusation</button>
-                        <button type="button" id="back-to-dashboard" class="bg-gray-600 hover:bg-gray-700 text-white font-bold py-3 px-6 rounded-lg w-full md:w-1/2 text-xl">Cancel</button>
-                    </div>
-                </form>
-            </div>
-        `,
+                 <div class="flex flex-col md:flex-row gap-4">
+                     <button type="submit" id="submit-accusation-btn" class="bg-green-700 hover:bg-green-800 text-white font-bold py-3 px-6 rounded-lg w-full md:w-1/2 text-xl" disabled>Submit Accusation</button>
+                     <button type="button" id="back-to-dashboard" class="bg-gray-600 hover:bg-gray-700 text-white font-bold py-3 px-6 rounded-lg w-full md:w-1/2 text-xl">Cancel</button>
+                 </div>
+             </form>
+         </div>
+     `,
         adminReview: ({ pendingAccusations }) => `
             <div class="bg-gray-900 p-5 rounded-lg mt-4">
                 <h2 class="text-2xl font-semibold mb-4 text-red-400">Admin Review: Pending Accusations</h2>
@@ -943,47 +943,58 @@ async function generateNightlyRecapStory(recapData) { // Make async
 
 
 async function performFetchAction(endpoint, payload) {
-     let loadingTimeout;
-     showLoadingOverlay();
+        let loadingTimeout;
+        showLoadingOverlay();
 
-     loadingTimeout = setTimeout(() => {
-         hideLoadingOverlay();
-         showMessage('Action timed out. Please try again or check your connection.');
-         console.warn(`performFetchAction: Timeout occurred for endpoint: ${endpoint}`);
-     }, 15000);
+        loadingTimeout = setTimeout(() => {
+            hideLoadingOverlay();
+            showMessage('Action timed out. Please try again or check your connection.');
+            console.warn(`performFetchAction: Timeout occurred for endpoint: ${endpoint}`);
+        }, 15000);
 
-     try {
-         // CRITICAL DEBUG: Log the exact URL being fetched
-         console.log(`performFetchAction: Attempting POST to URL: ${endpoint}`); // DEBUG LOG FETCH URL 1
-         console.log(`performFetchAction: Payload:`, payload); // DEBUG LOG PAYLOAD 1
+        try {
+            const sessionId = localStorage.getItem('mafiaGameSessionId'); // CRITICAL FIX: Get sessionId
+            if (!sessionId) {
+                throw new Error('No active session. Please log in again.');
+            }
+            
+            // CRITICAL FIX: Add sessionId to the payload
+            const authorizedPayload = { ...payload, sessionId: sessionId };
 
-         const response = await fetch(endpoint, {
-             method: 'POST',
-             headers: {
-                 'Content-Type': 'application/json',
-             },
-             body: JSON.stringify(payload),
-         });
+            const response = await fetch(endpoint, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify(authorizedPayload), // Send payload with sessionId
+            });
 
-         const result = await response.json();
+            const result = await response.json();
 
-         if (response.ok) {
-             showMessage(result.message || 'Action performed successfully!');
-             await fetchPlayers(true);
-             await fetchGameState();
-             initializeGame(state.currentUserId);
-         } else {
-             console.error(`performFetchAction: Server responded with status ${response.status} for ${endpoint}. Response:`, result); // DEBUG LOG FETCH ERROR 1
-             throw new Error(result.message || `Error: ${response.status} ${response.statusText}`);
-         }
-     } catch (error) {
-         console.error("Error performing action:", error);
-         showMessage(`Failed to perform action: ${error.message}`);
-     } finally {
-         clearTimeout(loadingTimeout);
-         hideLoadingOverlay();
-     }
- }
+            if (response.ok) {
+                showMessage(result.message || 'Action performed successfully!');
+                await fetchPlayers(true);
+                await fetchGameState();
+                initializeGame(state.currentUserId);
+            } else {
+                console.error(`performFetchAction: Server responded with status ${response.status} for ${endpoint}. Response:`, result);
+                // If unauthorized, force logout
+                if (response.status === 401 || response.status === 403) {
+                    showMessage(result.error || 'Unauthorized action. Please log in again.');
+                    localStorage.removeItem('mafiaGameUserId');
+                    localStorage.removeItem('mafiaGameSessionId');
+                    renderView('login');
+                }
+                throw new Error(result.message || `Error: ${response.status} ${response.statusText}`);
+            }
+        } catch (error) {
+            console.error("Error performing action:", error);
+            showMessage(`Failed to perform action: ${error.message}`);
+        } finally {
+            clearTimeout(loadingTimeout);
+            hideLoadingOverlay();
+        }
+    }
 
 
 // --- Audio Recording Functions ---
@@ -1092,11 +1103,7 @@ async function submitAccusation(accusedPlayerId, audioBlob) {
          }
          formData.append('audioFile', audioBlob, `accusation_${state.currentUserId}_${Date.now()}.${fileExtension}`);
 
-         // CRITICAL DEBUG: Log the exact URL being fetched
          const accusationEndpoint = '/.netlify/functions/submit-accusation';
-         console.log(`submitAccusation: Attempting POST to URL: ${accusationEndpoint}`); // DEBUG LOG ACCUSATION URL 1
-         // Note: Cannot log formData directly, but can log fields if needed
-
          const response = await fetch(accusationEndpoint, {
              method: 'POST',
              body: formData,
@@ -1110,7 +1117,7 @@ async function submitAccusation(accusedPlayerId, audioBlob) {
              await fetchGameState();
              initializeGame(state.currentUserId);
          } else {
-             console.error(`submitAccusation: Server responded with status ${response.status} for ${accusationEndpoint}. Response:`, result); // DEBUG LOG ACCUSATION ERROR 1
+             console.error(`Error submitting accusation: Server responded with status ${response.status} for ${accusationEndpoint}. Response:`, result);
              throw new Error(result.message || `Error: ${response.status} ${response.statusText}`);
          }
      } catch (error) {

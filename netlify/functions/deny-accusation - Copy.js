@@ -24,47 +24,32 @@ exports.handler = async (event, context) => {
         return { statusCode: 500, body: JSON.stringify({ error: 'Server configuration error.' }) };
     }
 
-    let accusationId, adminPlayerId, sessionId; // NEW: Receive sessionId
+    let accusationId, adminPlayerId;
     try {
         const body = JSON.parse(event.body);
         accusationId = body.accusationId;
         adminPlayerId = body.adminPlayerId;
-        sessionId = body.sessionId; // NEW: Get sessionId
     } catch (e) {
         console.error("deny-accusation: Invalid JSON body:", e.message);
         return { statusCode: 400, body: JSON.stringify({ error: 'Invalid request format.' }) };
     }
 
-    if (!accusationId || !adminPlayerId || !sessionId) { // NEW: Validate sessionId
-        return { statusCode: 400, body: JSON.stringify({ error: 'Missing required parameters.' }) };
+    if (!accusationId || !adminPlayerId) {
+        return { statusCode: 400, body: JSON.stringify({ error: 'Missing accusationId or adminPlayerId.' }) };
     }
 
     try {
         const sheets = await getSheetsService();
 
-        // CRITICAL FIX: Session Authorization
-        const authResponse = await fetch('https://' + event.headers.host + '/.netlify/functions/authorize-session', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ sessionId: sessionId }),
-        });
-        const authResult = await authResponse.json();
-
-        if (!authResponse.ok || authResult.authorizedPlayerId !== adminPlayerId) { // Check if session ID matches player ID
-            console.warn(`deny-accusation: Unauthorized attempt by ${authResult.authorizedPlayerId || 'Unknown'} to act as ${adminPlayerId}. Session: ${sessionId}`);
-            return { statusCode: 403, body: JSON.stringify({ error: 'Unauthorized action. Session mismatch.' }) };
-        }
-        // If we reach here, adminPlayerId is confirmed to be the authenticated user.
-
-
-        // 1. Validate Admin status of the denier (already authorized by session check above)
+        // 1. Validate Admin status of the denier
         const playersResponse = await sheets.spreadsheets.values.get({
             spreadsheetId: sheetId,
-            range: 'Players!A:S',
+            range: 'Players!A:S', // Fetch up to IsAdmin column (S)
         });
         const playersData = playersResponse.data.values || [];
         if (playersData.length < 1) {
-            return { statusCode: 500, body: JSON.stringify({ error: 'Players sheet is empty for admin validation.' }) };
+            console.error("deny-accusation: Players sheet is empty for admin validation.");
+            return { statusCode: 500, body: JSON.stringify({ error: 'Players sheet is empty.' }) };
         }
         const playerHeaders = playersData[0];
         const playerRows = playersData.slice(1);

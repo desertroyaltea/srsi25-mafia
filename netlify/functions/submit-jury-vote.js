@@ -24,20 +24,21 @@ exports.handler = async (event, context) => {
         return { statusCode: 500, body: JSON.stringify({ error: 'Server configuration error.' }) };
     }
 
-    let voterPlayerId, trialId, voteType, votingPower;
+    let voterPlayerId, trialId, voteType, votingPower, sessionId; // NEW: Receive sessionId
     try {
         const body = JSON.parse(event.body);
         voterPlayerId = body.voterPlayerId;
         trialId = body.trialId;
         voteType = body.voteType;
         votingPower = body.votingPower;
+        sessionId = body.sessionId; // NEW: Get sessionId
     } catch (e) {
         console.error("submit-jury-vote: Invalid JSON body:", e.message);
         return { statusCode: 400, body: JSON.stringify({ error: 'Invalid request format.' }) };
     }
 
-    if (!voterPlayerId || !trialId || !voteType || votingPower === undefined) {
-        return { statusCode: 400, body: JSON.stringify({ error: 'Missing voterPlayerId, trialId, voteType, or votingPower.' }) };
+    if (!voterPlayerId || !trialId || !voteType || votingPower === undefined || !sessionId) { // NEW: Validate sessionId
+        return { statusCode: 400, body: JSON.stringify({ error: 'Missing required parameters.' }) };
     }
     if (voteType !== 'GUILTY' && voteType !== 'NOTGUILTY') {
         return { statusCode: 400, body: JSON.stringify({ error: 'Invalid voteType. Must be GUILTY or NOTGUILTY.' }) };
@@ -50,15 +51,29 @@ exports.handler = async (event, context) => {
     try {
         const sheets = await getSheetsService();
 
+        // CRITICAL FIX: Session Authorization
+        const authResponse = await fetch('https://' + event.headers.host + '/.netlify/functions/authorize-session', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ sessionId: sessionId }),
+        });
+        const authResult = await authResponse.json();
+
+        if (!authResponse.ok || authResult.authorizedPlayerId !== voterPlayerId) { // Check if session ID matches player ID
+            console.warn(`submit-jury-vote: Unauthorized attempt by ${authResult.authorizedPlayerId || 'Unknown'} to act as ${voterPlayerId}. Session: ${sessionId}`);
+            return { statusCode: 403, body: JSON.stringify({ error: 'Unauthorized action. Session mismatch.' }) };
+        }
+        // If we reach here, voterPlayerId is confirmed to be the authenticated user.
+
+
         // 1. Fetch player data to validate voter status (alive, not admin)
         const playersResponse = await sheets.spreadsheets.values.get({
             spreadsheetId: sheetId,
-            range: 'Players!A:S', // Fetch up to IsAdmin column (S)
+            range: 'Players!A:S',
         });
         const playersData = playersResponse.data.values || [];
         if (playersData.length < 1) {
-            console.error("submit-jury-vote: Players sheet is empty for voter validation.");
-            return { statusCode: 500, body: JSON.stringify({ error: 'Players sheet is empty.' }) };
+            return { statusCode: 500, body: JSON.stringify({ error: 'Players sheet is empty for voter validation.' }) };
         }
         const playerHeaders = playersData[0];
         const playerRows = playersData.slice(1);
@@ -91,7 +106,7 @@ exports.handler = async (event, context) => {
 
 
         // 2. Find the trial and increment the vote count
-        const trialsResponse = await sheets.spreadsheets.values.get({ spreadsheetId: sheetId, range: 'Trials!A:I' }); // Fetch up to I for NOTGUILTY
+        const trialsResponse = await sheets.spreadsheets.values.get({ spreadsheetId: sheetId, range: 'Trials!A:I' });
         const trialHeaders = trialsResponse.data.values[0];
         const trials = trialsResponse.data.values.slice(1);
 

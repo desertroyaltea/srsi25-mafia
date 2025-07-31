@@ -24,19 +24,20 @@ exports.handler = async (event, context) => {
         return { statusCode: 500, body: JSON.stringify({ error: 'Server configuration error.' }) };
     }
 
-    let mafiaPlayerId, targetPlayerId1, targetPlayerId2; // CRITICAL FIX: Receive PlayerIDs directly
+    let mafiaPlayerId, targetPlayerId1, targetPlayerId2, sessionId; // NEW: Receive sessionId
     try {
         const body = JSON.parse(event.body);
         mafiaPlayerId = body.mafiaPlayerId;
         targetPlayerId1 = body.targetPlayerId1;
         targetPlayerId2 = body.targetPlayerId2;
+        sessionId = body.sessionId; // NEW: Get sessionId
     } catch (e) {
         console.error("kill-player: Invalid JSON body:", e.message);
         return { statusCode: 400, body: JSON.stringify({ error: 'Invalid request format.' }) };
     }
 
-    if (!mafiaPlayerId || !targetPlayerId1 || !targetPlayerId2) {
-        return { statusCode: 400, body: JSON.stringify({ error: 'Missing mafiaPlayerId or targetPlayerIds.' }) };
+    if (!mafiaPlayerId || !targetPlayerId1 || !targetPlayerId2 || !sessionId) { // NEW: Validate sessionId
+        return { statusCode: 400, body: JSON.stringify({ error: 'Missing required parameters.' }) };
     }
     if (targetPlayerId1 === targetPlayerId2) {
         return { statusCode: 400, body: JSON.stringify({ error: 'You must select two different players to kill.' }) };
@@ -45,10 +46,25 @@ exports.handler = async (event, context) => {
     try {
         const sheets = await getSheetsService();
 
+        // CRITICAL FIX: Session Authorization
+        const authResponse = await fetch('https://' + event.headers.host + '/.netlify/functions/authorize-session', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ sessionId: sessionId }),
+        });
+        const authResult = await authResponse.json();
+
+        if (!authResponse.ok || authResult.authorizedPlayerId !== mafiaPlayerId) { // Check if session ID matches player ID
+            console.warn(`kill-player: Unauthorized attempt by ${authResult.authorizedPlayerId || 'Unknown'} to act as ${mafiaPlayerId}. Session: ${sessionId}`);
+            return { statusCode: 403, body: JSON.stringify({ error: 'Unauthorized action. Session mismatch.' }) };
+        }
+        // If we reach here, mafiaPlayerId is confirmed to be the authenticated user.
+
+
         // Fetch all player data to validate
         const playersResponse = await sheets.spreadsheets.values.get({
             spreadsheetId: sheetId,
-            range: 'Players!A:Z', // Fetch all columns needed for validation
+            range: 'Players!A:Z',
         });
         const playersData = playersResponse.data.values || [];
         if (playersData.length < 1) {
@@ -85,12 +101,12 @@ exports.handler = async (event, context) => {
             return null;
         };
 
-        // Validate Mafia player
-        const mafiaInfo = getPlayerInfoById(mafiaPlayerId);
-        if (!mafiaInfo) {
-            return { statusCode: 404, body: JSON.stringify({ error: 'Mafia player not found.' }) };
+        // Validate Mafia player (already authorized by session check above)
+        const mafiaInfo = getPlayerInfoById(mafiaPlayerId); // Use authorized mafiaPlayerId
+        if (!mafiaInfo) { // Should not happen if authorization passed, but good fallback
+            return { statusCode: 404, body: JSON.stringify({ error: 'Mafia player not found (after auth).' }) };
         }
-        if (mafiaInfo.playerRole !== 'BDS342') {
+        if (mafiaInfo.playerRole !== 'Mafia') {
             return { statusCode: 403, body: JSON.stringify({ error: 'Only Mafia can use this ability.' }) };
         }
         if (mafiaInfo.playerMainUsed === 'TRUE') {
@@ -146,6 +162,7 @@ exports.handler = async (event, context) => {
         });
 
         // Update the Mafia player's MainUsed status to TRUE
+        if (mainUsedCol === -1) throw new Error("MainUsed column not found for update.");
         const updateRange = `Players!${String.fromCharCode(65 + mainUsedCol)}${mafiaInfo.rowIndex}`;
         await sheets.spreadsheets.values.update({
             spreadsheetId: sheetId,

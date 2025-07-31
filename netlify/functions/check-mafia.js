@@ -24,27 +24,43 @@ exports.handler = async (event, context) => {
         return { statusCode: 500, body: JSON.stringify({ error: 'Server configuration error.' }) };
     }
 
-    let detectivePlayerId, targetPlayerId; // CRITICAL FIX: Receive PlayerID
+    let detectivePlayerId, targetPlayerId, sessionId; // NEW: Receive sessionId
     try {
         const body = JSON.parse(event.body);
         detectivePlayerId = body.detectivePlayerId;
         targetPlayerId = body.targetPlayerId;
+        sessionId = body.sessionId; // NEW: Get sessionId
     } catch (e) {
         console.error("check-mafia: Invalid JSON body:", e.message);
         return { statusCode: 400, body: JSON.stringify({ error: 'Invalid request format.' }) };
     }
 
-    if (!detectivePlayerId || !targetPlayerId) {
-        return { statusCode: 400, body: JSON.stringify({ error: 'Missing detectivePlayerId or targetPlayerId.' }) };
+    if (!detectivePlayerId || !targetPlayerId || !sessionId) { // NEW: Validate sessionId
+        return { statusCode: 400, body: JSON.stringify({ error: 'Missing required parameters.' }) };
     }
 
     try {
         const sheets = await getSheetsService();
 
+        // CRITICAL FIX: Session Authorization
+        const authResponse = await fetch('https://' + event.headers.host + '/.netlify/functions/authorize-session', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ sessionId: sessionId }),
+        });
+        const authResult = await authResponse.json();
+
+        if (!authResponse.ok || authResult.authorizedPlayerId !== detectivePlayerId) { // Check if session ID matches player ID
+            console.warn(`check-mafia: Unauthorized attempt by ${authResult.authorizedPlayerId || 'Unknown'} to act as ${detectivePlayerId}. Session: ${sessionId}`);
+            return { statusCode: 403, body: JSON.stringify({ error: 'Unauthorized action. Session mismatch.' }) };
+        }
+        // If we reach here, detectivePlayerId is confirmed to be the authenticated user.
+
+
         // Fetch all player data to validate
         const playersResponse = await sheets.spreadsheets.values.get({
             spreadsheetId: sheetId,
-            range: 'Players!A:ZZ', // Fetch all columns needed for validation
+            range: 'Players!A:Z',
         });
         const playersData = playersResponse.data.values || [];
         if (playersData.length < 1) {
@@ -83,10 +99,10 @@ exports.handler = async (event, context) => {
             return null;
         };
 
-        // Validate Detective player
+        // Validate Detective player (already authorized by session check above)
         const detectiveInfo = getPlayerInfoById(detectivePlayerId);
-        if (!detectiveInfo) {
-            return { statusCode: 404, body: JSON.stringify({ error: 'Detective player not found.' }) };
+        if (!detectiveInfo) { // Should not happen if authorization passed, but good fallback
+            return { statusCode: 404, body: JSON.stringify({ error: 'Detective player not found (after auth).' }) };
         }
         if (detectiveInfo.playerRole !== 'Detective') {
             return { statusCode: 403, body: JSON.stringify({ error: 'Only Detectives can use this ability.' }) };
@@ -135,24 +151,22 @@ exports.handler = async (event, context) => {
         const newHistoryEntry = `${targetPlayerId}:${isMafiaResult}`;
         const updatedHistory = detectiveInfo.playerHistory ? `${detectiveInfo.playerHistory},${newHistoryEntry}` : newHistoryEntry;
 
+        const historyColIndex = playerHeaders.indexOf('InvestigationHistory');
+
         const updateRequests = [
             {
                 range: `Players!${String.fromCharCode(65 + mainUsedCol)}${detectiveInfo.rowIndex}`,
                 values: [['TRUE']]
-            },
-            {
-                range: `Players!${String.fromCharCode(65 + historyCol)}${detectiveInfo.rowIndex}`,
-                values: [['TRUE']] // Assuming history is a separate column
             }
         ];
-        // Ensure historyCol is correctly updated
-        const historyColIndex = playerHeaders.indexOf('InvestigationHistory');
+        
         if (historyColIndex !== -1) {
-            updateRequests[1].range = `Players!${String.fromCharCode(65 + historyColIndex)}${detectiveInfo.rowIndex}`;
-            updateRequests[1].values = [[updatedHistory]];
+            updateRequests.push({
+                range: `Players!${String.fromCharCode(65 + historyColIndex)}${detectiveInfo.rowIndex}`,
+                values: [[updatedHistory]]
+            });
         } else {
             console.warn("check-mafia: InvestigationHistory column not found, history will not be updated.");
-            updateRequests.pop(); // Remove the history update if column not found
         }
         
         await sheets.spreadsheets.values.batchUpdate({

@@ -24,20 +24,21 @@ exports.handler = async (event, context) => {
         return { statusCode: 500, body: JSON.stringify({ error: 'Server configuration error.' }) };
     }
 
-    let doctorPlayerId, targetPlayerId1, targetPlayerId2, doctorCanSaveMoreUsed;
+    let doctorPlayerId, targetPlayerId1, targetPlayerId2, doctorCanSaveMoreUsed, sessionId; // NEW: Receive sessionId
     try {
         const body = JSON.parse(event.body);
         doctorPlayerId = body.doctorPlayerId;
         targetPlayerId1 = body.targetPlayerId1;
         targetPlayerId2 = body.targetPlayerId2;
         doctorCanSaveMoreUsed = body.doctorCanSaveMoreUsed;
+        sessionId = body.sessionId; // NEW: Get sessionId
     } catch (e) {
         console.error("protect-player: Invalid JSON body:", e.message);
         return { statusCode: 400, body: JSON.stringify({ error: 'Invalid request format.' }) };
     }
 
-    if (!doctorPlayerId || !targetPlayerId1 || (doctorCanSaveMoreUsed && !targetPlayerId2)) {
-        return { statusCode: 400, body: JSON.stringify({ error: 'Missing doctorPlayerId or targetPlayerId(s).' }) };
+    if (!doctorPlayerId || !targetPlayerId1 || (doctorCanSaveMoreUsed && !targetPlayerId2) || !sessionId) { // NEW: Validate sessionId
+        return { statusCode: 400, body: JSON.stringify({ error: 'Missing required parameters.' }) };
     }
     if (doctorCanSaveMoreUsed && targetPlayerId1 === targetPlayerId2) {
         return { statusCode: 400, body: JSON.stringify({ error: 'You must select two different players to protect.' }) };
@@ -46,10 +47,25 @@ exports.handler = async (event, context) => {
     try {
         const sheets = await getSheetsService();
 
+        // CRITICAL FIX: Session Authorization
+        const authResponse = await fetch('https://' + event.headers.host + '/.netlify/functions/authorize-session', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ sessionId: sessionId }),
+        });
+        const authResult = await authResponse.json();
+
+        if (!authResponse.ok || authResult.authorizedPlayerId !== doctorPlayerId) { // Check if session ID matches player ID
+            console.warn(`protect-player: Unauthorized attempt by ${authResult.authorizedPlayerId || 'Unknown'} to act as ${doctorPlayerId}. Session: ${sessionId}`);
+            return { statusCode: 403, body: JSON.stringify({ error: 'Unauthorized action. Session mismatch.' }) };
+        }
+        // If we reach here, doctorPlayerId is confirmed to be the authenticated user.
+
+
         // Fetch all player data to validate
         const playersResponse = await sheets.spreadsheets.values.get({
             spreadsheetId: sheetId,
-            range: 'Players!A:Z', // Fetch all columns needed for validation
+            range: 'Players!A:Z',
         });
         const playersData = playersResponse.data.values || [];
         if (playersData.length < 1) {
@@ -88,10 +104,10 @@ exports.handler = async (event, context) => {
             return null;
         };
 
-        // Validate Doctor player
+        // Validate Doctor player (already authorized by session check above)
         const doctorInfo = getPlayerInfoById(doctorPlayerId);
-        if (!doctorInfo) {
-            return { statusCode: 404, body: JSON.stringify({ error: 'Doctor player not found.' }) };
+        if (!doctorInfo) { // Should not happen if authorization passed, but good fallback
+            return { statusCode: 404, body: JSON.stringify({ error: 'Doctor player not found (after auth).' }) };
         }
         if (doctorInfo.playerRole !== 'Doctor') {
             return { statusCode: 403, body: JSON.stringify({ error: 'Only Doctors can use this ability.' }) };
@@ -160,6 +176,8 @@ exports.handler = async (event, context) => {
         });
 
         // Update the Doctor's MainUsed status to TRUE and DoctorCanSaveMore to FALSE (if used)
+        if (mainUsedCol === -1 || doctorCanSaveMoreCol === -1) throw new Error("Required columns for update not found.");
+
         const updateRequests = [
             {
                 range: `Players!${String.fromCharCode(65 + mainUsedCol)}${doctorInfo.rowIndex}`,
