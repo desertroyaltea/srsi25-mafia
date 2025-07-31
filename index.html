@@ -568,7 +568,7 @@ async function handleLogin() {
         const loginError = document.getElementById('login-error');
 
         if (!passcodeInputElement) {
-            console.error("handleLogin: 'passcode-input' element not found in the DOM. This is the source of the TypeError.");
+            console.error("handleLogin: 'passcode-input' element not found in the DOM.");
             loginError.textContent = 'Login form element missing. Please refresh the page.';
             hideLoadingOverlay();
             return;
@@ -589,7 +589,7 @@ async function handleLogin() {
             const response = await fetch('/.netlify/functions/authenticate-player', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ passcode: passcodeInput }), // CRITICAL FIX: Only send passcode
+                body: JSON.stringify({ passcode: passcodeInput }),
             });
 
             const result = await response.json();
@@ -597,10 +597,15 @@ async function handleLogin() {
             if (response.ok && result.playerId) {
                 const authenticatedPlayerId = result.playerId;
                 const sessionId = result.sessionId;
-                localStorage.setItem('mafiaGameUserId', authenticatedPlayerId); // Store numeric PlayerID
+                const authenticatedUsername = result.username; // NEW: Get username from response
+
+                localStorage.setItem('mafiaGameUserId', authenticatedPlayerId);
                 localStorage.setItem('mafiaGameSessionId', sessionId);
+                localStorage.setItem('mafiaGameUsername', authenticatedUsername); // NEW: Store username
+                
                 showMessage('Login successful!');
-                await initializeGame(authenticatedPlayerId);
+                // CRITICAL FIX: Pass username to initializeGame as well
+                await initializeGame(authenticatedPlayerId, authenticatedUsername);
             } else {
                 loginError.textContent = result.error || 'Login failed. Please try again.';
                 console.error("handleLogin: Authentication failed:", result.error);
@@ -645,9 +650,21 @@ async function fetchPlayers(forceRefresh = false) {
  }
 
 
-async function initializeGame(userId) {
+async function initializeGame(userId, username = null) { // NEW: Receive username
     state.currentUserId = userId;
-    const sessionId = localStorage.getItem('mafiaGameSessionId'); // NEW: Get sessionId from localStorage
+    const sessionId = localStorage.getItem('mafiaGameSessionId');
+
+    // CRITICAL FIX: If username is null (e.g., from direct page load), get it from localStorage
+    const currentUsername = username || localStorage.getItem('mafiaGameUsername');
+    if (!currentUsername) {
+        console.error("initializeGame: Username not found. Forcing re-login.");
+        showMessage("Security error: Please log in again.");
+        localStorage.removeItem('mafiaGameUserId');
+        localStorage.removeItem('mafiaGameSessionId');
+        localStorage.removeItem('mafiaGameUsername');
+        renderView('login');
+        return;
+    }
 
     let currentUserFetchTimeout;
     showLoadingOverlay();
@@ -658,19 +675,21 @@ async function initializeGame(userId) {
     }, 10000);
 
     try {
-        const response = await fetch(`/.netlify/functions/get-player-data?playerId=${userId}`);
+        // CRITICAL FIX: Fetch current user's FULL data using Username and SessionId
+        const response = await fetch(`/.netlify/functions/get-player-data?username=${currentUsername}&sessionId=${sessionId}`);
         if (!response.ok) {
             const errorText = await response.text();
             console.error('initializeGame: Failed to fetch current user data:', response.status, errorText);
             throw new Error(`Failed to fetch your player data: ${response.statusText}`);
         }
-        state.currentUser = await response.json();
+        state.currentUser = await response.json(); // This now contains the FULL data for the current user
 
     } catch (error) {
         console.error("initializeGame: Error fetching current user data:", error);
         showMessage(`Failed to load your player data: ${error.message}. Please try logging in again.`);
         localStorage.removeItem('mafiaGameUserId');
-        localStorage.removeItem('mafiaGameSessionId'); // NEW: Clear sessionId on error
+        localStorage.removeItem('mafiaGameSessionId');
+        localStorage.removeItem('mafiaGameUsername');
         renderView('login');
         return;
     } finally {
@@ -680,88 +699,85 @@ async function initializeGame(userId) {
     state.isCurrentUserAdmin = state.currentUser.IsAdmin === 'TRUE';
     await fetchGameState();
 
-// NEW: Fetch current player's mission
-        let currentUserMissionTimeout;
-        showLoadingOverlay(); // Show loading while fetching mission
+    // Fetch current player's mission
+    let currentUserMissionTimeout;
+    showLoadingOverlay();
 
-        currentUserMissionTimeout = setTimeout(() => {
-            hideLoadingOverlay();
-            showMessage('Failed to load your mission data (timeout). Please refresh.');
-            console.warn("initializeGame: Current user mission fetch timeout occurred.");
-        }, 10000); // 10 seconds timeout for mission fetch
+    currentUserMissionTimeout = setTimeout(() => {
+        hideLoadingOverlay();
+        showMessage('Failed to load your mission data (timeout). Please refresh.');
+    }, 10000);
 
-        try {
-            console.log(`initializeGame: Attempting to fetch mission for player: ${state.currentUserId}`); // DEBUG LOG Frontend Mission 1
-            const missionResponse = await fetch(`/.netlify/functions/get-player-mission?playerId=${state.currentUserId}`);
-            if (missionResponse.ok) {
-                const missionResult = await missionResponse.json();
-                state.currentMission = missionResult.currentMission;
-                console.log("initializeGame: Fetched current mission data:", state.currentMission); // DEBUG LOG Frontend Mission 2
-            } else {
-                console.error("Error fetching player mission:", await missionResponse.text()); // DEBUG LOG Frontend Mission 3
-                state.currentMission = null;
-            }
-        } catch (error) {
-            console.error("Error fetching player mission:", error); // DEBUG LOG Frontend Mission 4
+    try {
+        const missionResponse = await fetch(`/.netlify/functions/get-player-mission?playerId=${state.currentUserId}`);
+        if (missionResponse.ok) {
+            const missionResult = await missionResponse.json();
+            state.currentMission = missionResult.currentMission;
+        } else {
+            console.error("Error fetching player mission:", await missionResponse.text());
             state.currentMission = null;
-        } finally {
-            clearTimeout(currentUserMissionTimeout);
-            hideLoadingOverlay(); // Hide loading after mission fetch
         }
+    } catch (error) {
+        console.error("Error fetching player mission:", error);
+        state.currentMission = null;
+    } finally {
+        clearTimeout(currentUserMissionTimeout);
+        hideLoadingOverlay();
+    }
 
     const currentUserWelcomeStatus = state.currentUser.Welcome?.toString().toUpperCase();
 
-// Check for Game Over conditions first
-    if (state.gameState?.Winner === 'Jester') { // NEW: Check for Jester win
-        renderView('jesterWinPage');
-        hideLoadingOverlay();
-    } else if (state.currentUser.Status && state.currentUser.Status.toLowerCase() === 'dead') {
-        renderView('deadPage');
-        hideLoadingOverlay();
-    } else if (state.gameState?.CurrentPhase === 'Off') {
-        renderView('offLimitsPage');
-        hideLoadingOverlay();
-    } else if (currentUserWelcomeStatus !== 'TRUE') {
-        localStorage.removeItem('mafiaGameUserId');
-        localStorage.removeItem('mafiaGameSessionId');
-        renderView('welcomePage');
-        hideLoadingOverlay();
-    } else {
-        renderView('dashboard');
-        updateDashboardActions(state.gameState?.CurrentPhase || 'Day');
+    if (state.gameState?.Winner === 'Jester') {
+        renderView('jesterWinPage');
+        hideLoadingOverlay();
+    } else if (state.currentUser.Status && state.currentUser.Status.toLowerCase() === 'dead') {
+        renderView('deadPage');
+        hideLoadingOverlay();
+    } else if (state.gameState?.CurrentPhase === 'Off') {
+        renderView('offLimitsPage');
+        hideLoadingOverlay();
+    } else if (currentUserWelcomeStatus !== 'TRUE') {
+        localStorage.removeItem('mafiaGameUserId');
+        localStorage.removeItem('mafiaGameSessionId');
+        localStorage.removeItem('mafiaGameUsername');
+        renderView('welcomePage');
+        hideLoadingOverlay();
+    } else {
+        renderView('dashboard');
+        updateDashboardActions(state.gameState?.CurrentPhase || 'Day');
 
-        if (state.gameState?.CurrentPhase === 'Day') {
-            const previousDay = parseInt(state.gameState.CurrentDay) - 1;
-            if (previousDay >= 1) {
-                let recapLoadingTimeout;
-                showLoadingOverlay();
+        if (state.gameState?.CurrentPhase === 'Day') {
+            const previousDay = parseInt(state.gameState.CurrentDay) - 1;
+            if (previousDay >= 1) {
+                let recapLoadingTimeout;
+                showLoadingOverlay();
 
-                recapLoadingTimeout = setTimeout(() => {
-                    hideLoadingOverlay();
-                    showMessage('Nightly recap loading timed out.');
-                }, 15000);
+                recapLoadingTimeout = setTimeout(() => {
+                    hideLoadingOverlay();
+                    showMessage('Nightly recap loading timed out.');
+                }, 15000);
 
-                try {
-                    const recapResponse = await fetch(`/.netlify/functions/get-nightly-recap?dayNumber=${previousDay}`);
-                    if (recapResponse.ok) {
-                        const recapResult = await recapResponse.json();
-                        state.nightlyRecap = recapResult.recapData;
-                        renderView('dashboard');
-                        updateDashboardActions(state.gameState?.CurrentPhase || 'Day');
-                    } else {
-                        console.error("Error fetching nightly recap:", await recapResponse.text());
-                        state.nightlyRecap = null;
-                    }
-                } catch (error) {
-                    console.error("Error fetching nightly recap:", error);
-                    state.nightlyRecap = null;
-                } finally {
-                    clearTimeout(recapLoadingTimeout);
-                    hideLoadingOverlay();
-                }
-            }
-        }
-    }
+                try {
+                    const recapResponse = await fetch(`/.netlify/functions/get-nightly-recap?dayNumber=${previousDay}`);
+                    if (recapResponse.ok) {
+                        const recapResult = await recapResponse.json();
+                        state.nightlyRecap = recapResult.recapData;
+                        renderView('dashboard');
+                        updateDashboardActions(state.gameState?.CurrentPhase || 'Day');
+                    } else {
+                        console.error("Error fetching nightly recap:", await recapResponse.text());
+                        state.nightlyRecap = null;
+                    }
+                } catch (error) {
+                    console.error("Error fetching nightly recap:", error);
+                    state.nightlyRecap = null;
+                } finally {
+                    clearTimeout(recapLoadingTimeout);
+                    hideLoadingOverlay();
+                }
+            }
+        }
+    }
 }
 
 
@@ -1726,9 +1742,9 @@ appRoot.addEventListener('click', async (e) => {
             
 
 } else if (e.target.id === 'logout-button') {
-                const sessionId = localStorage.getItem('mafiaGameSessionId'); // Get sessionId for logout
+                const sessionId = localStorage.getItem('mafiaGameSessionId');
                 if (sessionId) {
-                    stopSessionActivityUpdate(); // Stop periodic updates
+                    stopSessionActivityUpdate();
                     try {
                         const response = await fetch('/.netlify/functions/log-logout', {
                             method: 'POST',
@@ -1744,7 +1760,8 @@ appRoot.addEventListener('click', async (e) => {
                 }
 
                 localStorage.removeItem('mafiaGameUserId');
-                localStorage.removeItem('mafiaGameSessionId'); // Clear sessionId from localStorage
+                localStorage.removeItem('mafiaGameSessionId');
+                localStorage.removeItem('mafiaGameUsername'); // NEW: Clear username from localStorage
                 state.currentUserId = null;
                 state.currentUser = null;
                 state.isCurrentUserAdmin = false;

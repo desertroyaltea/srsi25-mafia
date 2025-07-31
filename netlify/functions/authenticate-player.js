@@ -2,7 +2,7 @@
 
 const { google } = require('googleapis');
 const { JWT } = require('google-auth-library');
-const bcrypt = require('bcryptjs'); // For hashing passcodes
+const bcrypt = require('bcryptjs');
 
 async function getSheetsService() {
     const credentials = JSON.parse(process.env.GOOGLE_SERVICE_ACCOUNT_CREDENTIALS);
@@ -25,7 +25,7 @@ exports.handler = async (event, context) => {
         return { statusCode: 500, body: JSON.stringify({ error: 'Server configuration error.' }) };
     }
 
-    let passcodeInput; // CRITICAL FIX: Only receive passcode
+    let passcodeInput;
     try {
         const body = JSON.parse(event.body);
         passcodeInput = body.passcode;
@@ -41,10 +41,10 @@ exports.handler = async (event, context) => {
     try {
         const sheets = await getSheetsService();
 
-        // Fetch PlayerID (A), Passcode (C)
+        // Fetch PlayerID (A), Passcode (C), Username (AA)
         const playersResponse = await sheets.spreadsheets.values.get({
             spreadsheetId: sheetId,
-            range: 'Players!A:C', // Fetch PlayerID (A), Name (B), Passcode (C)
+            range: 'Players!A:AA', // Fetch up to Username (AA)
         });
 
         const allPlayersData = playersResponse.data.values || [];
@@ -55,21 +55,21 @@ exports.handler = async (event, context) => {
         const headers = allPlayersData[0];
         const playerRows = allPlayersData.slice(1);
 
-        const playerIdCol = headers.indexOf('PlayerID'); // Column A
-        const passcodeCol = headers.indexOf('Passcode'); // Column C
+        const playerIdCol = headers.indexOf('PlayerID');
+        const passcodeCol = headers.indexOf('Passcode');
+        const usernameCol = headers.indexOf('Username'); // NEW: Get Username column index
 
-        if (playerIdCol === -1 || passcodeCol === -1) {
-            console.error("authenticate-player: Required columns 'PlayerID' or 'Passcode' not found in Players sheet.");
-            throw new Error("Required columns 'PlayerID' or 'Passcode' not found in Players sheet.");
+        if (playerIdCol === -1 || passcodeCol === -1 || usernameCol === -1) { // NEW: Validate Username column
+            console.error("authenticate-player: Required columns 'PlayerID', 'Passcode', or 'Username' not found in Players sheet.");
+            throw new Error("Required columns 'PlayerID', 'Passcode', or 'Username' not found in Players sheet.");
         }
 
         let authenticatedPlayerId = null;
+        let authenticatedUsername = null; // Store username for return
         for (const row of playerRows) {
             const storedHashedPasscode = row[passcodeCol] ? String(row[passcodeCol]).trim() : '';
             
             let isMatch = false;
-            // CRITICAL FIX: Use bcrypt.compare directly. The GAS hashing now produces bcrypt.
-            // No need for custom HMAC logic here.
             if (storedHashedPasscode.startsWith('$2a$') || storedHashedPasscode.startsWith('$2b$') || storedHashedPasscode.startsWith('$2y$')) {
                  isMatch = await bcrypt.compare(passcodeInput.trim(), storedHashedPasscode);
             } else {
@@ -77,7 +77,8 @@ exports.handler = async (event, context) => {
             }
 
             if (isMatch) {
-                authenticatedPlayerId = row[playerIdCol]; // Return the numeric PlayerID
+                authenticatedPlayerId = row[playerIdCol];
+                authenticatedUsername = row[usernameCol] ? String(row[usernameCol]).trim() : ''; // Get Username
                 break;
             }
         }
@@ -90,7 +91,7 @@ exports.handler = async (event, context) => {
 
             const sessionEntry = [
                 sessionId,
-                authenticatedPlayerId, // Log numeric PlayerID
+                authenticatedPlayerId,
                 loginTime,
                 loginTime,
                 '',
@@ -109,10 +110,10 @@ exports.handler = async (event, context) => {
             return {
                 statusCode: 200,
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ message: 'Authentication successful.', playerId: authenticatedPlayerId, sessionId: sessionId }), // Return numeric PlayerID
+                body: JSON.stringify({ message: 'Authentication successful.', playerId: authenticatedPlayerId, sessionId: sessionId, username: authenticatedUsername }), // NEW: Return username
             };
         } else {
-            return { statusCode: 401, body: JSON.stringify({ error: 'Invalid Passcode.' }) }; // Generic error
+            return { statusCode: 401, body: JSON.stringify({ error: 'Invalid Passcode.' }) };
         }
 
     } catch (error) {
