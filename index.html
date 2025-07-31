@@ -934,17 +934,17 @@ async function generateNightlyRecapStory(recapData) { // Make async
     storyParts.push(`As the first rays of dawn pierced through the darkness, <span class="font-bold text-gray-300">Building 9</span> slowly awoke from a restless night.`);
 
     if (successfullyProtectedNames.length > 0) {
-        storyParts.push(`The <span class="text-blue-400 font-bold">${getDisplayRoleName('Doctor')}s</span> worked tirelessly, their healing touch safeguarding ${successfullyProtectedNames} from harm.`);
+        storyParts.push(`The <span class="text-blue-400 font-bold">${getDisplayRoleName('Doctor')}s</span> worked tirelessly, aggressively covering up ${successfullyProtectedNames} in bubble wrap, saving them from the Mafia who tried to kill them.`);
     } else {
-        storyParts.push(`The <span class="text-blue-400 font-bold">${getDisplayRoleName('Doctor')}s</span> watched over the town, but their skills were either not needed or, sadly, not enough to prevent all tragedies.`);
+        storyParts.push(`The <span class="text-blue-400 font-bold">${getDisplayRoleName('Doctor')}s</span> watched over the town, but they couldn't protect those who needed it the most. Skill issue wallah.`);
     }
 
     if (mafiaKilledNames.length > 0) {
-        storyParts.push(`But the chilling silence was broken by the grim news: the <span class="text-red-500 font-bold">${getDisplayRoleName('Mafia')}</span> had claimed ${mafiaKilledNames}.`);
+        storyParts.push(`But the chilling silence was broken by the grim news: ${mafiaKilledNames} going down the elevator in Building 9, only for the elevator to suddenly "malfunction". A quick and brutal fall led to their demise. Needless to say, the <span class="text-red-500 font-bold">${getDisplayRoleName('Mafia')}</span> got their way.`);
     } else if (successfullyProtectedNames.length > 0) {
-         storyParts.push(`The <span class="text-red-500 font-bold">${getDisplayRoleName('Mafia')}'s</span> deadly aim was thwarted, as their targets managed to escape their grasp.`);
+         storyParts.push(`The <span class="text-red-500 font-bold">${getDisplayRoleName('Mafia')}'s</span> deadly aim was ineffective, as their targets managed to escape their grasp. Big L to the Mafia, and we all have the Doctors to thank`);
     } else {
-        storyParts.push(`Remarkably, the <span class="text-red-500 font-bold">${getDisplayRoleName('Mafia')}</span> seemed to have missed their mark, or perhaps, chose to lay low.`);
+        storyParts.push(`Remarkably, the <span class="text-red-500 font-bold">${getDisplayRoleName('Mafia')}</span> seemed to have missed their mark, skill issue perhaps?.`);
     }
 
     if (guiltyAccusedNames.length > 0) {
@@ -958,10 +958,10 @@ async function generateNightlyRecapStory(recapData) { // Make async
     if (sheriffKilledNames.length > 0) {
         storyParts.push(`Amidst the chaos, the vigilant <span class="text-yellow-500 font-bold">${getDisplayRoleName('Sheriff')}</span> exacted their own brand of justice, eliminating ${sheriffKilledNames}.`);
     } else {
-        storyParts.push(`The <span class="text-yellow-500 font-bold">${getDisplayRoleName('Sheriff')}'s</span> gun remained silent, their target perhaps elusive or their moment yet to come.`);
+        storyParts.push(`The <span class="text-yellow-500 font-bold">${getDisplayRoleName('Sheriff')}'s</span> gun remained silent, idk what they are waiting for tbh.`);
     }
 
-    storyParts.push(`<span class="font-bold text-blue-400">SRSI25 Cohort</span> now faces a new day, with new questions and old suspicions lingering in the air.`);
+    storyParts.push(`<span class="font-bold text-blue-400">SRSI25 Cohort</span> now faces a new day, will you repeat the same mistakes? Or will you learn from them...`);
 
     return storyParts.map(part => `<p>${part}</p>`).join('');
 }
