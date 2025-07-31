@@ -2,7 +2,7 @@
 
 const { google } = require('googleapis');
 const { JWT } = require('google-auth-library');
-const bcrypt = require('bcryptjs'); // Ensure this is installed via npm install bcryptjs
+const bcrypt = require('bcryptjs'); // For hashing passcodes
 
 async function getSheetsService() {
     const credentials = JSON.parse(process.env.GOOGLE_SERVICE_ACCOUNT_CREDENTIALS);
@@ -25,25 +25,29 @@ exports.handler = async (event, context) => {
         return { statusCode: 500, body: JSON.stringify({ error: 'Server configuration error.' }) };
     }
 
-    let passcodeInput;
+    let usernameInput, passcodeInput; // CRITICAL FIX: Receive usernameInput
     try {
         const body = JSON.parse(event.body);
-        passcodeInput = body.passcode; // This is the plain-text passcode entered by the user
+        usernameInput = body.username; // Get username
+        passcodeInput = body.passcode;
     } catch (e) {
         console.error("authenticate-player: Invalid JSON body:", e.message);
         return { statusCode: 400, body: JSON.stringify({ error: 'Invalid request format.' }) };
     }
 
-    if (!passcodeInput) {
-        return { statusCode: 400, body: JSON.stringify({ error: 'Passcode is required.' }) };
+    if (!usernameInput || !passcodeInput) { // Validate both username and passcode
+        return { statusCode: 400, body: JSON.stringify({ error: 'Username and Passcode are required.' }) };
     }
 
     try {
         const sheets = await getSheetsService();
 
+        // Fetch PlayerID (A), Username (AA), Passcode (C - assuming it shifted)
+        // CRITICAL: Adjust range if Passcode column has shifted due to Username column insertion
+        // Assuming your columns are now: A=PlayerID, B=Name, C=Passcode, D=Role, ..., AA=Username
         const playersResponse = await sheets.spreadsheets.values.get({
             spreadsheetId: sheetId,
-            range: 'Players!A:C', // Fetch PlayerID (A), Name (B), Passcode (C)
+            range: 'Players!A:AA', // Fetch up to Username (AA) to get all needed columns
         });
 
         const allPlayersData = playersResponse.data.values || [];
@@ -55,34 +59,35 @@ exports.handler = async (event, context) => {
         const playerRows = allPlayersData.slice(1);
 
         const playerIdCol = headers.indexOf('PlayerID');
-        const passcodeCol = headers.indexOf('Passcode'); // This column contains the HASHED passcode
+        const usernameCol = headers.indexOf('Username'); // NEW: Get Username column index
+        const passcodeCol = headers.indexOf('Passcode'); // Get Passcode column index
 
-        if (playerIdCol === -1 || passcodeCol === -1) {
-            console.error("authenticate-player: Required columns 'PlayerID' or 'Passcode' not found in Players sheet.");
-            throw new Error("Required columns 'PlayerID' or 'Passcode' not found in Players sheet.");
+        if (playerIdCol === -1 || usernameCol === -1 || passcodeCol === -1) {
+            console.error("authenticate-player: Required columns 'PlayerID', 'Username', or 'Passcode' not found in Players sheet.");
+            throw new Error("Required columns 'PlayerID', 'Username', or 'Passcode' not found in Players sheet.");
         }
 
         let authenticatedPlayerId = null;
-        for (const row of playerRows) {
-            const storedHashedPasscode = row[passcodeCol] ? String(row[passcodeCol]).trim() : ''; // This is the HASHED string from the sheet
-            
-            // CRITICAL FIX: Use bcrypt.compare to compare plain-text input against the stored hash
-            // If storedHashedPasscode is empty or not a valid hash, bcrypt.compare might throw or return false.
-            // We need to ensure it's a valid hash format for bcrypt.
-            let isMatch = false;
-            if (storedHashedPasscode.startsWith('$2a$') || storedHashedPasscode.startsWith('$2b$')) { // Check for bcrypt hash format
-                 isMatch = await bcrypt.compare(passcodeInput.trim(), storedHashedPasscode);
-            } else {
-                // If it's not a bcrypt hash (e.g., it's a plain-text passcode from before hashing was implemented)
-                // This branch should ideally not be hit once all passcodes are hashed.
-                // For robust migration, you might compare plain-text here too, but for security,
-                // we assume all stored passcodes are now hashed.
-                console.warn("authenticate-player: Stored passcode is not in bcrypt hash format. Comparison skipped.");
-            }
+        let foundUsername = null; // Store the username found for logging
 
-            if (isMatch) {
-                authenticatedPlayerId = row[playerIdCol];
-                break;
+        for (const row of playerRows) {
+            const storedUsername = row[usernameCol] ? String(row[usernameCol]).trim() : '';
+            const storedHashedPasscode = row[passcodeCol] ? String(row[passcodeCol]).trim() : '';
+            
+            // CRITICAL FIX: Authenticate by Username first, then verify Passcode
+            if (storedUsername.toLowerCase() === usernameInput.trim().toLowerCase()) { // Case-insensitive username match
+                foundUsername = storedUsername;
+                let isMatch = false;
+                if (storedHashedPasscode.startsWith('$2a$') || storedHashedPasscode.startsWith('$2b$')) {
+                    isMatch = await bcrypt.compare(passcodeInput.trim(), storedHashedPasscode);
+                } else {
+                    console.warn("authenticate-player: Stored passcode is not in bcrypt hash format. Comparison skipped.");
+                }
+
+                if (isMatch) {
+                    authenticatedPlayerId = row[playerIdCol]; // Get the numeric PlayerID
+                    break;
+                }
             }
         }
 
@@ -94,7 +99,7 @@ exports.handler = async (event, context) => {
 
             const sessionEntry = [
                 sessionId,
-                authenticatedPlayerId,
+                authenticatedPlayerId, // Log numeric PlayerID
                 loginTime,
                 loginTime,
                 '',
@@ -113,10 +118,10 @@ exports.handler = async (event, context) => {
             return {
                 statusCode: 200,
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ message: 'Authentication successful.', playerId: authenticatedPlayerId, sessionId: sessionId }),
+                body: JSON.stringify({ message: 'Authentication successful.', playerId: authenticatedPlayerId, sessionId: sessionId }), // Return numeric PlayerID
             };
         } else {
-            return { statusCode: 401, body: JSON.stringify({ error: 'Invalid Passcode.' }) };
+            return { statusCode: 401, body: JSON.stringify({ error: 'Invalid Username or Passcode.' }) }; // Generic error
         }
 
     } catch (error) {
