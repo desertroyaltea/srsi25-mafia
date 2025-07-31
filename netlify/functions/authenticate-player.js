@@ -1,7 +1,8 @@
+// netlify/functions/authenticate-player.js
 
 const { google } = require('googleapis');
 const { JWT } = require('google-auth-library');
-const bcrypt = require('bcryptjs');
+const bcrypt = require('bcryptjs'); // Ensure this is installed via npm install bcryptjs
 
 async function getSheetsService() {
     const credentials = JSON.parse(process.env.GOOGLE_SERVICE_ACCOUNT_CREDENTIALS);
@@ -27,7 +28,7 @@ exports.handler = async (event, context) => {
     let passcodeInput;
     try {
         const body = JSON.parse(event.body);
-        passcodeInput = body.passcode;
+        passcodeInput = body.passcode; // This is the plain-text passcode entered by the user
     } catch (e) {
         console.error("authenticate-player: Invalid JSON body:", e.message);
         return { statusCode: 400, body: JSON.stringify({ error: 'Invalid request format.' }) };
@@ -42,7 +43,7 @@ exports.handler = async (event, context) => {
 
         const playersResponse = await sheets.spreadsheets.values.get({
             spreadsheetId: sheetId,
-            range: 'Players!A:C',
+            range: 'Players!A:C', // Fetch PlayerID (A), Name (B), Passcode (C)
         });
 
         const allPlayersData = playersResponse.data.values || [];
@@ -54,7 +55,7 @@ exports.handler = async (event, context) => {
         const playerRows = allPlayersData.slice(1);
 
         const playerIdCol = headers.indexOf('PlayerID');
-        const passcodeCol = headers.indexOf('Passcode');
+        const passcodeCol = headers.indexOf('Passcode'); // This column contains the HASHED passcode
 
         if (playerIdCol === -1 || passcodeCol === -1) {
             console.error("authenticate-player: Required columns 'PlayerID' or 'Passcode' not found in Players sheet.");
@@ -63,9 +64,21 @@ exports.handler = async (event, context) => {
 
         let authenticatedPlayerId = null;
         for (const row of playerRows) {
-            const storedHashedPasscode = row[passcodeCol] ? String(row[passcodeCol]).trim() : '';
+            const storedHashedPasscode = row[passcodeCol] ? String(row[passcodeCol]).trim() : ''; // This is the HASHED string from the sheet
             
-            const isMatch = await bcrypt.compare(passcodeInput.trim(), storedHashedPasscode);
+            // CRITICAL FIX: Use bcrypt.compare to compare plain-text input against the stored hash
+            // If storedHashedPasscode is empty or not a valid hash, bcrypt.compare might throw or return false.
+            // We need to ensure it's a valid hash format for bcrypt.
+            let isMatch = false;
+            if (storedHashedPasscode.startsWith('$2a$') || storedHashedPasscode.startsWith('$2b$')) { // Check for bcrypt hash format
+                 isMatch = await bcrypt.compare(passcodeInput.trim(), storedHashedPasscode);
+            } else {
+                // If it's not a bcrypt hash (e.g., it's a plain-text passcode from before hashing was implemented)
+                // This branch should ideally not be hit once all passcodes are hashed.
+                // For robust migration, you might compare plain-text here too, but for security,
+                // we assume all stored passcodes are now hashed.
+                console.warn("authenticate-player: Stored passcode is not in bcrypt hash format. Comparison skipped.");
+            }
 
             if (isMatch) {
                 authenticatedPlayerId = row[playerIdCol];
