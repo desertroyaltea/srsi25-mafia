@@ -24,7 +24,7 @@ exports.handler = async (event, context) => {
         return { statusCode: 500, body: JSON.stringify({ error: 'Server configuration error.' }) };
     }
 
-    let doctorPlayerId, targetPlayerId1, targetPlayerId2, doctorCanSaveMoreUsed; // CRITICAL FIX: Receive PlayerIDs
+    let doctorPlayerId, targetPlayerId1, targetPlayerId2, doctorCanSaveMoreUsed;
     try {
         const body = JSON.parse(event.body);
         doctorPlayerId = body.doctorPlayerId;

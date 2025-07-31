@@ -62,16 +62,16 @@ exports.handler = async (event, context) => {
         });
 
         busboy.on('finish', async () => {
-            let accuserPlayerId, accusedPlayerId; // CRITICAL FIX: Receive Accused PlayerID
+            let accuserPlayerId, accusedPlayerId;
             try {
                 accuserPlayerId = fields.accuserPlayerId;
-                accusedPlayerId = fields.accusedPlayerId; // Get accused PlayerID
+                accusedPlayerId = fields.accusedPlayerId;
             } catch (e) {
                 console.error("submit-accusation: Error parsing form fields:", e.message);
                 return resolve({ statusCode: 400, body: JSON.stringify({ error: 'Invalid form data.' }) });
             }
 
-            if (!fileBuffer || !accuserPlayerId || !accusedPlayerId) { // Validate PlayerID
+            if (!fileBuffer || !accuserPlayerId || !accusedPlayerId) {
                 return resolve({
                     statusCode: 400,
                     body: JSON.stringify({ error: 'Missing audio file or player information.' }),
@@ -108,7 +108,7 @@ exports.handler = async (event, context) => {
                         if (String(playerRows[i][idCol]).trim() === id) {
                             return {
                                 playerID: String(playerRows[i][idCol]).trim(),
-                                playerName: String(playerRows[i][nameCol]).trim(), // Get Name for logs if needed
+                                playerName: String(playerRows[i][nameCol]).trim(),
                                 playerStatus: String(playerRows[i][statusCol]).trim(),
                                 playerIsAdmin: String(playerRows[i][isAdminCol]).trim(),
                                 rowIndex: i + 2
@@ -198,8 +198,8 @@ exports.handler = async (event, context) => {
                 const submissionTime = new Date().toISOString();
                 const values = [
                     accusationId,
-                    accuserPlayerId, // Store Accuser PlayerID (numeric)
-                    accusedPlayerId, // CRITICAL FIX: Store Accused PlayerID (numeric)
+                    accuserPlayerId,
+                    accusedPlayerId,
                     finalAudioUrl,
                     submissionTime,
                     'Pending',
