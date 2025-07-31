@@ -14,9 +14,7 @@ async function getSheetsService() {
 }
 
 exports.handler = async (event, context) => {
-    console.log("protect-player: Function started.");
     if (event.httpMethod !== 'POST') {
-        console.log("protect-player: Method Not Allowed.");
         return { statusCode: 405, body: 'Method Not Allowed' };
     }
 
@@ -25,155 +23,133 @@ exports.handler = async (event, context) => {
         console.error("protect-player: Google Sheet ID is not configured.");
         return { statusCode: 500, body: JSON.stringify({ error: 'Server configuration error.' }) };
     }
-    console.log(`protect-player: Sheet ID: ${sheetId}`);
+
+    let doctorPlayerId, targetPlayerId1, targetPlayerId2, doctorCanSaveMoreUsed; // CRITICAL FIX: Receive PlayerIDs
+    try {
+        const body = JSON.parse(event.body);
+        doctorPlayerId = body.doctorPlayerId;
+        targetPlayerId1 = body.targetPlayerId1;
+        targetPlayerId2 = body.targetPlayerId2;
+        doctorCanSaveMoreUsed = body.doctorCanSaveMoreUsed;
+    } catch (e) {
+        console.error("protect-player: Invalid JSON body:", e.message);
+        return { statusCode: 400, body: JSON.stringify({ error: 'Invalid request format.' }) };
+    }
+
+    if (!doctorPlayerId || !targetPlayerId1 || (doctorCanSaveMoreUsed && !targetPlayerId2)) {
+        return { statusCode: 400, body: JSON.stringify({ error: 'Missing doctorPlayerId or targetPlayerId(s).' }) };
+    }
+    if (doctorCanSaveMoreUsed && targetPlayerId1 === targetPlayerId2) {
+        return { statusCode: 400, body: JSON.stringify({ error: 'You must select two different players to protect.' }) };
+    }
 
     try {
-        const { doctorPlayerId, targetPlayerId1, targetPlayerId2, doctorCanSaveMoreUsed } = JSON.parse(event.body);
-        console.log(`protect-player: Received - Doctor: ${doctorPlayerId}, Target 1: ${targetPlayerId1}, Target 2: ${targetPlayerId2 || 'N/A'}, CanSaveMoreUsed: ${doctorCanSaveMoreUsed}`);
-        
-        if (!doctorPlayerId || !targetPlayerId1 || (doctorCanSaveMoreUsed && !targetPlayerId2)) {
-            console.log("protect-player: Missing doctorPlayerId or targetPlayerId(s).");
-            return { statusCode: 400, body: JSON.stringify({ error: 'Missing doctorPlayerId or targetPlayerId(s).' }) };
-        }
-
         const sheets = await getSheetsService();
-        console.log("protect-player: Sheets service initialized.");
 
-        // 1. Fetch player data to check role, action usage, and ability status
-        console.log("protect-player: Fetching Players sheet for validation.");
+        // Fetch all player data to validate
         const playersResponse = await sheets.spreadsheets.values.get({
             spreadsheetId: sheetId,
-            range: 'Players!A:Z', // Fetch all columns for server-side validation
+            range: 'Players!A:Z', // Fetch all columns needed for validation
         });
         const playersData = playersResponse.data.values || [];
         if (playersData.length < 1) {
-            console.error("protect-player: Players sheet is empty.");
             return { statusCode: 500, body: JSON.stringify({ error: 'Players sheet is empty.' }) };
         }
         const playerHeaders = playersData[0];
         const playerRows = playersData.slice(1);
 
         const idCol = playerHeaders.indexOf('PlayerID');
-        const roleCol = playerHeaders.indexOf('Role'); // Needed for role validation
-        const statusCol = playerHeaders.indexOf('Status'); // Needed for status validation
+        const roleCol = playerHeaders.indexOf('Role');
+        const statusCol = playerHeaders.indexOf('Status');
         const mainUsedCol = playerHeaders.indexOf('MainUsed');
         const doctorCanSaveMoreCol = playerHeaders.indexOf('DoctorCanSaveMore');
-        const isAdminCol = playerHeaders.indexOf('IsAdmin'); // Needed for admin exemption
+        const isAdminCol = playerHeaders.indexOf('IsAdmin');
 
         if ([idCol, roleCol, statusCol, mainUsedCol, doctorCanSaveMoreCol, isAdminCol].includes(-1)) {
-            console.error("protect-player: One or more required columns not found in Players sheet.");
+            console.error("protect-player: Required columns not found in Players sheet.");
             throw new Error("Required columns (PlayerID, Role, Status, MainUsed, DoctorCanSaveMore, IsAdmin) not found in Players sheet.");
         }
 
-        let doctorPlayerRowIndex = -1;
-        let doctorMainUsedStatus = 'FALSE';
-        let doctorCanSaveMoreStatus = 'FALSE';
-        let doctorRole = '';
-        let doctorIsAdmin = 'FALSE';
+        // Helper to get player info by ID
+        const getPlayerInfoById = (id) => {
+            for (let i = 0; i < playerRows.length; i++) {
+                if (String(playerRows[i][idCol]).trim() === id) {
+                    return {
+                        playerID: String(playerRows[i][idCol]).trim(),
+                        playerRole: String(playerRows[i][roleCol]).trim(),
+                        playerStatus: String(playerRows[i][statusCol]).trim(),
+                        playerMainUsed: String(playerRows[i][mainUsedCol]).trim(),
+                        playerCanSaveMore: String(playerRows[i][doctorCanSaveMoreCol]).trim(),
+                        playerIsAdmin: String(playerRows[i][isAdminCol]).trim(),
+                        rowIndex: i + 2
+                    };
+                }
+            }
+            return null;
+        };
 
-        let target1Status = '';
-        let target1IsAdmin = 'FALSE';
-        let target2Status = '';
-        let target2IsAdmin = 'FALSE';
-
-        // Map players for efficient lookup
-        const playerMap = new Map(); // Map<PlayerID, {data: row, index: i+2}>
-        for(let i = 0; i < playerRows.length; i++) {
-            const row = playerRows[i];
-            playerMap.set(row[idCol], {data: row, index: i + 2});
-        }
-
-        // Validate Doctor
-        const doctorInfo = playerMap.get(doctorPlayerId);
+        // Validate Doctor player
+        const doctorInfo = getPlayerInfoById(doctorPlayerId);
         if (!doctorInfo) {
-            console.log("protect-player: Doctor player not found in sheet.");
             return { statusCode: 404, body: JSON.stringify({ error: 'Doctor player not found.' }) };
         }
-        doctorPlayerRowIndex = doctorInfo.index;
-        doctorMainUsedStatus = doctorInfo.data[mainUsedCol] || 'FALSE';
-        doctorCanSaveMoreStatus = doctorInfo.data[doctorCanSaveMoreCol] || 'FALSE';
-        doctorRole = doctorInfo.data[roleCol];
-        doctorIsAdmin = doctorInfo.data[isAdminCol] || 'FALSE';
-
-        console.log(`protect-player: Doctor ${doctorPlayerId} found. Role: ${doctorRole}, MainUsed: ${doctorMainUsedStatus}, CanSaveMore: ${doctorCanSaveMoreStatus}, IsAdmin: ${doctorIsAdmin}`);
-
-        if (doctorRole.toLowerCase() !== 'doctor') {
-            console.log("protect-player: Player is not a Doctor.");
+        if (doctorInfo.playerRole !== 'FQP982') {
             return { statusCode: 403, body: JSON.stringify({ error: 'Only Doctors can use this ability.' }) };
         }
-        if (doctorMainUsedStatus === 'TRUE') {
-            console.log("protect-player: Doctor has already used action for tonight.");
+        if (doctorInfo.playerMainUsed === 'TRUE') {
             return { statusCode: 403, body: JSON.stringify({ error: 'You have already used your action for tonight.' }) };
         }
-        if (doctorCanSaveMoreUsed && doctorCanSaveMoreStatus !== 'TRUE') {
-            console.log("protect-player: Doctor tried to save more but does not have the ability.");
+        if (doctorCanSaveMoreUsed && doctorInfo.playerCanSaveMore !== 'TRUE') {
             return { statusCode: 403, body: JSON.stringify({ error: 'You do not have the ability to save more players.' }) };
         }
-        if (doctorIsAdmin === 'TRUE') { // Admin exemption for performing actions
-            console.log("protect-player: Admin player cannot perform Doctor actions.");
+        if (doctorInfo.playerIsAdmin === 'TRUE') {
             return { statusCode: 403, body: JSON.stringify({ error: 'Admin players cannot perform game actions.' }) };
         }
 
         // Validate Target 1
-        const target1Info = playerMap.get(targetPlayerId1);
+        const target1Info = getPlayerInfoById(targetPlayerId1);
         if (!target1Info) {
-            console.log("protect-player: Target 1 player not found in sheet.");
-            return { statusCode: 404, body: JSON.stringify({ error: 'Target 1 player not found.' }) };
+            return { statusCode: 404, body: JSON.stringify({ error: `Target 1 (${targetPlayerId1}) not found.` }) };
         }
-        target1Status = target1Info.data[statusCol] || '';
-        target1IsAdmin = target1Info.data[isAdminCol] || 'FALSE';
-        if (target1Status.toLowerCase() !== 'alive') {
-            console.log(`protect-player: Target 1 (${targetPlayerId1}) is not alive.`);
+        if (target1Info.playerStatus.toLowerCase() !== 'alive') {
             return { statusCode: 400, body: JSON.stringify({ error: `Target 1 (${targetPlayerId1}) is not alive.` }) };
         }
-        if (target1IsAdmin === 'TRUE') {
-            console.log(`protect-player: Target 1 (${targetPlayerId1}) is an Admin and cannot be targeted.`);
+        if (target1Info.playerIsAdmin === 'TRUE') {
             return { statusCode: 403, body: JSON.stringify({ error: `Target 1 (${targetPlayerId1}) is an Admin and cannot be targeted.` }) };
         }
 
         // Validate Target 2 (if applicable)
+        let target2Info = null;
         if (doctorCanSaveMoreUsed && targetPlayerId2) {
-            const target2Info = playerMap.get(targetPlayerId2);
+            target2Info = getPlayerInfoById(targetPlayerId2);
             if (!target2Info) {
-                console.log("protect-player: Target 2 player not found in sheet.");
-                return { statusCode: 404, body: JSON.stringify({ error: 'Target 2 player not found.' }) };
+                return { statusCode: 404, body: JSON.stringify({ error: `Target 2 (${targetPlayerId2}) not found.` }) };
             }
-            target2Status = target2Info.data[statusCol] || '';
-            target2IsAdmin = target2Info.data[isAdminCol] || 'FALSE';
-            if (target2Status.toLowerCase() !== 'alive') {
-                console.log(`protect-player: Target 2 (${targetPlayerId2}) is not alive.`);
+            if (target2Info.playerStatus.toLowerCase() !== 'alive') {
                 return { statusCode: 400, body: JSON.stringify({ error: `Target 2 (${targetPlayerId2}) is not alive.` }) };
             }
-            if (target2IsAdmin === 'TRUE') {
-                console.log(`protect-player: Target 2 (${targetPlayerId2}) is an Admin and cannot be targeted.`);
+            if (target2Info.playerIsAdmin === 'TRUE') {
                 return { statusCode: 403, body: JSON.stringify({ error: `Target 2 (${targetPlayerId2}) is an Admin and cannot be targeted.` }) };
             }
             if (targetPlayerId1 === targetPlayerId2) {
-                console.log("protect-player: Both targets are the same.");
                 return { statusCode: 400, body: JSON.stringify({ error: 'You must select two different players to protect.' }) };
             }
         }
 
-
-        // 2. Get current day
-        console.log("protect-player: Fetching current day from Game_State sheet.");
+        // Get current day
         const gameStateResponse = await sheets.spreadsheets.values.get({
             spreadsheetId: sheetId,
             range: 'Game_State!A2:A2',
         });
-        const currentDay = gameStateResponse.data.values && gameStateResponse.data.values[0] ? gameStateResponse.data.values[0][0] : 'Unknown';
-        console.log(`protect-player: Current Day: ${currentDay}`);
+        const currentDay = gameStateResponse.data.values && gameStateResponse.data.values[0] ? String(gameStateResponse.data.values[0][0]).trim() : 'Unknown';
 
-        // 3. Log the action(s)
+        // Log the action(s)
         const timestamp = new Date().toISOString();
         const actionsToLog = [];
 
-        actionsToLog.push([`ACT_PROTECT_${Date.now()}_1`, currentDay, doctorPlayerId, targetPlayerId1, timestamp, null, 'Logged']);
-        console.log(`protect-player: Appending action for Target 1 (${targetPlayerId1}) to Actions_Doctor sheet.`);
-
-        if (doctorCanSaveMoreUsed && targetPlayerId2) {
-            actionsToLog.push([`ACT_PROTECT_${Date.now()}_2`, currentDay, doctorPlayerId, targetPlayerId2, timestamp, null, 'Logged']);
-            console.log(`protect-player: Appending action for Target 2 (${targetPlayerId2}) to Actions_Doctor sheet.`);
+        actionsToLog.push([`ACT_PROTECT_${Date.now()}_1`, currentDay, doctorPlayerId, target1Info.playerID, timestamp, null, 'Logged']);
+        if (doctorCanSaveMoreUsed && target2Info) {
+            actionsToLog.push([`ACT_PROTECT_${Date.now()}_2`, currentDay, doctorPlayerId, target2Info.playerID, timestamp, null, 'Logged']);
         }
 
         await sheets.spreadsheets.values.append({
@@ -182,19 +158,18 @@ exports.handler = async (event, context) => {
             valueInputOption: 'USER_ENTERED',
             resource: { values: actionsToLog },
         });
-        console.log("protect-player: Doctor action(s) logged to Actions_Doctor sheet.");
 
-        // 4. Update the Doctor's MainUsed status to TRUE and DoctorCanSaveMore to FALSE (if used)
+        // Update the Doctor's MainUsed status to TRUE and DoctorCanSaveMore to FALSE (if used)
         const updateRequests = [
             {
-                range: `Players!${String.fromCharCode(65 + mainUsedCol)}${doctorPlayerRowIndex}`,
+                range: `Players!${String.fromCharCode(65 + mainUsedCol)}${doctorInfo.rowIndex}`,
                 values: [['TRUE']]
             }
         ];
 
         if (doctorCanSaveMoreUsed) {
             updateRequests.push({
-                range: `Players!${String.fromCharCode(65 + doctorCanSaveMoreCol)}${doctorPlayerRowIndex}`,
+                range: `Players!${String.fromCharCode(65 + doctorCanSaveMoreCol)}${doctorInfo.rowIndex}`,
                 values: [['FALSE']]
             });
         }
@@ -206,10 +181,6 @@ exports.handler = async (event, context) => {
                 data: updateRequests
             }
         });
-        console.log(`protect-player: Doctor's MainUsed status updated to TRUE.`);
-        if (doctorCanSaveMoreUsed) {
-            console.log(`protect-player: DoctorCanSaveMore status updated to FALSE.`);
-        }
 
         return {
             statusCode: 200,
@@ -224,6 +195,5 @@ exports.handler = async (event, context) => {
             body: JSON.stringify({ error: 'Failed to log protection action(s).', details: error.message }),
         };
     } finally {
-        console.log("protect-player: Function finished.");
     }
 };

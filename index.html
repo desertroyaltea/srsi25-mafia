@@ -278,69 +278,68 @@ dashboard: () => `
                 </div>
             </div>`,
 actionModal: ({ title, buttonText, targets, actionType }) => `
-                <div class="bg-gray-900 p-5 rounded-lg mt-4">
-                    <h2 class="text-2xl font-semibold mb-4 text-red-400">${title}</h2>
-                    <form id="action-form" data-action-type="${actionType}">
+            <div class="bg-gray-900 p-5 rounded-lg mt-4">
+                <h2 class="text-2xl font-semibold mb-4 text-red-400">${title}</h2>
+                <form id="action-form" data-action-type="${actionType}">
+                    <div class="mb-4">
+                        <label for="target-player-1" class="block text-gray-300 text-lg font-bold mb-2">Select Target 1:</label>
+                        <select id="target-player-1" class="shadow border rounded w-full py-3 px-4 text-lg leading-tight focus:outline-none focus:shadow-outline bg-gray-700 border-gray-600 text-white" required>
+                            <option value="">-- Select a player --</option>
+                            ${targets.map(p => `<option value="${p.PlayerID}">${p.Name}</option>`).join('')} <!-- CRITICAL FIX: Value is PlayerID -->
+                        </select>
+                    </div>
+                    ${actionType === 'kill' || (actionType === 'protect' && state.currentUser.DoctorCanSaveMore === 'TRUE') ? `
                         <div class="mb-4">
-                            <label for="target-player-1" class="block text-gray-300 text-lg font-bold mb-2">Select Target 1:</label>
-                            <select id="target-player-1" class="shadow border rounded w-full py-3 px-4 text-lg leading-tight focus:outline-none focus:shadow-outline bg-gray-700 border-gray-600 text-white" required>
+                            <label for="target-player-2" class="block text-gray-300 text-lg font-bold mb-2">Select Target 2:</label>
+                            <select id="target-player-2" class="shadow border rounded w-full py-3 px-4 text-lg leading-tight focus:outline-none focus:shadow-outline bg-gray-700 border-gray-600 text-white" required>
                                 <option value="">-- Select a player --</option>
-                                ${targets.map(p => `<option value="${p.PlayerID}">${p.Name}</option>`).join('')}
+                                ${targets.map(p => `<option value="${p.PlayerID}">${p.Name}</option>`).join('')} <!-- CRITICAL FIX: Value is PlayerID -->
                             </select>
                         </div>
-                        <!-- Conditional second target selection for Mafia Kill OR Doctor Protect -->
-                        ${actionType === 'kill' || (actionType === 'protect' && state.currentUser.DoctorCanSaveMore === 'TRUE') ? `
-                            <div class="mb-4">
-                                <label for="target-player-2" class="block text-gray-300 text-lg font-bold mb-2">Select Target 2:</label>
-                                <select id="target-player-2" class="shadow border rounded w-full py-3 px-4 text-lg leading-tight focus:outline-none focus:shadow-outline bg-gray-700 border-gray-600 text-white" required>
-                                    <option value="">-- Select a player --</option>
-                                    ${targets.map(p => `<option value="${p.PlayerID}">${p.Name}</option>`).join('')}
-                                </select>
-                            </div>
-                        ` : ''}
-                        <div class="flex flex-col md:flex-row gap-4">
-                            <button type="submit" class="bg-red-700 hover:bg-red-800 text-white font-bold py-3 px-6 rounded-lg w-full md:w-1/2 text-xl">
-                                ${buttonText}
-                            </button>
-                            <button type="button" id="back-to-dashboard" class="bg-gray-600 hover:bg-gray-700 text-white font-bold py-3 px-6 rounded-lg w-full md:w-1/2 text-xl">
-                                Cancel
-                            </button>
+                    ` : ''}
+                    <div class="flex flex-col md:flex-row gap-4">
+                        <button type="submit" class="bg-red-700 hover:bg-red-800 text-white font-bold py-3 px-6 rounded-lg w-full md:w-1/2 text-xl">
+                            ${buttonText}
+                        </button>
+                        <button type="button" id="back-to-dashboard" class="bg-gray-600 hover:bg-gray-700 text-white font-bold py-3 px-6 rounded-lg w-full md:w-1/2 text-xl">
+                            Cancel
+                        </button>
+                    </div>
+                </form>
+            </div>
+        `,
+accusationForm: ({ targets }) => `
+            <div class="bg-gray-900 p-5 rounded-lg mt-4">
+                <h2 class="text-2xl font-semibold mb-4 text-red-400">Submit Accusation</h2>
+                <form id="accusation-submission-form">
+                    <div class="mb-4">
+                        <label for="accuser-name" class="block text-gray-300 text-lg font-bold mb-2">Accuser (Your Name):</label>
+                        <input type="text" id="accuser-name" class="shadow appearance-none border rounded w-full py-3 px-4 text-lg text-gray-200 leading-tight focus:outline-none focus:shadow-outline bg-gray-700 border-gray-600 cursor-not-allowed" value="${state.currentUser.Name}" readonly>
+                    </div>
+                    <div class="mb-4">
+                        <label for="accused-player-select" class="block text-gray-300 text-lg font-bold mb-2">Accused Player:</label>
+                        <select id="accused-player-select" class="shadow border rounded w-full py-3 px-4 text-lg leading-tight focus:outline-none focus:shadow-outline bg-gray-700 border-gray-600 text-white" required>
+                            <option value="">-- Select accused player --</option>
+                            ${targets.map(p => `<option value="${p.PlayerID}">${p.Name}</option>`).join('')} <!-- CRITICAL FIX: Value is PlayerID -->
+                        </select>
+                    </div>
+
+                    <div class="mb-6">
+                        <label class="block text-gray-300 text-lg font-bold mb-2">Record Accusation:</label>
+                        <div class="flex flex-wrap items-center gap-4 mb-4">
+                            <button type="button" id="start-recording" class="bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-4 rounded-lg">Start Recording</button>
+                            <button type="button" id="stop-recording" class="bg-gray-600 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded-lg" disabled>Stop Recording</button>
                         </div>
-                    </form>
-                </div>
-            `,
-        accusationForm: ({ targets }) => `
-            <div class="bg-gray-900 p-5 rounded-lg mt-4">
-                <h2 class="text-2xl font-semibold mb-4 text-red-400">Submit Accusation</h2>
-                <form id="accusation-submission-form">
-                    <div class="mb-4">
-                        <label for="accuser-name" class="block text-gray-300 text-lg font-bold mb-2">Accuser (Your Name):</label>
-                        <input type="text" id="accuser-name" class="shadow appearance-none border rounded w-full py-3 px-4 text-lg text-gray-200 leading-tight focus:outline-none focus:shadow-outline bg-gray-700 border-gray-600 cursor-not-allowed" value="${state.currentUser.Name}" readonly>
-                    </div>
-                    <div class="mb-4">
-                        <label for="accused-player-select" class="block text-gray-300 text-lg font-bold mb-2">Accused Player:</label>
-                        <select id="accused-player-select" class="shadow border rounded w-full py-3 px-4 text-lg leading-tight focus:outline-none focus:shadow-outline bg-gray-700 border-gray-600 text-white" required>
-                            <option value="">-- Select accused player --</option>
-                            ${targets.map(p => `<option value="${p.PlayerID}">${p.Name}</option>`).join('')}
-                        </select>
-                    </div>
+                        <audio id="audio-playback" controls class="w-full hidden"></audio>
+                    </div>
 
-                    <div class="mb-6">
-                        <label class="block text-gray-300 text-lg font-bold mb-2">Record Accusation:</label>
-                        <div class="flex flex-wrap items-center gap-4 mb-4">
-                            <button type="button" id="start-recording" class="bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-4 rounded-lg">Start Recording</button>
-                            <button type="button" id="stop-recording" class="bg-gray-600 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded-lg" disabled>Stop Recording</button>
-                        </div>
-                        <audio id="audio-playback" controls class="w-full hidden"></audio>
-                    </div>
-
-                    <div class="flex flex-col md:flex-row gap-4">
-                        <button type="submit" id="submit-accusation-btn" class="bg-green-700 hover:bg-green-800 text-white font-bold py-3 px-6 rounded-lg w-full md:w-1/2 text-xl" disabled>Submit Accusation</button>
-                        <button type="button" id="back-to-dashboard" class="bg-gray-600 hover:bg-gray-700 text-white font-bold py-3 px-6 rounded-lg w-full md:w-1/2 text-xl">Cancel</button>
-                    </div>
-                </form>
-            </div>
-        `,
+                    <div class="flex flex-col md:flex-row gap-4">
+                        <button type="submit" id="submit-accusation-btn" class="bg-green-700 hover:bg-green-800 text-white font-bold py-3 px-6 rounded-lg w-full md:w-1/2 text-xl" disabled>Submit Accusation</button>
+                        <button type="button" id="back-to-dashboard" class="bg-gray-600 hover:bg-gray-700 text-white font-bold py-3 px-6 rounded-lg w-full md:w-1/2 text-xl">Cancel</button>
+                    </div>
+                </form>
+            </div>
+        `,
         adminReview: ({ pendingAccusations }) => `
             <div class="bg-gray-900 p-5 rounded-lg mt-4">
                 <h2 class="text-2xl font-semibold mb-4 text-red-400">Admin Review: Pending Accusations</h2>
@@ -1462,144 +1461,144 @@ window.onload = async () => {
             // const targetPlayerId = document.getElementById('target-player').value; // <-- DELETE THIS LINE
 
             switch (actionType) {
-                case 'kill':
-                    const targetPlayer1Element_kill = document.getElementById('target-player-1');
-                    const targetPlayer2Element_kill = document.getElementById('target-player-2');
+case 'kill':
+                 const targetPlayer1Element_kill = document.getElementById('target-player-1');
+                 const targetPlayer2Element_kill = document.getElementById('target-player-2');
 
-                    if (!targetPlayer1Element_kill || !targetPlayer2Element_kill) {
-                        showMessage("Error: Target selection fields not found. Please refresh.");
-                        console.error("Missing target selection elements for kill action.");
-                        return;
-                    }
+                 if (!targetPlayer1Element_kill || !targetPlayer2Element_kill) {
+                     showMessage("Error: Target selection fields not found. Please refresh.");
+                     console.error("Missing target selection elements for kill action.");
+                     return;
+                 }
 
-                    const targetPlayerId1_kill = targetPlayer1Element_kill.value;
-                    const targetPlayerId2_kill = targetPlayer2Element_kill.value;
+                 const targetPlayerId1_kill = targetPlayer1Element_kill.value; // CRITICAL FIX: Get PlayerID
+                 const targetPlayerId2_kill = targetPlayer2Element_kill.value; // CRITICAL FIX: Get PlayerID
 
-                    if (!targetPlayerId1_kill || !targetPlayerId2_kill) {
-                        showMessage("Please select both target players.");
-                        return;
-                    }
-                    if (targetPlayerId1_kill === targetPlayerId2_kill) {
-                        showMessage("You must select two different players to kill.");
-                        return;
-                    }
+                 if (!targetPlayerId1_kill || !targetPlayerId2_kill) {
+                     showMessage("Please select both target players.");
+                     return;
+                 }
+                 if (targetPlayerId1_kill === targetPlayerId2_kill) {
+                     showMessage("You must select two different players to kill.");
+                     return;
+                 }
 
-                    endpoint = '/.netlify/functions/kill-player';
-                    payload = { mafiaPlayerId: state.currentUserId, targetPlayerId1: targetPlayerId1_kill, targetPlayerId2: targetPlayerId2_kill };
-                    break;
+                 endpoint = '/.netlify/functions/kill-player';
+                 payload = { mafiaPlayerId: state.currentUserId, targetPlayerId1: targetPlayerId1_kill, targetPlayerId2: targetPlayerId2_kill }; // CRITICAL FIX: Send PlayerIDs
+                 break;
 
 case 'protect':
-                    const doctorCanSaveMore = state.currentUser.DoctorCanSaveMore === 'TRUE';
-                    let targetPlayerId_protect_1 = null;
-                    let targetPlayerId_protect_2 = null;
+                 const doctorCanSaveMore = state.currentUser.DoctorCanSaveMore === 'TRUE';
+                 let targetPlayerId1_protect = null; // CRITICAL FIX: Get PlayerID
+                 let targetPlayerId2_protect = null; // CRITICAL FIX: Get PlayerID
 
-                    const targetPlayer1Element_protect = document.getElementById('target-player-1');
-                    if (!targetPlayer1Element_protect) {
-                        showMessage("Error: Target selection field 1 not found. Please refresh.");
-                        console.error("Missing target selection element 1 for protect action.");
-                        return;
-                    }
-                    targetPlayerId_protect_1 = targetPlayer1Element_protect.value;
+                 const targetPlayer1Element_protect = document.getElementById('target-player-1');
+                 if (!targetPlayer1Element_protect) {
+                     showMessage("Error: Target selection field 1 not found. Please refresh.");
+                     console.error("Missing target selection element 1 for protect action.");
+                     return;
+                 }
+                 targetPlayerId1_protect = targetPlayer1Element_protect.value; // CRITICAL FIX: Get PlayerID
 
-                    if (doctorCanSaveMore) {
-                        const targetPlayer2Element_protect = document.getElementById('target-player-2');
-                        if (!targetPlayer2Element_protect) {
-                            showMessage("Error: Target selection field 2 not found. Please refresh.");
-                            console.error("Missing target selection element 2 for protect action with DoctorCanSaveMore.");
-                            return;
-                        }
-                        targetPlayerId_protect_2 = targetPlayer2Element_protect.value;
-                    }
+                 if (doctorCanSaveMore) {
+                     const targetPlayer2Element_protect = document.getElementById('target-player-2');
+                     if (!targetPlayer2Element_protect) {
+                         showMessage("Error: Target selection field 2 not found. Please refresh.");
+                         console.error("Missing target selection element 2 for protect action with DoctorCanSaveMore.");
+                         return;
+                     }
+                     targetPlayerId2_protect = targetPlayer2Element_protect.value; // CRITICAL FIX: Get PlayerID
+                 }
 
-                    if (!targetPlayerId_protect_1 || (doctorCanSaveMore && !targetPlayerId_protect_2)) {
-                        showMessage("Please select the player(s) to protect.");
-                        return;
-                    }
-                    if (doctorCanSaveMore && targetPlayerId_protect_1 === targetPlayerId_protect_2) {
-                        showMessage("You must select two different players to protect.");
-                        return;
-                    }
+                 if (!targetPlayerId1_protect || (doctorCanSaveMore && !targetPlayerId2_protect)) {
+                     showMessage("Please select the player(s) to protect.");
+                     return;
+                 }
+                 if (doctorCanSaveMore && targetPlayerId1_protect === targetPlayerId2_protect) {
+                     showMessage("You must select two different players to protect.");
+                     return;
+                 }
 
-                    endpoint = '/.netlify/functions/protect-player';
-                    payload = {
-                        doctorPlayerId: state.currentUserId,
-                        targetPlayerId1: targetPlayerId_protect_1, // Send first target
-                        targetPlayerId2: doctorCanSaveMore ? targetPlayerId_protect_2 : null, // Send second target only if ability is true
-                        doctorCanSaveMoreUsed: doctorCanSaveMore // Inform backend if ability was used
-                    };
-                    break;
+                 endpoint = '/.netlify/functions/protect-player';
+                 payload = {
+                     doctorPlayerId: state.currentUserId,
+                     targetPlayerId1: targetPlayerId1_protect, // CRITICAL FIX: Send PlayerID
+                     targetPlayerId2: doctorCanSaveMore ? targetPlayerId2_protect : null, // CRITICAL FIX: Send PlayerID
+                     doctorCanSaveMoreUsed: doctorCanSaveMore
+                 };
+                 break;
 
-                case 'check':
-                    const targetPlayerElement_check = document.getElementById('target-player-1'); // Get from target-player-1
-                    if (!targetPlayerElement_check) {
-                        showMessage("Error: Target selection field not found. Please refresh.");
-                        console.error("Missing target selection element for check action.");
-                        return;
-                    }
-                    const targetPlayerId_check = targetPlayerElement_check.value;
-                    if (!targetPlayerId_check) {
-                        showMessage("Please select a target player.");
-                        return;
-                    }
-                    endpoint = '/.netlify/functions/check-mafia';
-                    payload = { detectivePlayerId: state.currentUserId, targetPlayerId: targetPlayerId_check };
-                    break;
+case 'check':
+                 const targetPlayerElement_check = document.getElementById('target-player-1');
+                 if (!targetPlayerElement_check) {
+                     showMessage("Error: Target selection field not found. Please refresh.");
+                     console.error("Missing target selection element for check action.");
+                     return;
+                 }
+                 const targetPlayerId_check = targetPlayerElement_check.value; // CRITICAL FIX: Get PlayerID
+                 if (!targetPlayerId_check) {
+                     showMessage("Please select a target player.");
+                     return;
+                 }
+                 endpoint = '/.netlify/functions/check-mafia';
+                 payload = { detectivePlayerId: state.currentUserId, targetPlayerId: targetPlayerId_check }; // CRITICAL FIX: Send PlayerID
+                 break;
 
-                case 'shoot':
-                    const targetPlayerElement_shoot = document.getElementById('target-player-1'); // Get from target-player-1
-                    if (!targetPlayerElement_shoot) {
-                        showMessage("Error: Target selection field not found. Please refresh.");
-                        console.error("Missing target selection element for shoot action.");
-                        return;
-                    }
-                    const targetPlayerId_shoot = targetPlayerElement_shoot.value;
-                    if (!targetPlayerId_shoot) {
-                        showMessage("Please select a target player.");
-                        return;
-                    }
-                    endpoint = '/.netlify/functions/shoot-player';
-                    payload = { sheriffPlayerId: state.currentUserId, targetPlayerId: targetPlayerId_shoot };
-                    break;
+case 'shoot':
+                 const targetPlayerElement_shoot = document.getElementById('target-player-1');
+                 if (!targetPlayerElement_shoot) {
+                     showMessage("Error: Target selection field not found. Please refresh.");
+                     console.error("Missing target selection element for shoot action.");
+                     return;
+                 }
+                 const targetPlayerId_shoot = targetPlayerElement_shoot.value; // CRITICAL FIX: Get PlayerID
+                 if (!targetPlayerId_shoot) {
+                     showMessage("Please select a target player.");
+                     return;
+                 }
+                 endpoint = '/.netlify/functions/shoot-player';
+                 payload = { sheriffPlayerId: state.currentUserId, targetPlayerId: targetPlayerId_shoot }; // CRITICAL FIX: Send PlayerID
+                 break;
 
-                case 'check-and-display-result':
-                    const targetPlayerElement_display = document.getElementById('target-player-1'); // Get from target-player-1
-                    if (!targetPlayerElement_display) {
-                        showMessage("Error: Target selection field not found. Please refresh.");
-                        console.error("Missing target selection element for check-and-display-result action.");
-                        return;
-                    }
-                    const targetPlayerId_display = targetPlayerElement_display.value;
-                    if (!targetPlayerId_display) {
-                        showMessage("Please select a target player.");
-                        return;
-                    }
-                    endpoint = '/.netlify/functions/check-mafia';
-                    payload = { detectivePlayerId: state.currentUserId, targetPlayerId: targetPlayerId_display };
-                    
-                    loadingOverlay.style.display = 'flex';
-                    try {
-                        const response = await fetch(endpoint, {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify(payload),
-                        });
-                        const result = await response.json();
+case 'check-and-display-result':
+                 const targetPlayerElement_display = document.getElementById('target-player-1');
+                 if (!targetPlayerElement_display) {
+                     showMessage("Error: Target selection field not found. Please refresh.");
+                     console.error("Missing target selection element for check-and-display-result action.");
+                     return;
+                 }
+                 const targetPlayerId_display = targetPlayerElement_display.value; // CRITICAL FIX: Get PlayerID
+                 if (!targetPlayerId_display) {
+                     showMessage("Please select a target player.");
+                     return;
+                 }
+                 endpoint = '/.netlify/functions/check-mafia';
+                 payload = { detectivePlayerId: state.currentUserId, targetPlayerId: targetPlayerId_display }; // CRITICAL FIX: Send PlayerID
+                 
+                 showLoadingOverlay();
+                 try {
+                     const response = await fetch(endpoint, {
+                         method: 'POST',
+                         headers: { 'Content-Type': 'application/json' },
+                         body: JSON.stringify(payload),
+                     });
+                     const result = await response.json();
 
-                        if (response.ok) {
-                            const targetName = getPlayerNameById(targetPlayerId_display);
-                            renderView('investigationResult', { targetName: targetName, isMafiaResult: result.isMafiaResult });
-                        } else {
-                            throw new Error(result.message || `Error: ${response.status} ${response.statusText}`);
-                        }
-                    } catch (error) {
-                        console.error("Error performing investigation:", error);
-                        showMessage(`Failed to perform investigation: ${error.message}`);
-                        renderView('dashboard');
-                    } finally {
-                        loadingOverlay.style.display = 'none';
-                        setTimeout(() => { messageBox.style.display = 'none'; }, 5000);
-                    }
-                    return;
+                     if (response.ok) {
+                         // CRITICAL FIX: Look up Name from state.allPlayers for display
+                         const targetPlayerName_display = state.allPlayers.find(p => p.PlayerID === targetPlayerId_display)?.Name || 'N/A';
+                         renderView('investigationResult', { targetName: targetPlayerName_display, isMafiaResult: result.isMafiaResult });
+                     } else {
+                         throw new Error(result.message || `Error: ${response.status} ${response.statusText}`);
+                     }
+                 } catch (error) {
+                     console.error("Error performing investigation:", error);
+                     showMessage(`Failed to perform investigation: ${error.message}`);
+                     renderView('dashboard');
+                 } finally {
+                     hideLoadingOverlay();
+                 }
+                 return;
                 default:
                     showMessage('Unknown action type for submission.');
                     console.error('Unknown actionType:', actionType);
@@ -1610,9 +1609,10 @@ case 'protect':
                 await performFetchAction(endpoint, payload);
                 renderView('dashboard');
             }
-        } else if (e.target.id === 'accusation-submission-form') {
-            await submitAccusation(document.getElementById('accused-player-select').value, recordedAudioBlob);
-        }
+} else if (e.target.id === 'accusation-submission-form') {
+         const accusedPlayerId = document.getElementById('accused-player-select').value; // CRITICAL FIX: Get PlayerID
+         await submitAccusation(accusedPlayerId, recordedAudioBlob); // CRITICAL FIX: Send PlayerID
+     }
     });
 
 appRoot.addEventListener('click', async (e) => {

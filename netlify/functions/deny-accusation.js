@@ -14,9 +14,7 @@ async function getSheetsService() {
 }
 
 exports.handler = async (event, context) => {
-    console.log("deny-accusation: Function started.");
     if (event.httpMethod !== 'POST') {
-        console.log("deny-accusation: Method Not Allowed.");
         return { statusCode: 405, body: 'Method Not Allowed' };
     }
 
@@ -25,18 +23,23 @@ exports.handler = async (event, context) => {
         console.error("deny-accusation: Google Sheet ID is not configured.");
         return { statusCode: 500, body: JSON.stringify({ error: 'Server configuration error.' }) };
     }
-    console.log(`deny-accusation: Sheet ID: ${sheetId}`);
+
+    let accusationId, adminPlayerId;
+    try {
+        const body = JSON.parse(event.body);
+        accusationId = body.accusationId;
+        adminPlayerId = body.adminPlayerId;
+    } catch (e) {
+        console.error("deny-accusation: Invalid JSON body:", e.message);
+        return { statusCode: 400, body: JSON.stringify({ error: 'Invalid request format.' }) };
+    }
+
+    if (!accusationId || !adminPlayerId) {
+        return { statusCode: 400, body: JSON.stringify({ error: 'Missing accusationId or adminPlayerId.' }) };
+    }
 
     try {
-        const { accusationId, adminPlayerId } = JSON.parse(event.body); // Receive adminPlayerId
-        console.log(`deny-accusation: Received - Accusation ID: ${accusationId}, Admin Player ID: ${adminPlayerId}`);
-        if (!accusationId || !adminPlayerId) {
-            console.log("deny-accusation: Missing accusationId or adminPlayerId.");
-            return { statusCode: 400, body: JSON.stringify({ error: 'Missing accusationId or adminPlayerId.' }) };
-        }
-
         const sheets = await getSheetsService();
-        console.log("deny-accusation: Sheets service initialized.");
 
         // 1. Validate Admin status of the denier
         const playersResponse = await sheets.spreadsheets.values.get({
@@ -61,20 +64,17 @@ exports.handler = async (event, context) => {
 
         let isAdmin = 'FALSE';
         for (const row of playerRows) {
-            if (row[idColPlayers] === adminPlayerId) {
-                isAdmin = row[isAdminColPlayers] || 'FALSE';
+            if (String(row[idColPlayers]).trim() === adminPlayerId) {
+                isAdmin = String(row[isAdminColPlayers]).trim() || 'FALSE';
                 break;
             }
         }
-        console.log(`deny-accusation: Denier ${adminPlayerId} IsAdmin status: ${isAdmin}`);
 
         if (isAdmin !== 'TRUE') {
-            console.log("deny-accusation: Player is not an Admin.");
             return { statusCode: 403, body: JSON.stringify({ error: 'Only Admin players can deny accusations.' }) };
         }
 
         // 2. Find the accusation in the sheet
-        console.log(`deny-accusation: Searching for AccusationID ${accusationId}...`);
         const accusationsResponse = await sheets.spreadsheets.values.get({
             spreadsheetId: sheetId,
             range: 'Accusations!A:H',
@@ -98,7 +98,7 @@ exports.handler = async (event, context) => {
         let accusationData = null;
 
         for (let i = 0; i < accusationRows.length; i++) {
-            if (accusationRows[i][idCol] === accusationId) {
+            if (String(accusationRows[i][idCol]).trim() === accusationId) {
                 rowIndexToUpdate = i + 2;
                 accusationData = accusationRows[i];
                 break;
@@ -108,7 +108,6 @@ exports.handler = async (event, context) => {
         if (rowIndexToUpdate === -1) {
             return { statusCode: 404, body: JSON.stringify({ error: 'Accusation not found.' }) };
         }
-        console.log(`deny-accusation: Found accusation at row ${rowIndexToUpdate}.`);
 
         // 3. Modify the row data in memory before writing back
         accusationData[statusCol] = 'Denied';
@@ -116,7 +115,6 @@ exports.handler = async (event, context) => {
 
         // 4. Update the entire row in the Accusations sheet
         const updateRange = `Accusations!A${rowIndexToUpdate}:H${rowIndexToUpdate}`;
-        console.log(`deny-accusation: Updating Accusations sheet at range: ${updateRange}`);
         await sheets.spreadsheets.values.update({
             spreadsheetId: sheetId,
             range: updateRange,
@@ -137,6 +135,5 @@ exports.handler = async (event, context) => {
             body: JSON.stringify({ error: 'Failed to deny accusation.', details: error.message }),
         };
     } finally {
-        console.log("deny-accusation: Function finished.");
     }
 };

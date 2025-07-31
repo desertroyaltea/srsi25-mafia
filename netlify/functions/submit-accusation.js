@@ -32,7 +32,7 @@ exports.handler = async (event, context) => {
     }
 
     if (!sheetId || !bucketName) {
-        console.error('Configuration Error: Google Sheet ID or GCS Bucket Name is not configured.');
+        console.error('submit-accusation: Configuration Error: Google Sheet ID or GCS Bucket Name is not configured.');
         return { statusCode: 500, body: JSON.stringify({ error: 'Server configuration error.' }) };
     }
 
@@ -62,40 +62,102 @@ exports.handler = async (event, context) => {
         });
 
         busboy.on('finish', async () => {
+            let accuserPlayerId, accusedPlayerId; // CRITICAL FIX: Receive Accused PlayerID
             try {
-                const { accuserPlayerId, accusedPlayerId } = fields;
+                accuserPlayerId = fields.accuserPlayerId;
+                accusedPlayerId = fields.accusedPlayerId; // Get accused PlayerID
+            } catch (e) {
+                console.error("submit-accusation: Error parsing form fields:", e.message);
+                return resolve({ statusCode: 400, body: JSON.stringify({ error: 'Invalid form data.' }) });
+            }
 
-                if (!fileBuffer || !accuserPlayerId || !accusedPlayerId) {
-                    return resolve({
-                        statusCode: 400,
-                        body: JSON.stringify({ error: 'Missing audio file or player information.' }),
-                    });
+            if (!fileBuffer || !accuserPlayerId || !accusedPlayerId) { // Validate PlayerID
+                return resolve({
+                    statusCode: 400,
+                    body: JSON.stringify({ error: 'Missing audio file or player information.' }),
+                });
+            }
+
+            try {
+                // Fetch all player data to validate
+                const playersResponse = await sheets.spreadsheets.values.get({
+                    spreadsheetId: sheetId,
+                    range: 'Players!A:S', // Fetch up to IsAdmin column (S) for validation
+                });
+                const playersData = playersResponse.data.values || [];
+                if (playersData.length < 1) {
+                    console.error("submit-accusation: Players sheet is empty for validation.");
+                    return resolve({ statusCode: 500, body: JSON.stringify({ error: 'Players sheet is empty.' }) });
+                }
+                const playerHeaders = playersData[0];
+                const playerRows = playersData.slice(1);
+
+                const idCol = playerHeaders.indexOf('PlayerID');
+                const nameCol = playerHeaders.indexOf('Name');
+                const statusCol = playerHeaders.indexOf('Status');
+                const isAdminCol = playerHeaders.indexOf('IsAdmin');
+
+                if ([idCol, nameCol, statusCol, isAdminCol].includes(-1)) {
+                    console.error("submit-accusation: Required columns not found in Players sheet.");
+                    throw new Error("Required columns (PlayerID, Name, Status, IsAdmin) not found in Players sheet.");
                 }
 
-                // --- Determine file extension and MIME type for GCS upload ---
-                let determinedMimeType = fileMimeType.split(';')[0]; // Clean up MIME type (e.g., audio/webm)
-                let fileExtension = 'bin'; // Default fallback
+                // Helper to get player info by ID
+                const getPlayerInfoById = (id) => {
+                    for (let i = 0; i < playerRows.length; i++) {
+                        if (String(playerRows[i][idCol]).trim() === id) {
+                            return {
+                                playerID: String(playerRows[i][idCol]).trim(),
+                                playerName: String(playerRows[i][nameCol]).trim(), // Get Name for logs if needed
+                                playerStatus: String(playerRows[i][statusCol]).trim(),
+                                playerIsAdmin: String(playerRows[i][isAdminCol]).trim(),
+                                rowIndex: i + 2
+                            };
+                        }
+                    }
+                    return null;
+                };
 
-                // Extract extension from originalFileName if present
-                const extensionMatch = originalFileName.match(/\.([0-9a-z]+)$/i);
-                if (extensionMatch) {
-                    fileExtension = extensionMatch[1].toLowerCase();
-                } else {
-                    // Fallback to determine extension from MIME type if not in filename
-                    if (determinedMimeType.includes('mp4')) fileExtension = 'mp4';
-                    else if (determinedMimeType.includes('wav')) fileExtension = 'wav';
-                    else if (determinedMimeType.includes('webm')) fileExtension = 'webm';
-                    else if (determinedMimeType.includes('mpeg')) fileExtension = 'mp3';
+                // Validate Accuser player (by ID)
+                const accuserInfo = getPlayerInfoById(accuserPlayerId);
+                if (!accuserInfo) {
+                    return resolve({ statusCode: 404, body: JSON.stringify({ error: 'Accuser player not found.' }) });
+                }
+                if (accuserInfo.playerStatus.toLowerCase() !== 'alive') {
+                    return resolve({ statusCode: 403, body: JSON.stringify({ error: 'Only alive players can accuse.' }) });
+                }
+                if (accuserInfo.playerIsAdmin === 'TRUE') {
+                    return resolve({ statusCode: 403, body: JSON.stringify({ error: 'Admin players cannot accuse.' }) });
+                }
+
+                // Validate Accused player (by ID)
+                const accusedInfo = getPlayerInfoById(accusedPlayerId);
+                if (!accusedInfo) {
+                    return resolve({ statusCode: 404, body: JSON.stringify({ error: `Accused player (${accusedPlayerId}) not found.` }) });
+                }
+                if (accusedInfo.playerStatus.toLowerCase() !== 'alive') {
+                    return resolve({ statusCode: 400, body: JSON.stringify({ error: `Accused player (${accusedPlayerId}) is not alive.` }) });
+                }
+                if (accusedInfo.playerIsAdmin === 'TRUE') {
+                    return resolve({ statusCode: 403, body: JSON.stringify({ error: `Accused player (${accusedPlayerId}) is an Admin and cannot be accused.` }) });
+                }
+
+                // Determine file extension based on the actual recorded MIME type
+                let fileExtension = 'bin';
+                if (fileMimeType.includes('mp4')) {
+                    fileExtension = 'mp4';
+                } else if (fileMimeType.includes('wav')) {
+                    fileExtension = 'wav';
+                } else if (fileMimeType.includes('webm')) {
+                    fileExtension = 'webm';
                 }
 
                 const gcsFileName = `accusation_${accuserPlayerId}_${Date.now()}.${fileExtension}`;
                 const gcsFilePath = `accusations/${gcsFileName}`;
                 
-                console.log(`submit-accusation: GCS Upload: Filename=${gcsFileName}, MIMEType=${determinedMimeType}`);
-
                 const gcsFile = storage.bucket(bucketName).file(gcsFilePath);
                 const writeStream = gcsFile.createWriteStream({
-                    metadata: { contentType: determinedMimeType },
+                    metadata: { contentType: fileMimeType },
                 });
 
                 await new Promise((streamResolve, streamReject) => {
@@ -109,18 +171,15 @@ exports.handler = async (event, context) => {
 
                 await gcsFile.makePublic();
                 const originalGcsUrl = `https://storage.googleapis.com/${bucketName}/${gcsFilePath}`;
-                console.log(`submit-accusation: Original file uploaded. Public URL: ${originalGcsUrl}`);
 
-                // --- Trigger Transcoding Function ---
-                let finalAudioUrl = originalGcsUrl; // Default to original if transcoding fails or isn't needed
+                let finalAudioUrl = originalGcsUrl;
                 try {
-                    console.log("submit-accusation: Triggering audio transcoding...");
-                    const transcodeResponse = await fetch('https://' + event.headers.host + '/.netlify/functions/transcode-audio', { // Use full URL for internal function call
+                    const transcodeResponse = await fetch('https://' + event.headers.host + '/.netlify/functions/transcode-audio', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({
                             originalGcsUrl: originalGcsUrl,
-                            targetFormat: 'mp4' // Request MP4 for broad compatibility
+                            targetFormat: 'mp4'
                         }),
                     });
 
@@ -128,25 +187,20 @@ exports.handler = async (event, context) => {
 
                     if (transcodeResponse.ok && transcodeResult.transcodedGcsUrl) {
                         finalAudioUrl = transcodeResult.transcodedGcsUrl;
-                        console.log(`submit-accusation: Audio transcoded successfully. Final URL: ${finalAudioUrl}`);
                     } else {
                         console.error(`submit-accusation: Transcoding failed or returned no URL: ${transcodeResult.message || JSON.stringify(transcodeResult)}`);
-                        console.warn("submit-accusation: Falling back to original audio URL due to transcoding failure.");
                     }
                 } catch (transcodeError) {
                     console.error("submit-accusation: Error calling transcode-audio function:", transcodeError);
-                    console.warn("submit-accusation: Falling back to original audio URL due to transcoding function call error.");
                 }
-                // --- END Trigger Transcoding Function ---
 
-                // Add entry to Accusations sheet with the FINAL audio URL
-                const accusationId = `ACC_${Date.now()}`; // Declare here, use below
-                const submissionTime = new Date().toISOString(); // Declare here, use below
-                const values = [ // Declare here, use below
+                const accusationId = `ACC_${Date.now()}`;
+                const submissionTime = new Date().toISOString();
+                const values = [
                     accusationId,
-                    accuserPlayerId,
-                    accusedPlayerId,
-                    finalAudioUrl, // Use the transcoded URL here
+                    accuserPlayerId, // Store Accuser PlayerID (numeric)
+                    accusedPlayerId, // CRITICAL FIX: Store Accused PlayerID (numeric)
+                    finalAudioUrl,
                     submissionTime,
                     'Pending',
                     '',
@@ -170,7 +224,7 @@ exports.handler = async (event, context) => {
                 });
 
             } catch (error) {
-                console.error('submit-accusation: Server Error:', error);
+                console.error('submit-accusation: Error in try-catch block:', error);
                 resolve({
                     statusCode: 500,
                     body: JSON.stringify({ error: 'Failed to submit accusation.', details: error.message }),
@@ -178,14 +232,10 @@ exports.handler = async (event, context) => {
             }
         });
 
-        // This part handles streaming the event body to busboy
-        // Netlify functions provide event.body as a string, potentially base64 encoded
-        // busboy needs a stream or buffer.
-        // We'll create a readable stream from the event body.
         const bodyStream = new Readable();
         bodyStream.push(Buffer.from(event.body, event.isBase64Encoded ? 'base64' : 'utf8'));
-        bodyStream.push(null); // No more data
+        bodyStream.push(null);
 
-        bodyStream.pipe(busboy); // Pipe the stream to busboy
+        bodyStream.pipe(busboy);
     });
 };
