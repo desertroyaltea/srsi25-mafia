@@ -521,24 +521,24 @@ investigationHistory: ({ formattedHistory }) => `
             `,
 
 // NEW INVESTIGATION RESULT TEMPLATE
-            investigationResult: ({ targetName, isMafiaResult }) => `
-                <div class="bg-gray-900 p-5 rounded-lg mt-4 text-center">
-                    <h2 class="text-3xl font-bold mb-4 ${isMafiaResult === 'YES' ? 'text-red-500' : 'text-green-500'}">Investigation Result</h2>
-                    <p class="text-xl text-gray-300 mb-4">
-                        Your investigation of <span class="font-bold text-blue-400">${targetName}</span> reveals:
-                    </p>
-                    ${isMafiaResult === 'YES' ? `
-                        <p class="text-4xl font-bold text-red-500 mb-6">MAFIA!</p>
-                        <p class="text-lg text-gray-400">Proceed with caution.</p>
-                    ` : `
-                        <p class="text-4xl font-bold text-green-500 mb-6">NOT MAFIA.</p>
-                        <p class="text-lg text-gray-400">They appear to be innocent.</p>
-                    `}
-                    <button type="button" id="back-to-dashboard" class="mt-8 bg-gray-600 hover:bg-gray-700 text-white font-bold py-3 px-6 rounded-lg w-full md:w-1/2 text-xl mx-auto block">
-                        Back to Dashboard
-                    </button>
-                </div>
-            `,
+investigationResult: ({ targetName, isMafiaResult }) => `
+         <div class="bg-gray-900 p-5 rounded-lg mt-4 text-center">
+             <h2 class="text-3xl font-bold mb-4 ${isMafiaResult === 'YES' ? 'text-red-500' : 'text-green-500'}">Investigation Result</h2>
+             <p class="text-xl text-gray-300 mb-4">
+                 Your investigation of <span class="font-bold text-purple-400">${targetName}</span> reveals:
+             </p>
+             ${isMafiaResult === 'YES' ? `
+                 <p class="text-4xl font-bold text-red-500 mb-6">MAFIA!</p>
+                 <p class="text-lg text-gray-400">Proceed with caution.</p>
+             ` : `
+                 <p class="text-4xl font-bold text-green-500 mb-6">NOT MAFIA.</p>
+                 <p class="text-lg text-gray-400">They appear to be innocent.</p>
+             `}
+             <button type="button" id="back-to-dashboard" class="mt-8 bg-gray-600 hover:bg-gray-700 text-white font-bold py-3 px-6 rounded-lg w-full md:w-1/2 text-xl mx-auto block">
+                 Back to Dashboard
+             </button>
+         </div>
+     `,
 
         revealedTeammates: ({ role, teammates }) => `
             <div class="bg-gray-900 p-5 rounded-lg mt-4">
@@ -1371,18 +1371,17 @@ function updateDashboardActions(currentPhase) {
             }
 
             if (role === 'detective') {
-                createButton('btn-check', 'Investigate Player', 'bg-yellow-600 hover:bg-yellow-700', async () => {
-                    if (!isNight) return showMessage("You can only use this action at night.");
-                    if (state.currentUser.MainUsed === 'TRUE') return showMessage("You have already used your main action tonight.");
-                    
-                    const targets = getAliveNonAdminTargets(); 
-                    renderView('actionModal', {
-                        title: 'Choose a Player to Investigate',
-                        buttonText: 'Confirm Investigation',
-                        targets,
-                        actionType: 'check-and-display-result'
-                    });
-                });
+createButton('btn-check', 'Investigate Player', 'bg-yellow-600 hover:bg-yellow-700', async () => {
+                 if (!isNight) return showMessage("You can only use this action at night.");
+                 if (state.currentUser.MainUsed === 'TRUE') return showMessage("You have already used your main action tonight.");
+                 const targets = await getDisplayableTargets();
+                 renderView('actionModal', {
+                     title: 'Choose a Player to Investigate',
+                     buttonText: 'Confirm Investigation',
+                     targets,
+                     actionType: 'check-and-display-result'
+                 });
+             });
                 createButton('btn-reveal-detective', 'Reveal a Detective', 'bg-yellow-900', () => showMessage("This ability is not yet implemented."));
 createButton('btn-view-history', 'Investigation History', 'bg-purple-700 hover:bg-purple-800', async () => {
                  showLoadingOverlay(); // Show loader for this action
@@ -1594,29 +1593,30 @@ case 'check-and-display-result':
                      console.error("Missing target selection element for check-and-display-result action.");
                      return;
                  }
-                 const targetPlayerId_display = targetPlayerElement_display.value; // CRITICAL FIX: Get PlayerID
+                 const targetPlayerId_display = targetPlayerElement_display.value;
                  if (!targetPlayerId_display) {
                      showMessage("Please select a target player.");
                      return;
                  }
+
                  endpoint = '/.netlify/functions/check-mafia';
-                 payload = { detectivePlayerId: state.currentUserId, targetPlayerId: targetPlayerId_display }; // CRITICAL FIX: Send PlayerID
-                 
-                 showLoadingOverlay();
+                 payload = { detectivePlayerId: state.currentUserId, targetPlayerId: targetPlayerId_display };
+
+                 // CRITICAL FIX: Use performFetchAction to handle the fetch
+                 showLoadingOverlay(); // Start loader
                  try {
                      const response = await fetch(endpoint, {
                          method: 'POST',
                          headers: { 'Content-Type': 'application/json' },
-                         body: JSON.stringify(payload),
+                         body: JSON.stringify({ ...payload, sessionId: localStorage.getItem('mafiaGameSessionId') }), // Add sessionId
                      });
+
                      const result = await response.json();
 
                      if (response.ok) {
-                         // CRITICAL FIX: Look up Name from state.allPlayers for display
-                         const targetPlayerName_display = state.allPlayers.find(p => p.PlayerID === targetPlayerId_display)?.Name || 'N/A';
+                         const targetPlayerName_display = getPlayerNameById(targetPlayerId_display); // Use the sync helper
                          renderView('investigationResult', { targetName: targetPlayerName_display, isMafiaResult: result.isMafiaResult });
                      } else {
-                         console.error(`Error performing investigation: Server responded with status ${response.status} for ${endpoint}. Response:`, result);
                          throw new Error(result.message || `Error: ${response.status} ${response.statusText}`);
                      }
                  } catch (error) {
