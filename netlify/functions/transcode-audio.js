@@ -22,9 +22,8 @@ try {
     storage = null;
 }
 
-// --- Main Handler ---
 exports.handler = async (event, context) => {
-    console.log("--- TRANSCODE-AUDIO V4 (NEW FILTER) INITIATED ---");
+    console.log("--- TRANSCODE-AUDIO (STABLE) INITIATED ---");
 
     if (event.httpMethod !== 'POST') {
         return { statusCode: 405, body: 'Method Not Allowed' };
@@ -57,40 +56,24 @@ exports.handler = async (event, context) => {
     const tempDir = os.tmpdir();
     
     const downloadedInputPath = path.join(tempDir, `original_${originalFileName}`);
-    const sanitizedWavPath = path.join(tempDir, `${path.parse(originalFileName).name}.wav`);
-    const finalMp4Path = path.join(tempDir, `${path.parse(originalFileName).name}_masked.mp4`);
+    const finalMp4Path = path.join(tempDir, `${path.parse(originalFileName).name}_transcoded.mp4`);
     const finalGcsPath = `accusations/${path.basename(finalMp4Path)}`;
 
-    const filesToCleanup = [downloadedInputPath, sanitizedWavPath, finalMp4Path];
+    const filesToCleanup = [downloadedInputPath, finalMp4Path];
 
     try {
-        // --- PASS 1: Sanitize to WAV ---
         await storage.bucket(bucketName).file(originalGcsPath).download({ destination: downloadedInputPath });
         
+        // --- STABLE TRANSCODING ONLY ---
         await new Promise((resolve, reject) => {
             ffmpeg(downloadedInputPath)
-                .noVideo()
-                .outputOptions('-acodec pcm_s16le')
-                .toFormat('wav')
-                .on('end', resolve)
-                .on('error', (err) => reject(new Error(`FFmpeg sanitization failed: ${err.message}`)))
-                .save(sanitizedWavPath);
-        });
-
-        // --- PASS 2: Apply NEW Effect and Encode to MP4 ---
-        await new Promise((resolve, reject) => {
-            ffmpeg(sanitizedWavPath)
+                .noVideo() // Keep this for stability with MP4 files
                 .audioCodec('aac')
-                .audioFrequency(44100)
-                // === ❗️ FINAL ATTEMPT WITH NEW FILTER ===
-                // This uses a different, more stable method to lower the pitch.
-                // (35280 is 44100 * 0.8)
-                .audioFilter('aresample=35280,atempo=0.8')
-                // =========================================
                 .audioBitrate(128)
+                .output(finalMp4Path)
                 .on('end', resolve)
-                .on('error', (err) => reject(new Error(`FFmpeg effect/encoding failed: ${err.message}`)))
-                .save(finalMp4Path);
+                .on('error', (err) => reject(new Error(`FFmpeg transcoding failed: ${err.message}`)))
+                .run();
         });
 
         // --- Upload Final File ---
@@ -104,7 +87,7 @@ exports.handler = async (event, context) => {
             statusCode: 200,
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
-                message: 'Audio processed successfully!',
+                message: 'Audio transcoded successfully!',
                 transcodedGcsUrl: uploadedFile.publicUrl(),
             }),
         };
