@@ -79,27 +79,29 @@ exports.handler = async (event, context) => {
         cleanupFiles.push(inputFilePath);
 
         console.log(`transcode-audio: Starting transcoding with voice mask to ${targetFormat}.`);
-        await new Promise((resolve, reject) => {
-            ffmpeg(inputFilePath)
-                // === 🎙️ VOICE EFFECT ADDED HERE ===
-            // Standardize the audio sample rate to fix mobile compatibility
-            .audioFrequency(44100)
-                // This lowers the pitch without changing the audio's speed.
-                .audioFilter('asetrate=44100*0.8,atempo=1.25')
-                // ==================================
-                .audioCodec(targetFormat === 'mp4' ? 'aac' : 'pcm_s16le')
-                .audioBitrate(targetFormat === 'mp4' ? 128 : undefined)
-                .output(outputFilePath)
-                .on('end', () => {
-                    console.log("transcode-audio: Transcoding finished.");
-                    resolve();
-                })
-                .on('error', (err) => {
-                    console.error("transcode-audio: FFmpeg error:", err.message);
-                    reject(new Error(`FFmpeg transcoding failed: ${err.message}`));
-                })
-                .run();
-        });
+// Replace it with this new block
+await new Promise((resolve, reject) => {
+    ffmpeg(inputFilePath)
+        // === ✅ NEW, STABLE ORDERING APPLIED HERE ===
+        // 1. Set the final audio codec first for stability.
+        .audioCodec(targetFormat === 'mp4' ? 'aac' : 'pcm_s16le')
+        // 2. Standardize the audio's sample rate.
+        .audioFrequency(44100)
+        // 3. Apply the voice-masking filter last.
+        .audioFilter('asetrate=44100*0.8,atempo=1.25')
+        // ===========================================
+        .audioBitrate(targetFormat === 'mp4' ? 128 : undefined)
+        .output(outputFilePath)
+        .on('end', () => {
+            console.log("transcode-audio: Transcoding finished successfully.");
+            resolve();
+        })
+        .on('error', (err) => {
+            console.error("transcode-audio: FFmpeg error during transcoding:", err.message);
+            reject(new Error(`FFmpeg transcoding failed: ${err.message}`));
+        })
+        .run();
+});
         cleanupFiles.push(outputFilePath);
 
         console.log(`transcode-audio: Uploading ${outputFileName} to GCS.`);
