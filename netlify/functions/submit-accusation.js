@@ -143,20 +143,8 @@ if (accuserInfo.playerStatus.toLowerCase() !== 'alive' && accuserInfo.playerStat
                 }
 
                 // Determine file extension based on the actual recorded MIME type
-// Replace it with this new block
-// Determine file extension based on the actual recorded MIME type
-console.log(`[LOG] submit-accusation: Received audio file with MIME type: ${fileMimeType}`);
-
-let fileExtension = 'bin'; // Default
-if (fileMimeType.includes('mp4') || fileMimeType.includes('m4a')) {
-    fileExtension = 'mp4'; // Treat m4a as mp4
-} else if (fileMimeType.includes('wav')) {
-    fileExtension = 'wav';
-} else if (fileMimeType.includes('webm')) {
-    fileExtension = 'webm';
-} else {
-    console.warn(`[WARN] submit-accusation: Unhandled MIME type '${fileMimeType}', defaulting to .bin`);
-}
+// Replace it with this one line
+const fileExtension = 'mp4';
 
                 const gcsFileName = `accusation_${accuserPlayerId}_${Date.now()}.${fileExtension}`;
                 const gcsFilePath = `accusations/${gcsFileName}`;
