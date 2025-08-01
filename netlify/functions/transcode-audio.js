@@ -65,7 +65,7 @@ exports.handler = async (event) => {
                 .audioCodec('aac')
                 .audioBitrate(128)
                 // Applying the stable robotic effect
-                .audioFilter('flanger=delay=5:depth=4:regen=50:width=100:speed=2:shape=sine')
+.audioFilter('asetrate=44100*0.8,atempo=1.25')
                 .output(finalMp4Path)
                 .on('end', resolve)
                 .on('error', (err) => reject(new Error(`FFmpeg transcoding failed: ${err.message}`)))
