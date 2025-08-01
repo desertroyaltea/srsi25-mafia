@@ -737,9 +737,10 @@ async function initializeGame(userId, username = null) { // NEW: Receive usernam
         localStorage.removeItem('mafiaGameUsername');
         renderView('welcomePage');
         hideLoadingOverlay();
-    } else {
-        renderView('dashboard');
-        updateDashboardActions(state.gameState?.CurrentPhase || 'Day');
+} else {
+            renderView('dashboard');
+            // CRITICAL FIX: Await the updateDashboardActions function here.
+            await updateDashboardActions(state.gameState?.CurrentPhase || 'Day');
 
         if (state.gameState?.CurrentPhase === 'Day') {
             const previousDay = parseInt(state.gameState.CurrentDay) - 1;
