@@ -123,7 +123,7 @@ exports.handler = async (event, context) => {
                 if (!accuserInfo) {
                     return resolve({ statusCode: 404, body: JSON.stringify({ error: 'Accuser player not found.' }) });
                 }
-if (status !== 'alive' && status !== 'dead') {
+if (playerStatus !== 'alive' && playerStatus !== 'dead') {
     return resolve({ statusCode: 403, body: JSON.stringify({ error: 'Only alive or dead players can accuse.' }) });
 }
                 if (accuserInfo.playerIsAdmin === 'TRUE') {
