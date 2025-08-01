@@ -9,8 +9,6 @@
 
 [functions]
   node_bundler = "esbuild"
-  included_files = ["node_modules/@ffmpeg-installer/**"]
-
 
 [[redirects]]
   from = "/netlify/functions/*"
