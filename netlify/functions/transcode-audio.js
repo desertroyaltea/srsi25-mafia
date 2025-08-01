@@ -80,16 +80,19 @@ exports.handler = async (event, context) => {
 
         console.log(`transcode-audio: Starting transcoding with voice mask to ${targetFormat}.`);
 // Replace it with this new block
+// Replace it with this new block
 await new Promise((resolve, reject) => {
     ffmpeg(inputFilePath)
-        // === ✅ NEW, STABLE ORDERING APPLIED HERE ===
+        // === 📱 IPHONE FIX APPLIED HERE ===
+        // Force FFmpeg to ignore any video track in the file.
+        .noVideo()
+        // ===================================
         // 1. Set the final audio codec first for stability.
         .audioCodec(targetFormat === 'mp4' ? 'aac' : 'pcm_s16le')
         // 2. Standardize the audio's sample rate.
         .audioFrequency(44100)
         // 3. Apply the voice-masking filter last.
         .audioFilter('asetrate=44100*0.8,atempo=1.25')
-        // ===========================================
         .audioBitrate(targetFormat === 'mp4' ? 128 : undefined)
         .output(outputFilePath)
         .on('end', () => {
