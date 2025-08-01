@@ -82,6 +82,8 @@ exports.handler = async (event, context) => {
         await new Promise((resolve, reject) => {
             ffmpeg(inputFilePath)
                 // === 🎙️ VOICE EFFECT ADDED HERE ===
+            // Standardize the audio sample rate to fix mobile compatibility
+            .audioFrequency(44100)
                 // This lowers the pitch without changing the audio's speed.
                 .audioFilter('asetrate=44100*0.8,atempo=1.25')
                 // ==================================
