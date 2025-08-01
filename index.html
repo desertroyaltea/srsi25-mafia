@@ -1255,13 +1255,14 @@ function updateDashboardActions(currentPhase) {
      const isOff = currentPhase && currentPhase.toLowerCase() === 'off';
 
      const recapStoryDiv = document.getElementById('nightly-recap-story');
-     if (recapStoryDiv) {
-         if (isDay && state.nightlyRecap) {
-             recapStoryDiv.innerHTML = generateNightlyRecapStory(state.nightlyRecap);
-         } else {
-             recapStoryDiv.innerHTML = '';
-         }
-     }
+if (isDay && state.nightlyRecap) {
+    generateNightlyRecapStory(state.nightlyRecap).then(html => {
+        recapStoryDiv.innerHTML = html;
+    });
+} else {
+    recapStoryDiv.innerHTML = '';
+}
+
 
      if (isOff) {
          playerActions.innerHTML = '';
