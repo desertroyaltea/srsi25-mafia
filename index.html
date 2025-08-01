@@ -851,14 +851,14 @@ function showMessage(message) {
 // Helper function to convert encrypted role codes to display names
     function getDisplayRoleName(encryptedRoleCode) {
         switch (encryptedRoleCode) {
-            case 'BDS342': return 'Mafia';
-            case 'VSR983': return 'Villager';
-            case 'FQP982': return 'Doctor';
-            case 'LAP302': return 'Detective';
-            case 'MPA081': return 'Jester';
-            case 'QRW438': return 'Sheriff';
+            case 'Mafia': return 'Mafia';
+            case 'Villager': return 'Villager';
+            case 'Doctor': return 'Doctor';
+            case 'Detective': return 'Detective';
+            case 'Jester': return 'Jester';
+            case 'Sheriff': return 'Sheriff';
             case 'ADMIN': return 'Admin'; // Added ADMIN for completeness
-            default: return 'Unknown Role';
+            default: return 'Unknown';
         }
     }
 
@@ -1243,7 +1243,7 @@ async function fetchCurrentTrial() {
     }
 }
 
-function updateDashboardActions(currentPhase) {
+async function updateDashboardActions(currentPhase) { // CRITICAL FIX: Make the function async
      const playerActions = document.getElementById('player-dashboard-actions');
      if (!playerActions) return;
      playerActions.innerHTML = '';
