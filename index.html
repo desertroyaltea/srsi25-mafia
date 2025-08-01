@@ -496,8 +496,7 @@ offLimitsPage: () => `
                     <h2 class="text-3xl font-bold text-red-400 mb-4 text-center">The Trial</h2>
                     ${trial ? `
                         <div class="space-y-4">
-                            <p class="text-lg text-gray-300"><strong>Accused:</strong> ${getPlayerNameById(trial.AccusedPlayerID)}</p>
-                            <div class="mt-3 mb-4">
+<p class="text-lg text-gray-300"><strong>Accused:</strong> ${trial.AccusedName}</p>                            <div class="mt-3 mb-4">
                                 <label class="block text-gray-400 text-sm font-bold mb-2">Accusation Audio:</label>
                                 <audio controls class="w-full">
                                     <source src="${trial.AccusationAudioLink}" type="audio/webm">
