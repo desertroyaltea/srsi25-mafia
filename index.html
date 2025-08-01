@@ -244,8 +244,8 @@ dashboard: () => `
              </div>
              <!-- END CURRENT MISSION SECTION -->
 
-             <!-- NEW NIGHTLY RECAP SECTION (ALWAYS RENDERED, HIDDEN BY DEFAULT) -->
-             <div id="nightly-recap-section" class="bg-gray-800 p-4 rounded-lg mb-0 mt-0 border border-gray-700 hidden">
+             <!-- NEW NIGHTLY RECAP SECTION (ALWAYS RENDERED, CONTENT IS DYNAMIC) -->
+             <div id="nightly-recap-section" class="bg-gray-800 p-4 rounded-lg mb-0 mt-0 border border-gray-700">
                  <h3 class="text-xl font-semibold text-red-400 mb-2">Last Night's Story:</h3>
                  <div id="nightly-recap-story" class="text-gray-300 leading-relaxed">
                       <!-- Story will be generated here by JavaScript -->
@@ -645,130 +645,135 @@ async function fetchPlayers(forceRefresh = false) {
  }
 
 
-async function initializeGame(userId, username = null) {
- state.currentUserId = userId;
- const sessionId = localStorage.getItem('mafiaGameSessionId');
+async function initializeGame(userId, username = null) { // NEW: Receive username
+    state.currentUserId = userId;
+    const sessionId = localStorage.getItem('mafiaGameSessionId');
 
- let currentUserFetchTimeout;
- showLoadingOverlay();
+    // CRITICAL FIX: If username is null (e.g., from direct page load), get it from localStorage
+    const currentUsername = username || localStorage.getItem('mafiaGameUsername');
+    if (!currentUsername) {
+        console.error("initializeGame: Username not found. Forcing re-login.");
+        showMessage("Security error: Please log in again.");
+        localStorage.removeItem('mafiaGameUserId');
+        localStorage.removeItem('mafiaGameSessionId');
+        localStorage.removeItem('mafiaGameUsername');
+        renderView('login');
+        return;
+    }
 
- currentUserFetchTimeout = setTimeout(() => {
-     hideLoadingOverlay();
-     showMessage('Failed to load your player data (timeout). Please refresh.');
- }, 10000);
+    let currentUserFetchTimeout;
+    showLoadingOverlay();
 
- try {
-     const response = await fetch(`/.netlify/functions/get-player-data?username=${currentUsername}&sessionId=${sessionId}`);
-     if (!response.ok) {
-         const errorText = await response.text();
-         console.error('initializeGame: Failed to fetch current user data:', response.status, errorText);
-         throw new Error(`Failed to fetch your player data: ${response.statusText}`);
-     }
-     state.currentUser = await response.json();
+    currentUserFetchTimeout = setTimeout(() => {
+        hideLoadingOverlay();
+        showMessage('Failed to load your player data (timeout). Please refresh.');
+    }, 10000);
 
- } catch (error) {
-     console.error("initializeGame: Error fetching current user data:", error);
-     showMessage(`Failed to load your player data: ${error.message}. Please try logging in again.`);
-     localStorage.removeItem('mafiaGameUserId');
-     localStorage.removeItem('mafiaGameSessionId');
-     localStorage.removeItem('mafiaGameUsername');
-     renderView('login');
-     return;
- } finally {
-     clearTimeout(currentUserFetchTimeout);
- }
+    try {
+        // CRITICAL FIX: Fetch current user's FULL data using Username and SessionId
+        const response = await fetch(`/.netlify/functions/get-player-data?username=${currentUsername}&sessionId=${sessionId}`);
+        if (!response.ok) {
+            const errorText = await response.text();
+            console.error('initializeGame: Failed to fetch current user data:', response.status, errorText);
+            throw new Error(`Failed to fetch your player data: ${response.statusText}`);
+        }
+        state.currentUser = await response.json(); // This now contains the FULL data for the current user
 
- state.isCurrentUserAdmin = state.currentUser.IsAdmin === 'TRUE';
- await fetchGameState();
+    } catch (error) {
+        console.error("initializeGame: Error fetching current user data:", error);
+        showMessage(`Failed to load your player data: ${error.message}. Please try logging in again.`);
+        localStorage.removeItem('mafiaGameUserId');
+        localStorage.removeItem('mafiaGameSessionId');
+        localStorage.removeItem('mafiaGameUsername');
+        renderView('login');
+        return;
+    } finally {
+        clearTimeout(currentUserFetchTimeout);
+    }
 
- // Fetch current player's mission
- let currentUserMissionTimeout;
- showLoadingOverlay();
+    state.isCurrentUserAdmin = state.currentUser.IsAdmin === 'TRUE';
+    await fetchGameState();
 
- currentUserMissionTimeout = setTimeout(() => {
-     hideLoadingOverlay();
-     showMessage('Failed to load your mission data (timeout). Please refresh.');
- }, 10000);
+    // Fetch current player's mission
+    let currentUserMissionTimeout;
+    showLoadingOverlay();
 
- try {
-     const missionResponse = await fetch(`/.netlify/functions/get-player-mission?playerId=${state.currentUserId}`);
-     if (missionResponse.ok) {
-         const missionResult = await missionResponse.json();
-         state.currentMission = missionResult.currentMission;
-     } else {
-         console.error("Error fetching player mission:", await missionResponse.text());
-         state.currentMission = null;
-     }
- } catch (error) {
-     console.error("Error fetching player mission:", error);
-     state.currentMission = null;
- } finally {
-     clearTimeout(currentUserMissionTimeout);
-     // hideLoadingOverlay() is not called here directly, it's managed later
- }
+    currentUserMissionTimeout = setTimeout(() => {
+        hideLoadingOverlay();
+        showMessage('Failed to load your mission data (timeout). Please refresh.');
+    }, 10000);
 
- const currentUserWelcomeStatus = state.currentUser.Welcome?.toString().toUpperCase();
+    try {
+        const missionResponse = await fetch(`/.netlify/functions/get-player-mission?playerId=${state.currentUserId}`);
+        if (missionResponse.ok) {
+            const missionResult = await missionResponse.json();
+            state.currentMission = missionResult.currentMission;
+        } else {
+            console.error("Error fetching player mission:", await missionResponse.text());
+            state.currentMission = null;
+        }
+    } catch (error) {
+        console.error("Error fetching player mission:", error);
+        state.currentMission = null;
+    } finally {
+        clearTimeout(currentUserMissionTimeout);
+        hideLoadingOverlay();
+    }
 
- if (state.gameState?.Winner === 'Jester') {
-     renderView('jesterWinPage');
-     hideLoadingOverlay();
- } else if (state.currentUser.Status && state.currentUser.Status.toLowerCase() === 'dead') {
-     renderView('deadPage');
-     hideLoadingOverlay();
- } else if (state.gameState?.CurrentPhase === 'Off') {
-     renderView('offLimitsPage');
-     hideLoadingOverlay();
- } else if (currentUserWelcomeStatus !== 'TRUE') {
-     localStorage.removeItem('mafiaGameUserId');
-     localStorage.removeItem('mafiaGameSessionId');
-     localStorage.removeItem('mafiaGameUsername');
-     renderView('welcomePage');
-     hideLoadingOverlay();
- } else {
-     // CRITICAL FIX: Prepare recap story HTML before rendering dashboard
-     let nightlyRecapHtml = '';
-     let recapFetchTimeout; // Specific timeout for this fetch
+    const currentUserWelcomeStatus = state.currentUser.Welcome?.toString().toUpperCase();
 
-     if (state.gameState?.CurrentPhase === 'Day') {
-         const previousDay = parseInt(state.gameState.CurrentDay) - 1;
-         if (previousDay >= 1) {
-             showLoadingOverlay(); // Show loader for recap fetch
+    if (state.gameState?.Winner === 'Jester') {
+        renderView('jesterWinPage');
+        hideLoadingOverlay();
+    } else if (state.currentUser.Status && state.currentUser.Status.toLowerCase() === 'dead') {
+        renderView('deadPage');
+        hideLoadingOverlay();
+    } else if (state.gameState?.CurrentPhase === 'Off') {
+        renderView('offLimitsPage');
+        hideLoadingOverlay();
+    } else if (currentUserWelcomeStatus !== 'TRUE') {
+        localStorage.removeItem('mafiaGameUserId');
+        localStorage.removeItem('mafiaGameSessionId');
+        localStorage.removeItem('mafiaGameUsername');
+        renderView('welcomePage');
+        hideLoadingOverlay();
+} else {
+            renderView('dashboard');
+            // CRITICAL FIX: Await the updateDashboardActions function here.
+            await updateDashboardActions(state.gameState?.CurrentPhase || 'Day');
 
-             recapFetchTimeout = setTimeout(() => {
-                 hideLoadingOverlay();
-                 showMessage('Nightly recap loading timed out.');
-             }, 15000);
+        if (state.gameState?.CurrentPhase === 'Day') {
+            const previousDay = parseInt(state.gameState.CurrentDay) - 1;
+            if (previousDay >= 1) {
+                let recapLoadingTimeout;
+                showLoadingOverlay();
 
-             try {
-                 const recapResponse = await fetch(`/.netlify/functions/get-nightly-recap?dayNumber=${previousDay}`);
-                 if (recapResponse.ok) {
-                     const recapResult = await recapResponse.json();
-                     state.nightlyRecap = recapResult.recapData; // Store raw data
-                     if (state.nightlyRecap) {
-                         // Generate HTML string here
-                         nightlyRecapHtml = await generateNightlyRecapStory(state.nightlyRecap);
-                     }
-                 } else {
-                     console.error("Error fetching nightly recap:", await recapResponse.text());
-                     state.nightlyRecap = null;
-                     nightlyRecapHtml = '<p class="text-red-400">Failed to load last night\'s story.</p>';
-                 }
-             } catch (error) {
-                 console.error("Error fetching nightly recap:", error);
-                 state.nightlyRecap = null;
-                 nightlyRecapHtml = '<p class="text-red-400">Error loading last night\'s story.</p>';
-             } finally {
-                 clearTimeout(recapFetchTimeout);
-                 hideLoadingOverlay(); // Hide loader after recap fetch
-             }
-         } else {
-             nightlyRecapHtml = '<p class="text-gray-400">No story for Day 1.</p>';
-         }
-     }
-     
-     renderView('dashboard', { nightlyRecapHtml: nightlyRecapHtml }); // Pass ready HTML to dashboard template
-     await updateDashboardActions(state.gameState?.CurrentPhase || 'Day'); // Still call to render buttons
- }
+                recapLoadingTimeout = setTimeout(() => {
+                    hideLoadingOverlay();
+                    showMessage('Nightly recap loading timed out.');
+                }, 15000);
+
+                try {
+                    const recapResponse = await fetch(`/.netlify/functions/get-nightly-recap?dayNumber=${previousDay}`);
+                    if (recapResponse.ok) {
+                        const recapResult = await recapResponse.json();
+                        state.nightlyRecap = recapResult.recapData;
+                        renderView('dashboard');
+                        updateDashboardActions(state.gameState?.CurrentPhase || 'Day');
+                    } else {
+                        console.error("Error fetching nightly recap:", await recapResponse.text());
+                        state.nightlyRecap = null;
+                    }
+                } catch (error) {
+                    console.error("Error fetching nightly recap:", error);
+                    state.nightlyRecap = null;
+                } finally {
+                    clearTimeout(recapLoadingTimeout);
+                    hideLoadingOverlay();
+                }
+            }
+        }
+    }
 }
 
 
@@ -854,7 +859,7 @@ function showMessage(message) {
             case 'Jester': return 'Jester';
             case 'Sheriff': return 'Sheriff';
             case 'ADMIN': return 'Admin'; // Added ADMIN for completeness
-            default: return 'Unknown';
+            default: return 'Unknown Role';
         }
     }
 
@@ -1239,7 +1244,7 @@ async function fetchCurrentTrial() {
     }
 }
 
-async function updateDashboardActions(currentPhase) {
+function updateDashboardActions(currentPhase) {
      const playerActions = document.getElementById('player-dashboard-actions');
      if (!playerActions) return;
      playerActions.innerHTML = '';
@@ -1248,25 +1253,15 @@ async function updateDashboardActions(currentPhase) {
      const isDay = currentPhase && currentPhase.toLowerCase() === 'day';
      const isOff = currentPhase && currentPhase.toLowerCase() === 'off';
 
-     // Recaption content is now handled by initializeGame before renderView('dashboard')
-     // The recap section is either rendered or not based on state.gameState?.CurrentPhase === 'Day'
-     // and its content is passed via the template parameter.
-     // This function only needs to manage the visibility of the section if initializeGame doesn't explicitly hide it.
-     const recapSection = document.getElementById('nightly-recap-section');
      const recapStoryDiv = document.getElementById('nightly-recap-story');
-
-     if (recapSection && recapStoryDiv) {
+     if (recapStoryDiv) {
          if (isDay && state.nightlyRecap) {
-             // If it's Day and we have recap data, show the section and populate it
-             recapSection.classList.remove('hidden');
-             recapStoryDiv.innerHTML = await generateNightlyRecapStory(state.nightlyRecap);
+             recapStoryDiv.innerHTML = generateNightlyRecapStory(state.nightlyRecap);
          } else {
-             // Otherwise, hide the section and clear its content
-             recapSection.classList.add('hidden');
              recapStoryDiv.innerHTML = '';
          }
      }
-     
+
      if (isOff) {
          playerActions.innerHTML = '';
          const adminActions = document.getElementById('admin-dashboard-actions');
