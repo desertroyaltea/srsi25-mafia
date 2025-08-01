@@ -863,46 +863,7 @@ function showMessage(message) {
         }
     }
 
-
- // --- Session Activity Tracking ---
- async function updateSessionActivity(sessionId) {
-     try {
-         // No loading overlay for background activity updates
-         const response = await fetch('/.netlify/functions/update-session-activity', {
-             method: 'POST',
-             headers: { 'Content-Type': 'application/json' },
-             body: JSON.stringify({ sessionId: sessionId }),
-         });
-         if (!response.ok) {
-             const errorText = await response.text();
-             console.error('updateSessionActivity: Failed to update session activity:', errorText);
-         }
-     } catch (error) {
-         console.error('updateSessionActivity: Error sending session activity:', error);
-     }
- }
-
- function startSessionActivityUpdate(sessionId) {
-     // Clear any existing interval to prevent duplicates
-     if (sessionActivityIntervalId) {
-         clearInterval(sessionActivityIntervalId);
-     }
-     // Update immediately, then every 5 minutes
-     updateSessionActivity(sessionId);
-     sessionActivityIntervalId = setInterval(() => {
-         updateSessionActivity(sessionId);
-     }, 5 * 60 * 1000); // Every 5 minutes (5 * 60 seconds * 1000 milliseconds)
- }
-
- function stopSessionActivityUpdate() {
-     if (sessionActivityIntervalId) {
-         clearInterval(sessionActivityIntervalId);
-         sessionActivityIntervalId = null;
-     }
- }
-
-
-// --- Nightly Recap Story Generation ---
+    // --- Nightly Recap Story Generation ---
 async function generateNightlyRecapStory(recapData) { // Make async
     if (!recapData) {
         return '<p class="text-gray-400">No events recorded last night.</p>';
@@ -961,6 +922,46 @@ async function generateNightlyRecapStory(recapData) { // Make async
 
     return storyParts.map(part => `<p>${part}</p>`).join('');
 }
+
+
+ // --- Session Activity Tracking ---
+ async function updateSessionActivity(sessionId) {
+     try {
+         // No loading overlay for background activity updates
+         const response = await fetch('/.netlify/functions/update-session-activity', {
+             method: 'POST',
+             headers: { 'Content-Type': 'application/json' },
+             body: JSON.stringify({ sessionId: sessionId }),
+         });
+         if (!response.ok) {
+             const errorText = await response.text();
+             console.error('updateSessionActivity: Failed to update session activity:', errorText);
+         }
+     } catch (error) {
+         console.error('updateSessionActivity: Error sending session activity:', error);
+     }
+ }
+
+ function startSessionActivityUpdate(sessionId) {
+     // Clear any existing interval to prevent duplicates
+     if (sessionActivityIntervalId) {
+         clearInterval(sessionActivityIntervalId);
+     }
+     // Update immediately, then every 5 minutes
+     updateSessionActivity(sessionId);
+     sessionActivityIntervalId = setInterval(() => {
+         updateSessionActivity(sessionId);
+     }, 5 * 60 * 1000); // Every 5 minutes (5 * 60 seconds * 1000 milliseconds)
+ }
+
+ function stopSessionActivityUpdate() {
+     if (sessionActivityIntervalId) {
+         clearInterval(sessionActivityIntervalId);
+         sessionActivityIntervalId = null;
+     }
+ }
+
+
 
 
 async function performFetchAction(endpoint, payload) {
