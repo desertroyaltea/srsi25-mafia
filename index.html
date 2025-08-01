@@ -229,12 +229,12 @@ gameLayout: (viewHtml) => `
                 <div id="view-content">${viewHtml}</div>
             </div>`,
 dashboard: () => `
-            <div class="bg-gray-900 p-5 rounded-lg mt-4">
-                <h2 class="text-2xl font-semibold mb-4">Dashboard</h2>
-                <p class="text-gray-400 mb-4">Select an action to proceed.</p> <!-- mb-6 to mb-4 -->
+         <div class="bg-gray-900 p-5 rounded-lg mt-0">
+             <h2 class="text-2xl font-semibold mb-0">Dashboard</h2>
+             <p class="text-gray-400 mb-0">Select an action to proceed.</p>
 
              <!-- CURRENT MISSION SECTION -->
-             <div class="bg-gray-800 p-4 rounded-lg mb-4 border border-gray-700"> <!-- mb-6 to mb-4 -->
+             <div class="bg-gray-800 p-4 rounded-lg mb-0 mt-0 border border-gray-700">
                  <h3 class="text-xl font-semibold text-yellow-400 mb-2">Current Mission:</h3>
                  ${state.currentMission ? `
                      <p class="text-gray-300">${state.currentMission.MissionDescription}</p>
@@ -244,39 +244,34 @@ dashboard: () => `
              </div>
              <!-- END CURRENT MISSION SECTION -->
 
-             <!-- NEW NIGHTLY RECAP SECTION -->
-             ${state.gameState?.CurrentPhase === 'Day' && state.nightlyRecap ? `
-                 <div class="bg-gray-800 p-4 rounded-lg mb-4 border border-gray-700"> <!-- mb-6 to mb-4 -->
-                     <h3 class="text-xl font-semibold text-red-400 mb-2">Last Night's Story:</h3>
-                     <div id="nightly-recap-story" class="text-gray-300 leading-relaxed">
-                         <!-- Story will be generated here by JavaScript -->
-                     </div>
+             <!-- NEW NIGHTLY RECAP SECTION (ALWAYS RENDERED, CONTENT IS DYNAMIC) -->
+             <div id="nightly-recap-section" class="bg-gray-800 p-4 rounded-lg mb-0 mt-0 border border-gray-700">
+                 <h3 class="text-xl font-semibold text-red-400 mb-2">Last Night's Story:</h3>
+                 <div id="nightly-recap-story" class="text-gray-300 leading-relaxed">
+                      <!-- Story will be generated here by JavaScript -->
                  </div>
-             ` : ''}
+             </div>
              <!-- END NEW NIGHTLY RECAP SECTION -->
 
-<!-- NEW ROLE REVEAL SECTION -->
-                <div id="role-reveal-container" class="relative bg-gray-800 p-4 rounded-lg mb-0 mt-0 border border-gray-700 overflow-hidden">
-                    <div id="role-info-content" class="relative z-10">
-                        <h3 class="text-xl font-semibold mb-2 ${ROLE_DATA[state.currentUser.Role]?.color || 'text-gray-300'}">Your Role:</h3>
-                        <p class="text-gray-300 text-sm mb-3">${ROLE_DATA[state.currentUser.Role]?.description || 'No description available.'}</p>
-                        <h4 class="text-lg font-semibold text-gray-400 mb-1">Your Actions:</h4>
-                        <ul class="list-disc list-inside text-gray-300 text-sm space-y-1">
-                            ${ROLE_DATA[state.currentUser.Role]?.actions.map(action => `<li>${action}</li>`).join('') || '<li>No specific actions listed.</li>'}
-                        </ul>
-                    </div>
-                    <!-- Black overlay -->
-                    <div id="role-reveal-overlay" class="absolute inset-0 bg-black flex items-center justify-center z-20 cursor-pointer">
-                        <p class="text-white text-2xl font-bold animate-pulse">CLICK TO REVEAL ROLE</p>
-                    </div>
-                </div>
-                <!-- END NEW ROLE REVEAL SECTION -->
-
-                <div id="player-dashboard-actions" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4"></div>
-                <div id="admin-dashboard-actions" class="grid-cols-1 md:grid-cols-2 gap-4 ${state.isCurrentUserAdmin ? 'grid' : 'hidden'}">
-                    <button id="btn-review-accusations" class="bg-green-700 hover:bg-green-800 text-white font-bold py-3 px-6 rounded-lg">Review Accusations</button>
-                </div>
-            </div>`,
+             <div id="role-reveal-container" class="relative bg-gray-800 p-4 rounded-lg mb-0 mt-0 border border-gray-700 overflow-hidden">
+                 <div id="role-info-content" class="relative z-10">
+                     <h3 class="text-xl font-semibold mb-2 ${ROLE_DATA[state.currentUser.Role]?.color || 'text-gray-300'}">Your Role: ${getDisplayRoleName(state.currentUser.Role)}</h3>
+                     <p class="text-gray-300 text-sm mb-3">${ROLE_DATA[state.currentUser.Role]?.description || 'No description available.'}</p>
+                     <h4 class="text-lg font-semibold text-gray-400 mb-1">Your Actions:</h4>
+                     <ul class="list-disc list-inside text-gray-300 text-sm space-y-1">
+                         ${ROLE_DATA[state.currentUser.Role]?.actions.map(action => `<li>${action}</li>`).join('') || '<li>No specific actions listed.</li>'}
+                     </ul>
+                 </div>
+                 <!-- Black overlay -->
+                 <div id="role-reveal-overlay" class="absolute inset-0 bg-black flex items-center justify-center z-20 cursor-pointer">
+                     <p class="text-white text-2xl font-bold animate-pulse">CLICK TO REVEAL ROLE</p>
+                 </div>
+             </div>
+             <div id="player-dashboard-actions" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-0 mt-0"></div>
+             <div id="admin-dashboard-actions" class="grid-cols-1 md:grid-cols-2 gap-0 mt-0 ${state.isCurrentUserAdmin ? 'grid' : 'hidden'}">
+                 <button id="btn-review-accusations" class="bg-green-700 hover:bg-green-800 text-white font-bold py-3 px-6 rounded-lg">Review Accusations</button>
+             </div>
+         </div>`,
 actionModal: ({ title, buttonText, targets, actionType }) => `
             <div class="bg-gray-900 p-5 rounded-lg mt-4">
                 <h2 class="text-2xl font-semibold mb-4 text-red-400">${title}</h2>
