@@ -64,9 +64,8 @@ exports.handler = async (event) => {
                 .noVideo() // Ignore any video tracks
                 .audioCodec('aac')
                 .audioBitrate(128)
-                // === 🤖 NEW STABLE ROBOTIC EFFECT ===
-.audioFilter('flanger=delay=5:depth=4:regen=50:width=100:speed=2:shape=sine')
-                // ===================================
+                // Applying the stable robotic effect
+                .audioFilter('flanger=delay=5:depth=4:regen=50:width=100:speed=2:shape=sine')
                 .output(finalMp4Path)
                 .on('end', resolve)
                 .on('error', (err) => reject(new Error(`FFmpeg transcoding failed: ${err.message}`)))
