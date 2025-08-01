@@ -348,8 +348,12 @@ accusationForm: ({ targets }) => `
                                 <p class="text-gray-300"><strong>Submitted:</strong> ${new Date(acc.SubmissionTime).toLocaleString()}</p>
                                 <div class="mt-3 mb-4">
                                     <label class="block text-gray-400 text-sm font-bold mb-2">Audio:</label>
-                                    <audio controls class="w-full">
-                                        <source src="${acc.AudioDriveLink}" type="audio/webm">
+<audio id="audio-review-${acc.AccusationID}" class="w-full">
+    <source src="${acc.AudioDriveLink}" type="audio/mp4">
+</audio>
+<button type="button" class="btn-play-effect mt-2 bg-purple-700 hover:bg-purple-800 text-white font-bold py-2 px-4 rounded-lg w-full" data-target-id="audio-review-${acc.AccusationID}">
+    Play with Masked Voice
+</button>                                        <source src="${acc.AudioDriveLink}" type="audio/webm">
                                         <source src="${acc.AudioDriveLink}" type="audio/mp4">
                                         Your browser does not support the audio element.
                                     </audio>
@@ -499,8 +503,12 @@ offLimitsPage: () => `
                             <p class="text-lg text-gray-300"><strong>Accused:</strong> ${getPlayerNameById(trial.AccusedPlayerID)}</p>
                             <div class="mt-3 mb-4">
                                 <label class="block text-gray-400 text-sm font-bold mb-2">Accusation Audio:</label>
-                                <audio controls class="w-full">
-                                    <source src="${trial.AccusationAudioLink}" type="audio/webm">
+<audio id="audio-trial-${trial.TrialID}" class="w-full">
+    <source src="${trial.AccusationAudioLink}" type="audio/mp4">
+</audio>
+<button type="button" class="btn-play-effect mt-2 bg-purple-700 hover:bg-purple-800 text-white font-bold py-2 px-4 rounded-lg w-full" data-target-id="audio-trial-${trial.TrialID}">
+    Play with Masked Voice
+</button>                                    <source src="${trial.AccusationAudioLink}" type="audio/webm">
                                     <source src="${trial.AccusationAudioLink}" type="audio/mp4">
                                     Your browser does not support the audio element.
                                 </audio>
@@ -591,6 +599,30 @@ investigationResult: ({ targetName, isMafiaResult }) => `
             appRoot.innerHTML = templates.gameLayout(templates[viewName](data));
         }
     }
+
+// Add this new function to your script
+function playAudioWithEffect(audioElement) {
+    // Use an existing AudioContext or create a new one
+    const audioContext = window.audioContext || new window.AudioContext();
+    window.audioContext = audioContext;
+
+    // Create an audio source from the <audio> element
+    const source = audioContext.createMediaElementSource(audioElement);
+
+    // Create the lowpass filter to make the voice deeper/muffled
+    const lowpassFilter = audioContext.createBiquadFilter();
+    lowpassFilter.type = 'lowpass';
+    lowpassFilter.frequency.value = 1000; // Cut off high frequencies above 1000Hz. Lower this value for a more muffled effect.
+    lowpassFilter.Q.value = 1; // Standard quality factor
+
+    // Connect the audio path: source -> filter -> speakers
+    source.connect(lowpassFilter);
+    lowpassFilter.connect(audioContext.destination);
+
+    // Play the audio
+    audioElement.play();
+}
+
 
 async function handleLogin() {
         const passcodeInputElement = document.getElementById('passcode-input');
