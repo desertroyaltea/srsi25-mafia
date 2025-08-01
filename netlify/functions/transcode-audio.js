@@ -65,7 +65,7 @@ exports.handler = async (event) => {
                 .audioCodec('aac')
                 .audioBitrate(128)
                 // === 🤖 NEW STABLE ROBOTIC EFFECT ===
-                .audioFilter('flanger=delay=2:depth=3:regen=5:width=80:speed=1:shape=sine')
+.audioFilter('flanger=delay=5:depth=4:regen=50:width=100:speed=2:shape=sine')
                 // ===================================
                 .output(finalMp4Path)
                 .on('end', resolve)
