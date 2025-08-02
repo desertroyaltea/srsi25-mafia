@@ -1266,9 +1266,7 @@ async function fetchCurrentTrial() {
 
         state.currentTrial = nextTrial;
         // CRITICAL FIX: Fetch accused player's name for the trial
-        if (state.currentTrial) {
-            state.currentTrial.AccusedName = await getPlayerNameById(state.currentTrial.AccusedPlayerID);
-        }
+
 
         if (!state.currentTrial) {
             showMessage('You have voted on all active trials! Returning to dashboard.');
@@ -1347,14 +1345,16 @@ createButton('btn-submit-accusation', 'Submit Accusation', 'bg-gray-700 hover:bg
 
      // --- TRIAL BUTTON (for non-admins) ---
      if (!state.isCurrentUserAdmin) {
-         createButton('btn-the-trial', 'The Trial', 'bg-purple-700 hover:bg-purple-800', async () => {
-             await fetchCurrentTrial();
-             if (state.currentTrial) {
-                 renderView('trialPage', { trial: state.currentTrial });
-             } else {
-                 showMessage('No active trial found at this time.');
-             }
-         });
+createButton('btn-the-trial', 'The Trial', 'bg-purple-700 hover:bg-purple-800', async () => {
+    await fetchCurrentTrial(); // This now only gets the raw trial data
+    if (state.currentTrial) {
+        // Now, we explicitly fetch the name before rendering
+        state.currentTrial.AccusedName = await getPlayerNameById(state.currentTrial.AccusedPlayerID);
+        renderView('trialPage', { trial: state.currentTrial });
+    } else {
+        showMessage('No active trial found at this time.');
+    }
+});
      }
 
      // --- NIGHT ACTIONS (Only visible during Night Phase) ---
@@ -1685,10 +1685,16 @@ appRoot.addEventListener('click', async (e) => {
             await startRecording();
         } else if (e.target.id === 'stop-recording') {
             stopRecording();
-        } else if (e.target.id === 'btn-review-accusations') {
-            await fetchPendingAccusations();
-            renderView('adminReview', { pendingAccusations: state.pendingAccusations });
-        } else if (e.target.classList.contains('btn-approve-accusation')) {
+// Replace it with this block
+} else if (e.target.id === 'btn-review-accusations') {
+    await fetchPendingAccusations();
+    // Loop through and fetch names before rendering
+    for (const acc of state.pendingAccusations) {
+        acc.AccuserName = await getPlayerNameById(acc.AccuserPlayerID);
+        acc.AccusedName = await getPlayerNameById(acc.AccusedPlayerID);
+    }
+    renderView('adminReview', { pendingAccusations: state.pendingAccusations });
+} else if (e.target.classList.contains('btn-approve-accusation')) {
             const accusationId = e.target.dataset.accusationId;
             if (accusationId) {
                 await handleApproveAccusation(accusationId);
