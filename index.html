@@ -1334,13 +1334,12 @@ if (isDay && state.nightlyRecap) {
      };
 
 
-     // --- ALL ROLES ---
-     if (isDay) {
-         createButton('btn-submit-accusation', 'Submit Accusation', 'bg-gray-700 hover:bg-gray-800', () => {
-             const targets = getDisplayableTargets();
-             renderView('accusationForm', { targets });
-         });
-     }
+// Replace it with this
+// --- ALL ROLES ---
+createButton('btn-submit-accusation', 'Submit Accusation', 'bg-gray-700 hover:bg-gray-800', () => {
+    const targets = getDisplayableTargets();
+    renderView('accusationForm', { targets });
+});
 
      // --- TRIAL BUTTON (for non-admins) ---
      if (!state.isCurrentUserAdmin) {
