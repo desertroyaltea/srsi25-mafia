@@ -760,9 +760,13 @@ async function initializeGame(userId, username = null) { // NEW: Receive usernam
     if (state.gameState?.Winner === 'Jester') {
         renderView('jesterWinPage');
         hideLoadingOverlay();
-    } else if (state.currentUser.Status && state.currentUser.Status.toLowerCase() === 'dead') {
-        renderView('deadPage');
-        hideLoadingOverlay();
+// Replace it with this block
+} else if (state.currentUser.Status && state.currentUser.Status.toLowerCase() === 'dead') {
+    const targets = getDisplayableTargets();
+    const accuserName = state.currentUser.Name;
+    renderView('deadPage', { accuserName, targets });
+    hideLoadingOverlay();
+// ...
     } else if (state.gameState?.CurrentPhase === 'Off') {
         renderView('offLimitsPage');
         hideLoadingOverlay();
