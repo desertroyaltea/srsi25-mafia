@@ -1672,7 +1672,12 @@ case 'check-and-display-result':
 appRoot.addEventListener('click', async (e) => {
         if (e.target.id === 'back-to-dashboard') {
             renderView('dashboard');
-        } else if (e.target.id === 'start-recording') {
+        // Add this block inside the appRoot.addEventListener('click', ...)
+} else if (e.target.id === 'btn-dead-accuse') {
+    const targets = getDisplayableTargets();
+    renderView('accusationForm', { targets });
+}
+         else if (e.target.id === 'start-recording') {
             await startRecording();
         } else if (e.target.id === 'stop-recording') {
             stopRecording();

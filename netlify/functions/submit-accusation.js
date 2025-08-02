@@ -123,9 +123,10 @@ exports.handler = async (event, context) => {
                 if (!accuserInfo) {
                     return resolve({ statusCode: 404, body: JSON.stringify({ error: 'Accuser player not found.' }) });
                 }
-                if (accuserInfo.playerStatus.toLowerCase() !== 'alive') {
-                    return resolve({ statusCode: 403, body: JSON.stringify({ error: 'Only alive players can accuse.' }) });
-                }
+const status = accuserInfo.playerStatus.toLowerCase();
+if (status !== 'alive' && status !== 'dead') {
+    return resolve({ statusCode: 403, body: JSON.stringify({ error: 'This action is not available to you.' }) });
+}
                 if (accuserInfo.playerIsAdmin === 'TRUE') {
                     return resolve({ statusCode: 403, body: JSON.stringify({ error: 'Admin players cannot accuse.' }) });
                 }
