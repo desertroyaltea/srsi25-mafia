@@ -1427,8 +1427,18 @@ createButton('btn-the-trial', 'The Trial', 'bg-purple-700 hover:bg-purple-800', 
                      actionType: 'check-and-display-result'
                  });
              });
-             createButton('btn-reveal-detective', 'Reveal a Detective', 'bg-yellow-900', () => showMessage("This ability is not yet implemented."));
-             createButton('btn-view-history', 'Investigation History', 'bg-purple-700 hover:bg-purple-800', async () => {
+createButton('btn-reveal-detective', 'Reveal a Detective', 'bg-yellow-900', () => {
+    if (!isNight) return showMessage("You can only use this ability at night.");
+    if (state.currentUser.DetectiveCanRevealSelf !== 'TRUE') return showMessage("You have not unlocked this ability or have already used it.");
+    performFetchAction('/.netlify/functions/reveal-detective', { detectivePlayerId: state.currentUserId });
+});
+createButton('btn-view-teammates', 'List Detectives', 'bg-cyan-600 hover:bg-cyan-700', async () => {
+    if (!state.currentUser.RevealedTeammates) return showMessage("You have not revealed any teammates yet.");
+    const teammateIds = state.currentUser.RevealedTeammates.split(',').map(id => id.trim());
+    const teammateNamesPromises = teammateIds.map(id => getPlayerNameById(id));
+    const teammateNames = await Promise.all(teammateNamesPromises);
+    renderView('revealedTeammates', { role: 'Detective', teammates: teammateNames });
+});             createButton('btn-view-history', 'Investigation History', 'bg-purple-700 hover:bg-purple-800', async () => {
                  const response = await fetch(`/.netlify/functions/get-investigation-history?playerId=${state.currentUserId}`);
                  if (!response.ok) {
                      showMessage("Failed to load investigation history.");
