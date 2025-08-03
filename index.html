@@ -931,7 +931,7 @@ async function generateNightlyRecapStory(recapData) { // Make async
     if (successfullyProtectedNames.length > 0) {
         storyParts.push(`The <span class="text-blue-400 font-bold">${getDisplayRoleName('Doctor')}s</span> worked tirelessly, aggressively covering up ${successfullyProtectedNames} in bubble wrap, saving them from the Mafia who tried to kill them.`);
     } else {
-        storyParts.push(`The <span class="text-blue-400 font-bold">${getDisplayRoleName('Doctors')}s</span> were reportedly busy trying to fix the printer in Building 9 and completely missed the call for help. The printer is still broken, by the way.`);
+        storyParts.push(`The <span class="text-blue-400 font-bold">${getDisplayRoleName('Doctor')}s</span> were reportedly busy trying to fix the printer in Building 9 and completely missed the call for help. The printer is still broken, by the way.`);
     }
 
     if (mafiaKilledNames.length > 0) {
