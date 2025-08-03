@@ -931,7 +931,7 @@ async function generateNightlyRecapStory(recapData) { // Make async
     if (successfullyProtectedNames.length > 0) {
         storyParts.push(`The <span class="text-blue-400 font-bold">${getDisplayRoleName('Doctor')}s</span> worked tirelessly, aggressively covering up ${successfullyProtectedNames} in bubble wrap, saving them from the Mafia who tried to kill them.`);
     } else {
-        storyParts.push(`The <span class="text-blue-400 font-bold">${getDisplayRoleName('Doctor')}s</span> watched over the town, but they couldn't protect those who needed it the most. Skill issue wallah.`);
+        storyParts.push(`The <span class="text-blue-400 font-bold">${getDisplayRoleName('Doctors')}s</span> were reportedly busy trying to fix the printer in Building 9 and completely missed the call for help. The printer is still broken, by the way.`);
     }
 
     if (mafiaKilledNames.length > 0) {
@@ -943,11 +943,11 @@ async function generateNightlyRecapStory(recapData) { // Make async
     }
 
     if (guiltyAccusedNames.length > 0) {
-        storyParts.push(`The verdict is in: <span class="text-red-500 font-bold">GUILTY</span>! ${guiltyAccusedNames.length > 1 ? 's' : ''} of ${guiltyAccusedNames} was last seen being dragged away by EXCORs, forced to listen to 'Baby Shark' on repeat for the foreseeable future..`);
+        storyParts.push(`The verdict is in: <span class="text-red-500 font-bold">GUILTY</span>! ${guiltyAccusedNames} was last seen being dragged away by EXCORs, forced to listen to 'Baby Shark' on repeat for the foreseeable future..`);
     }
 
     if (notGuiltyAccusedNames.length > 0) {
-        storyParts.push(`${notGuiltyAccusedNames}The case against [Player Names] fell apart when their lawyer pulled a classic 'Chewbacca Defense.' It made no sense, but it was surprisingly effective. They are <span class="text-green-500 font-bold">NOT GUILTY</span>!`);
+        storyParts.push(`The case against ${notGuiltyAccusedNames} fell apart when his lawyer pulled a classic 'Chewbacca Defense.' It made no sense, but it was surprisingly effective. They are <span class="text-green-500 font-bold">NOT GUILTY</span>!`);
     }
 
     if (sheriffKilledNames.length > 0) {
