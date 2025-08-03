@@ -935,7 +935,7 @@ async function generateNightlyRecapStory(recapData) { // Make async
     }
 
     if (mafiaKilledNames.length > 0) {
-        storyParts.push(`But the chilling silence was broken by the grim news: ${mafiaKilledNames} going down the elevator in Building 9, only for the elevator to suddenly "malfunction". A quick and brutal fall led to their demise. Needless to say, the <span class="text-red-500 font-bold">${getDisplayRoleName('Mafia')}</span> got their way.`);
+        storyParts.push(`The night was shattered by a tragic accident involving ${mafiaKilledNames} and a suspiciously faulty vending machine in the Building 9 lobby. The <span class="text-red-500 font-bold">${getDisplayRoleName('Mafia')}</span>, meanwhile, were seen casually whistling and counting a suspicious amount of loose change...`);
     } else if (successfullyProtectedNames.length > 0) {
          storyParts.push(`The <span class="text-red-500 font-bold">${getDisplayRoleName('Mafia')}'s</span> deadly aim was ineffective, as their targets managed to escape their grasp. Big L to the Mafia, and we all have the Doctors to thank`);
     } else {
@@ -943,20 +943,20 @@ async function generateNightlyRecapStory(recapData) { // Make async
     }
 
     if (guiltyAccusedNames.length > 0) {
-        storyParts.push(`In a tense moment, the trial${guiltyAccusedNames.length > 1 ? 's' : ''} of ${guiltyAccusedNames} concluded with a verdict of <span class="text-red-500 font-bold">GUILTY</span>. Justice, swift and final, was served.`);
+        storyParts.push(`The verdict is in: <span class="text-red-500 font-bold">GUILTY</span>! ${guiltyAccusedNames.length > 1 ? 's' : ''} of ${guiltyAccusedNames} was last seen being dragged away by EXCORs, forced to listen to 'Baby Shark' on repeat for the foreseeable future..`);
     }
 
     if (notGuiltyAccusedNames.length > 0) {
-        storyParts.push(`The town deliberated over ${notGuiltyAccusedNames}'s fate, but the verdict came back <span class="text-green-500 font-bold">NOT GUILTY</span>. They walk free, for now.`);
+        storyParts.push(`${notGuiltyAccusedNames}The case against [Player Names] fell apart when their lawyer pulled a classic 'Chewbacca Defense.' It made no sense, but it was surprisingly effective. They are <span class="text-green-500 font-bold">NOT GUILTY</span>!`);
     }
 
     if (sheriffKilledNames.length > 0) {
         storyParts.push(`Amidst the chaos, the vigilant <span class="text-yellow-500 font-bold">${getDisplayRoleName('Sheriff')}</span> exacted their own brand of justice, eliminating ${sheriffKilledNames}.`);
     } else {
-        storyParts.push(`The <span class="text-yellow-500 font-bold">${getDisplayRoleName('Sheriff')}'s</span> gun remained silent, idk what they are waiting for tbh.`);
+        storyParts.push(`The <span class="text-yellow-500 font-bold">${getDisplayRoleName('Sheriff')}'s</span> spent the night polishing their badge and practicing cool one-liners in the mirror, but ultimately decided not to shoot anyone. The town's safety can wait; Aura is forever...`);
     }
 
-    storyParts.push(`<span class="font-bold text-blue-400">SRSI25 Cohort</span> now faces a new day, will you repeat the same mistakes? Or will you learn from them...`);
+    storyParts.push(`<span class="font-bold text-blue-400">SRSI25 Cohort</span> now faces a new day. And the stakes have never been higher...`);
 
     return storyParts.map(part => `<p>${part}</p>`).join('');
 }
