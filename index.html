@@ -1403,6 +1403,15 @@ createButton('btn-the-trial', 'The Trial', 'bg-purple-700 hover:bg-purple-800', 
 });
      }
 
+// Paste this code right after the Trial Button block
+// --- DETECTIVE-SPECIFIC (ALWAYS ON) ---
+if (state.currentUser.Role.toLowerCase() === 'detective') {
+    createButton('btn-undercover', 'Undercover', 'bg-red-700 hover:bg-red-800', () => {
+        renderMafiaFacade();
+    });
+}
+     
+
      // --- NIGHT ACTIONS (Only visible during Night Phase) ---
      if (isNight) {
          const role = state.currentUser.Role.toLowerCase();
