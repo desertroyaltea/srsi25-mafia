@@ -1474,11 +1474,7 @@ if (state.currentUser.Role.toLowerCase() === 'detective') {
          if (role === 'detective') {
          // Add this new block
 // --- DETECTIVE-SPECIFIC (ALWAYS ON) ---
-if (state.currentUser.Role.toLowerCase() === 'detective') {
-    createButton('btn-undercover', 'Undercover', 'bg-red-700 hover:bg-red-800', () => {
-        renderMafiaFacade();
-    });
-}
+
              createButton('btn-check', 'Investigate Player', 'bg-yellow-600 hover:bg-yellow-700', () => {
                  if (!isNight) return showMessage("You can only use this action at night.");
                  if (state.currentUser.MainUsed === 'TRUE') return showMessage("You have already used your main action tonight.");
