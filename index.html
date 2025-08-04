@@ -1439,15 +1439,45 @@ createButton('btn-view-teammates', 'List Detectives', 'bg-cyan-600 hover:bg-cyan
     const teammateNames = await Promise.all(teammateNamesPromises);
     renderView('revealedTeammates', { role: 'Detective', teammates: teammateNames });
 });             createButton('btn-view-history', 'Investigation History', 'bg-purple-700 hover:bg-purple-800', async () => {
-                 const response = await fetch(`/.netlify/functions/get-investigation-history?playerId=${state.currentUserId}`);
-                 if (!response.ok) {
-                     showMessage("Failed to load investigation history.");
-                     console.error("Error fetching investigation history:", await response.text());
-                     return;
-                 }
-                 const result = await response.json();
-                 renderView('investigationHistory', { history: result.history });
-             });
+    showLoadingOverlay();
+    try {
+        const response = await fetch(`/.netlify/functions/get-investigation-history?playerId=${state.currentUserId}`);
+        if (!response.ok) {
+            throw new Error(await response.text());
+        }
+
+        const result = await response.json();
+        const rawHistory = result.history || '';
+
+        if (!rawHistory) {
+            renderView('investigationHistory', { formattedHistory: [] });
+            return;
+        }
+
+        // Parse the history string (e.g., "id1:YES,id2:NO") into an array of objects
+        const historyEntries = rawHistory.split(',').map(entry => {
+            const [playerId, isMafia] = entry.split(':');
+            return { playerId, isMafia };
+        });
+
+        // Fetch the names for each player ID in the history
+        const formattedHistoryPromises = historyEntries.map(async (entry) => {
+            const playerName = await getPlayerNameById(entry.playerId);
+            return { ...entry, playerName };
+        });
+
+        const formattedHistory = await Promise.all(formattedHistoryPromises);
+
+        // Now render the view with the fully prepared data
+        renderView('investigationHistory', { formattedHistory });
+
+    } catch (error) {
+        showMessage("Failed to load investigation history.");
+        console.error("Error fetching or processing investigation history:", error);
+    } finally {
+        hideLoadingOverlay();
+    }
+});
          }
 
          // --- VILLAGER ---
@@ -1653,7 +1683,8 @@ case 'check-and-display-result':
                      const result = await response.json();
 
                      if (response.ok) {
-                         const targetPlayerName_display = getPlayerNameById(targetPlayerId_display); // Use the sync helper
+                         // Replace it with this line
+const targetPlayerName_display = await getPlayerNameById(targetPlayerId_display);
                          renderView('investigationResult', { targetName: targetPlayerName_display, isMafiaResult: result.isMafiaResult });
                      } else {
                          throw new Error(result.message || `Error: ${response.status} ${response.statusText}`);
