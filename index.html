@@ -524,7 +524,7 @@ investigationHistory: ({ formattedHistory }) => `
                      <ul class="list-disc list-inside space-y-2">
                          ${formattedHistory.map(entry => `
                              <li>
-                                 <span class="text-purple-400 font-bold">${entry.playerName}</span> (${entry.playerId}): ${entry.isMafia === 'YES' ? 'Is Mafia' : 'Not Mafia'}
+<span class="text-purple-400 font-bold">${entry.playerName}</span>: ${entry.isMafia === 'YES' ? 'Is Mafia' : 'Not Mafia'}
                              </li>
                          `).join('')}
                      </ul>
@@ -590,6 +590,53 @@ investigationResult: ({ targetName, isMafiaResult }) => `
         }
     }
 
+
+// Add this entire new function
+function renderMafiaFacade() {
+    const playerActions = document.getElementById('player-dashboard-actions');
+    if (!playerActions) return;
+    playerActions.innerHTML = ''; // Clear the real Detective buttons
+
+    // --- 1. Update the Role Info Display to show "Mafia" ---
+    const roleInfoContent = document.getElementById('role-info-content');
+    if(roleInfoContent) {
+        const mafiaRoleData = ROLE_DATA['Mafia'];
+        roleInfoContent.innerHTML = `
+            <h3 class="text-xl font-semibold mb-2 ${mafiaRoleData.color}">Your Role: Mafia</h3>
+            <p class="text-gray-300 text-sm mb-3">${mafiaRoleData.description}</p>
+            <h4 class="text-lg font-semibold text-gray-400 mb-1">Your Actions:</h4>
+            <ul class="list-disc list-inside text-gray-300 text-sm space-y-1">
+                ${mafiaRoleData.actions.map(action => `<li>${action}</li>`).join('')}
+            </ul>
+        `;
+    }
+
+    // --- 2. Create the fake, non-functional Mafia buttons ---
+    const createFacadeButton = (id, text, style) => {
+        const button = document.createElement('button');
+        button.id = id;
+        button.textContent = text;
+        button.className = `${style} text-white font-bold py-3 px-6 rounded-lg transition`;
+        // All facade buttons are non-functional and just show an error message
+        button.onclick = () => showMessage('404 Error');
+        playerActions.appendChild(button);
+    };
+
+    // Create the fake Mafia buttons based on the current phase
+    const isNight = state.gameState?.CurrentPhase?.toLowerCase() !== 'day';
+
+    createFacadeButton('fake-btn-submit-accusation', 'Submit Accusation', 'bg-gray-700 hover:bg-gray-800');
+    createFacadeButton('fake-btn-the-trial', 'The Trial', 'bg-purple-700 hover:bg-purple-800');
+
+    if (isNight) {
+        createFacadeButton('fake-btn-kill', 'Kill Player', 'bg-red-700 hover:bg-red-800');
+        createFacadeButton('fake-btn-convert', 'Convert Villager', 'bg-red-900');
+        createFacadeButton('fake-btn-reveal-mafia', 'Reveal Mafia', 'bg-red-900');
+        createFacadeButton('fake-btn-view-teammates', 'List Mafia', 'bg-cyan-600 hover:bg-cyan-700');
+    }
+
+    showMessage("You are now Undercover. Refresh the page to exit.");
+}
 
     
 async function handleLogin() {
@@ -1416,6 +1463,13 @@ createButton('btn-the-trial', 'The Trial', 'bg-purple-700 hover:bg-purple-800', 
 
          // --- DETECTIVE ---
          if (role === 'detective') {
+         // Add this new block
+// --- DETECTIVE-SPECIFIC (ALWAYS ON) ---
+if (state.currentUser.Role.toLowerCase() === 'detective') {
+    createButton('btn-undercover', 'Undercover', 'bg-red-700 hover:bg-red-800', () => {
+        renderMafiaFacade();
+    });
+}
              createButton('btn-check', 'Investigate Player', 'bg-yellow-600 hover:bg-yellow-700', () => {
                  if (!isNight) return showMessage("You can only use this action at night.");
                  if (state.currentUser.MainUsed === 'TRUE') return showMessage("You have already used your main action tonight.");
