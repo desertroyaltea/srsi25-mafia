@@ -976,13 +976,13 @@ async function generateNightlyRecapStory(recapData) { // Make async
     storyParts.push(`As the first rays of dawn pierced through the darkness, <span class="font-bold text-gray-300">Building 9</span> slowly awoke from a restless night.`);
 
     if (successfullyProtectedNames.length > 0) {
-        storyParts.push(`The <span class="text-blue-400 font-bold">${getDisplayRoleName('Doctor')}s</span> worked tirelessly, aggressively covering up ${successfullyProtectedNames} in bubble wrap, saving them from the Mafia who tried to kill them.`);
+        storyParts.push(`The Mafia's poison-laced coffee was mysteriously replaced with a healthy green smoothie. ${successfullyProtectedNames} is now just annoyingly energetic, and the <span class="text-blue-400 font-bold">${getDisplayRoleName('Doctor')}s</span> are taking all the credit..`);
     } else {
         storyParts.push(`The <span class="text-blue-400 font-bold">${getDisplayRoleName('Doctor')}s</span> were reportedly busy trying to fix the printer in Building 9 and completely missed the call for help. The printer is still broken, by the way.`);
     }
 
     if (mafiaKilledNames.length > 0) {
-        storyParts.push(`The night was shattered by a tragic accident involving ${mafiaKilledNames} and a suspiciously faulty vending machine in the Building 9 lobby. The <span class="text-red-500 font-bold">${getDisplayRoleName('Mafia')}</span>, meanwhile, were seen casually whistling and counting a suspicious amount of loose change...`);
+        storyParts.push(`A formal complaint to SRSI managemrnt was filed against ${mafiaKilledNames} 'excessive mogging,' which apparently resulted in them being buried under a mountain of meetings with management. Their demise was swift, and frankly, a little bit bureaucratic. The <span class="text-red-500 font-bold">${getDisplayRoleName('Mafia')}</span> must be thrilled.`);
     } else if (successfullyProtectedNames.length > 0) {
          storyParts.push(`The <span class="text-red-500 font-bold">${getDisplayRoleName('Mafia')}'s</span> deadly aim was ineffective, as their targets managed to escape their grasp. Big L to the Mafia, and we all have the Doctors to thank`);
     } else {
@@ -990,17 +990,17 @@ async function generateNightlyRecapStory(recapData) { // Make async
     }
 
     if (guiltyAccusedNames.length > 0) {
-        storyParts.push(`The verdict is in: <span class="text-red-500 font-bold">GUILTY</span>! ${guiltyAccusedNames} was last seen being dragged away by EXCORs, forced to listen to 'Baby Shark' on repeat for the foreseeable future..`);
+        storyParts.push(`After a dramatic trial where the primary evidence was 'just trust me, bro,' the town has found ${guiltyAccusedNames} <span class="text-red-500 font-bold">GUILTY</span>!. They have been sentenced to write a 1,000-word apology essay.`);
     }
 
     if (notGuiltyAccusedNames.length > 0) {
-        storyParts.push(`The case against ${notGuiltyAccusedNames} fell apart when his lawyer pulled a classic 'Chewbacca Defense.' It made no sense, but it was surprisingly effective. They are <span class="text-green-500 font-bold">NOT GUILTY</span>!`);
+        storyParts.push(`After reviewing the evidence, the town concluded they had absolutely no idea what was going on and declared ${notGuiltyAccusedNames} <span class="text-green-500 font-bold">NOT GUILTY</span> by default. The search for a scapegoat continues.`);
     }
 
     if (sheriffKilledNames.length > 0) {
         storyParts.push(`Amidst the chaos, the vigilant <span class="text-yellow-500 font-bold">${getDisplayRoleName('Sheriff')}</span> exacted their own brand of justice, eliminating ${sheriffKilledNames}.`);
     } else {
-        storyParts.push(`The <span class="text-yellow-500 font-bold">${getDisplayRoleName('Sheriff')}'s</span> spent the night polishing their badge and practicing cool one-liners in the mirror, but ultimately decided not to shoot anyone. The town's safety can wait; Aura is forever...`);
+        storyParts.push(`The <span class="text-yellow-500 font-bold">${getDisplayRoleName('Sheriff')}'s</span> stood dramatically on a rooftop, waiting for the perfect moment with the perfect background music to take their shot. The moment never came, but they looked incredibly cool.`);
     }
 
     storyParts.push(`<span class="font-bold text-blue-400">SRSI25 Cohort</span> now faces a new day. And the stakes have never been higher...`);
