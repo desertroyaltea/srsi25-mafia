@@ -948,74 +948,87 @@ function showMessage(message) {
         }
     }
 
-    // --- Nightly Recap Story Generation ---
-async function generateNightlyRecapStory(recapData) { // Make async
+async function generateNightlyRecapStory(recapData) {
     if (!recapData) {
         return '<p class="text-gray-400">No events recorded last night.</p>';
     }
 
     const storyParts = [];
 
-    const formatPlayerNames = async (playerIDs) => { // Made async
-        if (playerIDs.length === 0) return '';
+    const formatPlayerNames = async (playerIDs) => {
+        if (!playerIDs || playerIDs.length === 0) return '';
         const playerNamesPromises = playerIDs.map(id => getPlayerNameById(id));
-        const playerNames = await Promise.all(playerNamesPromises); // Await all name fetches
+        const playerNames = await Promise.all(playerNamesPromises);
         const coloredNames = playerNames.map(name => `<span class="text-purple-400 font-bold">${name}</span>`);
         if (coloredNames.length === 1) return coloredNames[0];
         if (coloredNames.length === 2) return `${coloredNames[0]} and ${coloredNames[1]}`;
         return `${coloredNames.slice(0, -1).join(', ')}, and ${coloredNames[coloredNames.length - 1]}`;
     };
 
-    const successfullyProtectedNames = await formatPlayerNames(recapData.mafiaProtected);
-    const mafiaKilledNames = await formatPlayerNames(recapData.mafiaKills);
-    const sheriffKilledNames = await formatPlayerNames(recapData.sheriffKills);
+    // Safely get data, defaulting to empty arrays to prevent errors
+    const mafiaKills = recapData.mafiaKills || [];
+    const sheriffKills = recapData.sheriffKills || [];
+    const trialResults = recapData.trialResults || [];
+    const successfullyProtected = recapData.mafiaProtected || [];
 
-    const guiltyAccusedNames = await formatPlayerNames(recapData.trialResults.filter(trial => trial.result === 'GUILTY').map(t => t.accusedPlayerId));
-    const notGuiltyAccusedNames = await formatPlayerNames(recapData.trialResults.filter(trial => trial.result === 'NOT GUILTY').map(t => t.accusedPlayerId));
+    const mafiaKilledNames = await formatPlayerNames(mafiaKills);
+    const sheriffKilledNames = await formatPlayerNames(sheriffKills);
+    const successfullyProtectedNames = await formatPlayerNames(successfullyProtected);
 
+    const guiltyTrials = trialResults.filter(t => t.result === 'GUILTY');
+    const notGuiltyTrials = trialResults.filter(t => t.result === 'NOT GUILTY');
+
+    const guiltyAccusedNames = await formatPlayerNames(guiltyTrials.map(t => t.accusedPlayerId));
+    const notGuiltyAccusedNames = await formatPlayerNames(notGuiltyTrials.map(t => t.accusedPlayerId));
+
+    // --- STORY CONSTRUCTION ---
     storyParts.push(`As the first rays of dawn pierced through the darkness, <span class="font-bold text-gray-300">Building 9</span> slowly awoke from a restless night.`);
 
-// Doctor Section
-if (successfullyProtected) {
-storyParts.push(`The <span class="text-blue-400 font-bold">Doctors</span>, fueled by sheer determination, managed to wrap ${successfullyProtectedNames} in an impenetrable layer of bubble wrap, saving them from certain doom.`);
-} else {
-storyParts.push(`The <span class="text-blue-400 font-bold">Doctors</span> were nowhere to be found. Rumor has it they spent the previous night gossiping in Hall 1 and ended up sleeping straight through the chaos. Not their finest hour.`);
-}
-
-
-// Mafia Section
-if (mafiaKilledNames) {
-    storyParts.push(`Whispers spread quickly through the halls: the <span class="text-red-500 font-bold">Mafia</span> was spotted lurking in the shadows… accompanied by a suspiciously cheerful fox mascot on their heads 🦊.`);
-    storyParts.push(`Their twisted plan? A soy milk chugging contest gone horribly wrong. ${mafiaKilledNames} met their end, not by stealth or poison, but by an overdose of plant-based calcium. Brutal. Ironic. Very on-brand.`);
-} else {
-    storyParts.push(`The <span class="text-red-500 font-bold">Mafia</span>'s plans fell apart when they spent the entire night arguing about the fox mascot's name. No one was killed, but 'Foxy McFoxface' is now the leading candidate.`);
-}
-
-// Sheriff Section
-if (sheriffKilledNames) {
-    storyParts.push(`At long last, the <span class="text-yellow-500 font-bold">Sheriff</span> took a shot. With nerves of steel and dramatic background music playing in their head, they fired and eliminated ${sheriffKilledNames}. Not for being suspicious, but for blatantly ignoring the formal dress code. Justice was served. Fashionably late.`);
-} else {
-    storyParts.push(`The <span class="text-yellow-500 font-bold">Sheriff</span>, however, decided to hold their fire. Apparently, the dramatic background music in their head wasn't quite dramatic enough. Aura must be maintained.`);
-}
-
-// Trial Section
-if (guiltyAccusedNames || notGuiltyAccusedNames) {
-    let trialIntro = `Meanwhile, the town held yet another dramatic trial. Accusations flew, defenses crumbled, but in the end, `;
-    let trialOutcomes = [];
-    if (guiltyAccusedNames) {
-        trialOutcomes.push(`${guiltyAccusedNames} was found <span class="text-red-500 font-bold">GUILTY</span> and has been sentenced to manage the cohort's shared Google Drive, a fate from which there is no escape.`);
+    // Doctor Section
+    if (successfullyProtected.length > 0) {
+        storyParts.push(`The <span class="text-blue-400 font-bold">Doctors</span>, fueled by sheer determination, managed to wrap ${successfullyProtectedNames} in an impenetrable layer of bubble wrap, saving them from certain doom.`);
+    } else {
+        storyParts.push(`The <span class="text-blue-400 font-bold">Doctors</span> were nowhere to be found. Rumor has it they spent the previous night gossiping in Hall 1 and ended up sleeping straight through the chaos. Not their finest hour.`);
     }
-    if (notGuiltyAccusedNames) {
-        trialOutcomes.push(`${notGuiltyAccusedNames} were both voted <span class="text-green-500 font-bold">NOT GUILTY</span>. The crowd cheered or sighed. It is hard to tell at this point.`);
-    }
-    storyParts.push(trialIntro + trialOutcomes.join(' '));
-}
 
-// Conclusion
-storyParts.push(`<span class="font-bold text-blue-400">SRSI25 Cohort</span> now faces a new day. The tension is real. The foxes are still missing. And the <span class="text-red-500 font-bold">Mafia</span>? They are just getting started…`);
+    // Mafia Section
+    storyParts.push(`Whispers spread quickly through the halls: the <span class="text-red-500 font-bold">Mafia</span> was spotted lurking in the shadows, each with a suspiciously cheerful fox mascot on their heads 🦊.`);
+
+    if (mafiaKills.length > 0) {
+        storyParts.push(`Their twisted plan? A soy milk chugging contest gone horribly wrong. ${mafiaKilledNames} met their end, not by stealth or poison, but by an overdose of plant-based calcium. Brutal. Ironic. Very on-brand.`);
+    } else {
+        storyParts.push(`However, their plans were foiled. It seems their intended victims were lactose intolerant and wisely avoided the soy milk chugging contest altogether.`);
+    }
+
+    // Sheriff Section
+    if (sheriffKills.length > 0) {
+        storyParts.push(`At long last, the <span class="text-yellow-500 font-bold">Sheriff</span> took a shot. With nerves of steel and dramatic background music playing in their head, they fired and eliminated ${sheriffKilledNames}. Not for being suspicious, but for blatantly ignoring the formal dress code. Justice was served. Fashionably.`);
+    } else {
+        storyParts.push(`The <span class="text-yellow-500 font-bold">Sheriff</span> decided to hold their fire, still waiting for the perfect moment and perhaps a better soundtrack.`);
+    }
+
+    // Trial Section
+    if (guiltyTrials.length > 0 || notGuiltyTrials.length > 0) {
+        let trialIntro = `Meanwhile, the town held yet another dramatic trial. Accusations flew, defenses crumbled, but in the end, `;
+        let trialOutcomes = [];
+        if (guiltyTrials.length > 0) {
+            const verb = guiltyTrials.length > 1 ? 'were' : 'was';
+            trialOutcomes.push(`${guiltyAccusedNames} ${verb} found <span class="text-red-500 font-bold">GUILTY</span> and has been sentenced to reply to all the unread cohort-wide emails.`);
+        }
+        if (notGuiltyTrials.length > 0) {
+            const verb = notGuiltyTrials.length > 1 ? 'were' : 'was';
+            const subject = notGuiltyTrials.length > 1 ? 'both' : '';
+            trialOutcomes.push(`${notGuiltyAccusedNames} ${verb} ${subject} voted <span class="text-green-500 font-bold">NOT GUILTY</span>. The crowd cheered or sighed. It is hard to tell at this point.`);
+        }
+        storyParts.push(trialIntro + trialOutcomes.join(' '));
+    }
+
+    // Conclusion
+    storyParts.push(`<span class="font-bold text-blue-400">SRSI25 Cohort</span> now faces a new day. The tension is real. The foxes are still missing. And the Mafia? They are just getting started...`);
 
     return storyParts.map(part => `<p>${part}</p>`).join('');
 }
+
 
 
  // --- Session Activity Tracking ---
