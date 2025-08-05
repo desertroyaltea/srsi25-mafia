@@ -975,35 +975,44 @@ async function generateNightlyRecapStory(recapData) { // Make async
 
     storyParts.push(`As the first rays of dawn pierced through the darkness, <span class="font-bold text-gray-300">Building 9</span> slowly awoke from a restless night.`);
 
-    if (successfullyProtectedNames.length > 0) {
-        storyParts.push(`The Mafia's poison-laced coffee was mysteriously replaced with a healthy green smoothie. ${successfullyProtectedNames} is now just annoyingly energetic, and the <span class="text-blue-400 font-bold">${getDisplayRoleName('Doctor')}s</span> are taking all the credit..`);
-    } else {
-        storyParts.push(`The <span class="text-blue-400 font-bold">${getDisplayRoleName('Doctor')}s</span> were reportedly busy trying to fix the printer in Building 9 and completely missed the call for help. The printer is still broken, by the way.`);
-    }
+// Doctor Section
+if (successfullyProtected) {
+storyParts.push(`The <span class="text-blue-400 font-bold">Doctors</span>, fueled by sheer determination, managed to wrap ${successfullyProtectedNames} in an impenetrable layer of bubble wrap, saving them from certain doom.`);
+} else {
+storyParts.push(`The <span class="text-blue-400 font-bold">Doctors</span> were nowhere to be found. Rumor has it they spent the previous night gossiping in Hall 1 and ended up sleeping straight through the chaos. Not their finest hour.`);
+}
 
-    if (mafiaKilledNames.length > 0) {
-        storyParts.push(`A formal complaint to SRSI managemrnt was filed against ${mafiaKilledNames} 'excessive mogging,' which apparently resulted in them being buried under a mountain of meetings with management. Their demise was swift, and frankly, a little bit bureaucratic. The <span class="text-red-500 font-bold">${getDisplayRoleName('Mafia')}</span> must be thrilled.`);
-    } else if (successfullyProtectedNames.length > 0) {
-         storyParts.push(`The <span class="text-red-500 font-bold">${getDisplayRoleName('Mafia')}'s</span> deadly aim was ineffective, as their targets managed to escape their grasp. Big L to the Mafia, and we all have the Doctors to thank`);
-    } else {
-        storyParts.push(`Remarkably, the <span class="text-red-500 font-bold">${getDisplayRoleName('Mafia')}</span> seemed to have missed their mark, skill issue perhaps?.`);
-    }
 
-    if (guiltyAccusedNames.length > 0) {
-        storyParts.push(`After a dramatic trial where the primary evidence was 'just trust me, bro,' the town has found ${guiltyAccusedNames} <span class="text-red-500 font-bold">GUILTY</span>!. They have been sentenced to write a 1,000-word apology essay.`);
-    }
+// Mafia Section
+if (mafiaKilledNames) {
+    storyParts.push(`Whispers spread quickly through the halls: the <span class="text-red-500 font-bold">Mafia</span> was spotted lurking in the shadows… accompanied by a suspiciously cheerful fox mascot on their heads 🦊.`);
+    storyParts.push(`Their twisted plan? A soy milk chugging contest gone horribly wrong. ${mafiaKilledNames} met their end, not by stealth or poison, but by an overdose of plant-based calcium. Brutal. Ironic. Very on-brand.`);
+} else {
+    storyParts.push(`The <span class="text-red-500 font-bold">Mafia</span>'s plans fell apart when they spent the entire night arguing about the fox mascot's name. No one was killed, but 'Foxy McFoxface' is now the leading candidate.`);
+}
 
-    if (notGuiltyAccusedNames.length > 0) {
-        storyParts.push(`After reviewing the evidence, the town concluded they had absolutely no idea what was going on and declared ${notGuiltyAccusedNames} <span class="text-green-500 font-bold">NOT GUILTY</span> by default. The search for a scapegoat continues.`);
-    }
+// Sheriff Section
+if (sheriffKilledNames) {
+    storyParts.push(`At long last, the <span class="text-yellow-500 font-bold">Sheriff</span> took a shot. With nerves of steel and dramatic background music playing in their head, they fired and eliminated ${sheriffKilledNames}. Not for being suspicious, but for blatantly ignoring the formal dress code. Justice was served. Fashionably late.`);
+} else {
+    storyParts.push(`The <span class="text-yellow-500 font-bold">Sheriff</span>, however, decided to hold their fire. Apparently, the dramatic background music in their head wasn't quite dramatic enough. Aura must be maintained.`);
+}
 
-    if (sheriffKilledNames.length > 0) {
-        storyParts.push(`Amidst the chaos, the vigilant <span class="text-yellow-500 font-bold">${getDisplayRoleName('Sheriff')}</span> exacted their own brand of justice, eliminating ${sheriffKilledNames}.`);
-    } else {
-        storyParts.push(`The <span class="text-yellow-500 font-bold">${getDisplayRoleName('Sheriff')}'s</span> stood dramatically on a rooftop, waiting for the perfect moment with the perfect background music to take their shot. The moment never came, but they looked incredibly cool.`);
+// Trial Section
+if (guiltyAccusedNames || notGuiltyAccusedNames) {
+    let trialIntro = `Meanwhile, the town held yet another dramatic trial. Accusations flew, defenses crumbled, but in the end, `;
+    let trialOutcomes = [];
+    if (guiltyAccusedNames) {
+        trialOutcomes.push(`${guiltyAccusedNames} was found <span class="text-red-500 font-bold">GUILTY</span> and has been sentenced to manage the cohort's shared Google Drive, a fate from which there is no escape.`);
     }
+    if (notGuiltyAccusedNames) {
+        trialOutcomes.push(`${notGuiltyAccusedNames} were both voted <span class="text-green-500 font-bold">NOT GUILTY</span>. The crowd cheered or sighed. It is hard to tell at this point.`);
+    }
+    storyParts.push(trialIntro + trialOutcomes.join(' '));
+}
 
-    storyParts.push(`<span class="font-bold text-blue-400">SRSI25 Cohort</span> now faces a new day. And the stakes have never been higher...`);
+// Conclusion
+storyParts.push(`<span class="font-bold text-blue-400">SRSI25 Cohort</span> now faces a new day. The tension is real. The foxes are still missing. And the <span class="text-red-500 font-bold">Mafia</span>? They are just getting started…`);
 
     return storyParts.map(part => `<p>${part}</p>`).join('');
 }
