@@ -81,10 +81,10 @@ exports.handler = async (event, context) => {
 
         for (const row of archiveRows) {
             if (parseInt(row[dayCol]) === targetDay) { // Match by day number
-                const actionType = row[actionTypeCol];
+const actionType = String(row[actionTypeCol] || '').trim();
                 const details = row[detailsCol];
                 const playerIDsInvolved = row[playerIDsInvolvedCol];
-                const outcome = row[outcomeCol];
+const outcome = String(row[outcomeCol] || '').trim();
 
                 switch (actionType) {
                     case 'Doctor Protection':

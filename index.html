@@ -1002,7 +1002,7 @@ async function generateNightlyRecapStory(recapData) {
 
     // Sheriff Section
     if (sheriffKills.length > 0) {
-        storyParts.push(`At long last, the <span class="text-yellow-500 font-bold">Sheriff</span> took a shot. With nerves of steel and dramatic background music playing in their head, they fired and eliminated ${sheriffKilledNames}. Not for being suspicious, but for blatantly ignoring the formal dress code. Justice was served. Fashionably.`);
+        storyParts.push(`At long last, the <span class="text-yellow-500 font-bold">Sheriff</span> took a shot. With nerves of steel and dramatic background music playing in their head, they fired and eliminated ${sheriffKilledNames}. Not for being suspicious, but for blatantly ignoring the formal dress code. Justice was served. Fashionably late.`);
     } else {
         storyParts.push(`The <span class="text-yellow-500 font-bold">Sheriff</span> decided to hold their fire, still waiting for the perfect moment and perhaps a better soundtrack.`);
     }
@@ -1024,7 +1024,7 @@ async function generateNightlyRecapStory(recapData) {
     }
 
     // Conclusion
-    storyParts.push(`<span class="font-bold text-blue-400">SRSI25 Cohort</span> now faces a new day. The tension is real. The foxes are still missing. And the Mafia? They are just getting started...`);
+    storyParts.push(`<span class="font-bold text-blue-400">SRSI25 Cohort</span> now faces a new day. The tension is real. The foxes are still missing. And the <span class="text-red-500 font-bold">Mafia</span>? They are just getting started...`);
 
     return storyParts.map(part => `<p>${part}</p>`).join('');
 }
