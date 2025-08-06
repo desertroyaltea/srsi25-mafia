@@ -6,6 +6,7 @@
     <title>SRSI Mafia</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.onesignal.com/sdks/web/v16/OneSignalSDK.page.js" defer></script>
+    <link rel="manifest" href="/manifest.json">
     <style>
         body {
             font-family: "Times New Roman", Times, serif;
@@ -606,24 +607,34 @@ function renderView(viewName, data = {}) {
 // Replace your entire initOneSignal function with this
 // Replace the entire initOneSignal function with this
 function initOneSignal() {
-  if (oneSignalInitialized) {
-    return; // Stop if already initialized
-  }
-  oneSignalInitialized = true; // Set the flag to prevent re-running
+  if (oneSignalInitialized) return;
+  oneSignalInitialized = true;
+
+  const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
+  const isInStandaloneMode = ('standalone' in window.navigator) && (window.navigator.standalone);
+  const promptContainer = document.getElementById('notification-prompt-container');
+  const iosGuideContainer = document.getElementById('ios-guide-container');
 
   window.OneSignalDeferred = window.OneSignalDeferred || [];
   OneSignalDeferred.push(function(OneSignal) {
     OneSignal.init({
       appId: "59e43537-34e1-4250-9953-9dd7e57b0a19",
-      allowSlidedown: true, // This is required to use the prompt
     }).then(function() {
         OneSignal.isPushNotificationsEnabled().then(function(isEnabled) {
-            const promptContainer = document.getElementById('notification-prompt-container');
-            if (promptContainer) {
-                if (isEnabled) {
+            if (isEnabled) {
+                // If notifications are on, hide everything.
+                promptContainer.classList.add('hidden');
+                iosGuideContainer.classList.add('hidden');
+            } else {
+                // If notifications are off...
+                if (isIOS && !isInStandaloneMode) {
+                    // Show the guide if they are on an iPhone but NOT in the home screen app.
                     promptContainer.classList.add('hidden');
+                    iosGuideContainer.classList.remove('hidden');
                 } else {
+                    // Show the button for everyone else, or for iPhones IN the home screen app.
                     promptContainer.classList.remove('hidden');
+                    iosGuideContainer.classList.add('hidden');
                 }
             }
         });
