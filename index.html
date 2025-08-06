@@ -846,6 +846,7 @@ async function initializeGame(userId, username = null) { // NEW: Receive usernam
         hideLoadingOverlay();
 } else {
             renderView('dashboard');
+                initOneSignal(); // <-- ADD THIS LINE
             // CRITICAL FIX: Await the updateDashboardActions function here.
             await updateDashboardActions(state.gameState?.CurrentPhase || 'Day');
 
@@ -1611,7 +1612,6 @@ createButton('btn-view-teammates', 'List Detectives', 'bg-cyan-600 hover:bg-cyan
 window.onload = async () => {
     const savedUserId = localStorage.getItem('mafiaGameUserId');
     let initialLoadTimeout;
-    initOneSignal();
 
     showLoadingOverlay(); 
 
