@@ -1848,7 +1848,7 @@ appRoot.addEventListener('click', async (e) => {
 }
 
     else if (e.target.id === 'btn-enable-notifications') {
-        OneSignal.showSlidedownPrompt().then(() => {
+OneSignal.Slidedown.prompt().then(() => {
             OneSignal.getUserId(async function(userId) {
                 if (userId) {
                     // Send the ID to your server to save it
