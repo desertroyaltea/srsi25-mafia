@@ -602,22 +602,40 @@ function renderView(viewName, data = {}) {
     }
 }
 
-    function initOneSignal() {
+// Replace the entire initOneSignal function with this new version
+function initOneSignal() {
+  console.log("DEBUG: initOneSignal() CALLED."); // Step 1: Confirms the function is running
+
+  const promptContainer = document.getElementById('notification-prompt-container');
+  if (!promptContainer) {
+      console.error("DEBUG: CRITICAL FAILURE - The 'notification-prompt-container' DIV does NOT exist in the HTML when this function ran.");
+      return;
+  }
+  console.log("DEBUG: Step 2 - Found the notification container DIV successfully.", promptContainer);
+
+  // Force the button to be visible for this test
+  promptContainer.classList.remove('hidden');
+  console.log("DEBUG: Step 3 - Forcibly removed the 'hidden' class. The button should now be visible no matter what.");
+
   window.OneSignal = window.OneSignal || [];
   OneSignal.push(function() {
+    console.log("DEBUG: Step 4 - OneSignal.push() has been executed.");
     OneSignal.init({
-      appId: "YOUR_ONESIGNAL_APP_ID", // <-- IMPORTANT: PASTE YOUR APP ID HERE
+      appId: "59e43537-34e1-4250-9953-9dd7e57b0a19",
     });
 
-    // Check if user is already subscribed
     OneSignal.isPushNotificationsEnabled().then(function(isEnabled) {
-        if (!isEnabled) {
-            document.getElementById('notification-prompt-container').classList.remove('hidden');
+        console.log(`DEBUG: Step 5 - OneSignal reports notifications are enabled: ${isEnabled}`);
+        if (isEnabled) {
+            console.log("DEBUG: Hiding the button because notifications are already enabled.");
+            promptContainer.classList.add('hidden');
+        } else {
+            console.log("DEBUG: Keeping the button visible because notifications are NOT enabled.");
+            promptContainer.classList.remove('hidden');
         }
     });
   });
 }
-
 
 // Add this entire new function
 function renderMafiaFacade() {
