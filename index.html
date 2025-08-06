@@ -986,16 +986,14 @@ async function generateNightlyRecapStory(recapData) {
 
     // Doctor Section
     if (successfullyProtected.length > 0) {
-        storyParts.push(`The <span class="text-blue-400 font-bold">Doctors</span>, fueled by sheer determination, managed to wrap ${successfullyProtectedNames} in an impenetrable layer of bubble wrap, saving them from certain doom.`);
+        storyParts.push(`The <span class="text-blue-400 font-bold">Doctors</span>, in a stroke of genius, diagnosed the <span class="text-red-500 font-bold">Mafia</span> with a severe case of "skill issue" and prescribed ${successfullyProtectedNames} a course of "not getting killed." Amazingly, the treatment was 100% effective`);
     } else {
         storyParts.push(`The <span class="text-blue-400 font-bold">Doctors</span> were nowhere to be found. Rumor has it they spent the previous night gossiping in Hall 1 and ended up sleeping straight through the chaos. Not their finest hour.`);
     }
-
+        storyParts.push(`It turns out <span class="text-blue-400 font-bold">Ahmed Alharbi</span> wasn't actually dead, just taking a 'strategic nap.' The <span class="text-blue-400 font-bold">Doctors</span> heroically woke them up with a very loud alarm clock, claiming a successful revival and taking all the credit`);
     // Mafia Section
-    storyParts.push(`Whispers spread quickly through the halls: the <span class="text-red-500 font-bold">Mafia</span> was spotted lurking in the shadows, each with a suspiciously cheerful fox mascot on their heads 🦊.`);
-
     if (mafiaKills.length > 0) {
-        storyParts.push(`Their twisted plan? A soy milk chugging contest gone horribly wrong. ${mafiaKilledNames} met their end, not by stealth or poison, but by an overdose of plant-based calcium. Brutal. Ironic. Very on-brand.`);
+        storyParts.push(`The <span class="text-red-500 font-bold">Mafia</span>, in a brilliant act of culinary evil, ordered a mountain of Albaik for ${mafiaKilledNames} but "forgot" the garlic sauce. The sheer, flavorless tragedy was simply too much for them to handle.`);
     } else {
         storyParts.push(`However, their plans were foiled. It seems their intended victims were lactose intolerant and wisely avoided the soy milk chugging contest altogether.`);
     }
@@ -1004,7 +1002,7 @@ async function generateNightlyRecapStory(recapData) {
     if (sheriffKills.length > 0) {
         storyParts.push(`At long last, the <span class="text-yellow-500 font-bold">Sheriff</span> took a shot. With nerves of steel and dramatic background music playing in their head, they fired and eliminated ${sheriffKilledNames}. Not for being suspicious, but for blatantly ignoring the formal dress code. Justice was served. Fashionably late.`);
     } else {
-        storyParts.push(`The <span class="text-yellow-500 font-bold">Sheriff</span> decided to hold their fire, still waiting for the perfect moment and perhaps a better soundtrack.`);
+        storyParts.push(`After a long and dramatic internal monologue, the <span class="text-yellow-500 font-bold">Sheriff</span> decided the city's lighting just wasn't cinematic enough for the occasion. They'll wait for a night with better ambiance`);
     }
 
     // Trial Section
