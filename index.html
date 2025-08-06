@@ -605,6 +605,7 @@ function renderView(viewName, data = {}) {
 
 // This is the correct initOneSignal function
 // Replace your entire initOneSignal function with this
+// Replace the entire initOneSignal function with this
 function initOneSignal() {
   if (oneSignalInitialized) {
     return; // Stop if already initialized
@@ -618,7 +619,8 @@ function initOneSignal() {
       allowSlidedown: true,
     });
 
-    OneSignal.isPushNotificationsEnabled().then(function(isEnabled) {
+    // CORRECTED SYNTAX: Use a callback function instead of .then()
+    OneSignal.isPushNotificationsEnabled(function(isEnabled) {
         const promptContainer = document.getElementById('notification-prompt-container');
         if (promptContainer && isEnabled) {
             promptContainer.classList.add('hidden');
@@ -1839,8 +1841,13 @@ appRoot.addEventListener('click', async (e) => {
 // Replace the entire 'btn-enable-notifications' block with this
  else if (e.target.id === 'btn-enable-notifications') {
     OneSignal.push(function() {
-        OneSignal.Slidedown.prompt().then(() => {
-            OneSignal.getUserId(async function(userId) {
+        // CORRECTED SYNTAX: The prompt doesn't need a .then()
+        OneSignal.Slidedown.prompt();
+
+        // Listen for when the user accepts the prompt
+        OneSignal.on('subscriptionChange', async function (isSubscribed) {
+            if (isSubscribed) {
+                const userId = await OneSignal.getUserId();
                 if (userId) {
                     // Send the ID to your server to save it
                     await fetch('/.netlify/functions/save-notification-id', {
@@ -1851,7 +1858,7 @@ appRoot.addEventListener('click', async (e) => {
                     document.getElementById('notification-prompt-container').classList.add('hidden');
                     showMessage("Notifications enabled!");
                 }
-            });
+            }
         });
     });
 }
