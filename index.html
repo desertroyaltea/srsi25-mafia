@@ -603,40 +603,28 @@ function renderView(viewName, data = {}) {
 }
 
 // Replace the entire initOneSignal function with this new version
+// Replace the entire initOneSignal function with this
 function initOneSignal() {
-  console.log("DEBUG: initOneSignal() CALLED."); // Step 1: Confirms the function is running
-
-  const promptContainer = document.getElementById('notification-prompt-container');
-  if (!promptContainer) {
-      console.error("DEBUG: CRITICAL FAILURE - The 'notification-prompt-container' DIV does NOT exist in the HTML when this function ran.");
-      return;
-  }
-  console.log("DEBUG: Step 2 - Found the notification container DIV successfully.", promptContainer);
-
-  // Force the button to be visible for this test
-  promptContainer.classList.remove('hidden');
-  console.log("DEBUG: Step 3 - Forcibly removed the 'hidden' class. The button should now be visible no matter what.");
-
   window.OneSignal = window.OneSignal || [];
   OneSignal.push(function() {
-    console.log("DEBUG: Step 4 - OneSignal.push() has been executed.");
     OneSignal.init({
       appId: "59e43537-34e1-4250-9953-9dd7e57b0a19",
+      allowSlidedown: true, // This line enables the slidedown prompt
     });
 
+    // Check if user is already subscribed and hide the button if they are
     OneSignal.isPushNotificationsEnabled().then(function(isEnabled) {
-        console.log(`DEBUG: Step 5 - OneSignal reports notifications are enabled: ${isEnabled}`);
-        if (isEnabled) {
-            console.log("DEBUG: Hiding the button because notifications are already enabled.");
-            promptContainer.classList.add('hidden');
-        } else {
-            console.log("DEBUG: Keeping the button visible because notifications are NOT enabled.");
-            promptContainer.classList.remove('hidden');
+        const promptContainer = document.getElementById('notification-prompt-container');
+        if (promptContainer) {
+            if (isEnabled) {
+                promptContainer.classList.add('hidden');
+            } else {
+                promptContainer.classList.remove('hidden');
+            }
         }
     });
   });
 }
-
 // Add this entire new function
 function renderMafiaFacade() {
     const playerActions = document.getElementById('player-dashboard-actions');
