@@ -603,10 +603,26 @@ function renderView(viewName, data = {}) {
     }
 }
 
+function waitForOneSignal() {
+    return new Promise((resolve) => {
+        if (window.OneSignal && window.OneSignal.isPushNotificationsEnabled) {
+            resolve();
+        } else {
+            const checkInterval = setInterval(() => {
+                if (window.OneSignal && window.OneSignal.isPushNotificationsEnabled) {
+                    clearInterval(checkInterval);
+                    resolve();
+                }
+            }, 100);
+        }
+    });
+}
+
 // Add this new function to your script
-function updateNotificationUI() {
-  OneSignalDeferred.push(function(OneSignal) {
-    OneSignal.isPushNotificationsEnabled().then(function(isEnabled) {
+async function updateNotificationUI() {
+    try {
+        await waitForOneSignal();
+        const isEnabled = await window.OneSignal.isPushNotificationsEnabled();
         const promptContainer = document.getElementById('notification-prompt-container');
         if (promptContainer) {
             if (isEnabled) {
@@ -615,24 +631,32 @@ function updateNotificationUI() {
                 promptContainer.classList.remove('hidden');
             }
         }
-    });
-  });
+    } catch (error) {
+        console.error('Error updating notification UI:', error);
+    }
 }
 
 // Replace your old initOneSignal function with this one
 function initOneSignal() {
-  if (oneSignalInitialized) return;
-  oneSignalInitialized = true;
+    if (oneSignalInitialized) return;
+    oneSignalInitialized = true;
 
-  window.OneSignalDeferred = window.OneSignalDeferred || [];
-  OneSignalDeferred.push(function(OneSignal) {
-    OneSignal.init({
-      appId: "59e43537-34e1-4250-9953-9dd7e57b0a19",
-    }).then(function() {
-        // After init is complete, THEN we update the UI
-        updateNotificationUI();
+    window.OneSignalDeferred = window.OneSignalDeferred || [];
+    OneSignalDeferred.push(function(OneSignal) {
+        OneSignal.init({
+            appId: "59e43537-34e1-4250-9953-9dd7e57b0a19",
+            safari_web_id: "web.onesignal.auto.xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx", // Add this if you need Safari support
+            notifyButton: {
+                enable: false // Disable the default notify button since you have a custom one
+            }
+        }).then(function() {
+            console.log('OneSignal initialized successfully');
+            // After init is complete, update the UI
+            updateNotificationUI();
+        }).catch(function(error) {
+            console.error('OneSignal initialization failed:', error);
+        });
     });
-  });
 }
 // Add this entire new function
 function renderMafiaFacade() {
@@ -1845,24 +1869,46 @@ appRoot.addEventListener('click', async (e) => {
 }
 
 // Replace the 'btn-enable-notifications' block with this
- else if (e.target.id === 'btn-enable-notifications') {
-    OneSignalDeferred.push(function(OneSignal) {
-        OneSignal.showSlidedownPrompt().then(function() {
-            // After the prompt is shown, we check the subscription status again
-            updateNotificationUI();
-            // And we get the user ID to save it
-            OneSignal.getUserId().then(async function(userId) {
-                if (userId) {
-                    await fetch('/.netlify/functions/save-notification-id', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ playerId: state.currentUserId, oneSignalId: userId }),
-                    });
-                    showMessage("Notifications enabled!");
+else if (e.target.id === 'btn-enable-notifications') {
+    try {
+        await waitForOneSignal();
+        const result = await window.OneSignal.showSlidedownPrompt();
+        console.log('Slidedown prompt result:', result);
+        
+        // Wait a moment for the user to respond to the prompt
+        setTimeout(async () => {
+            try {
+                const isEnabled = await window.OneSignal.isPushNotificationsEnabled();
+                if (isEnabled) {
+                    const userId = await window.OneSignal.getUserId();
+                    if (userId) {
+                        const response = await fetch('/.netlify/functions/save-notification-id', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ 
+                                playerId: state.currentUserId, 
+                                oneSignalId: userId 
+                            }),
+                        });
+                        
+                        if (response.ok) {
+                            showMessage("Notifications enabled successfully!");
+                        } else {
+                            console.error('Failed to save notification ID:', await response.text());
+                            showMessage("Notifications enabled, but failed to save to server.");
+                        }
+                    }
                 }
-            });
-        });
-    });
+                updateNotificationUI();
+            } catch (error) {
+                console.error('Error after notification prompt:', error);
+            }
+        }, 2000); // Wait 2 seconds for user response
+        
+    } catch (error) {
+        console.error('Error showing notification prompt:', error);
+        showMessage("Failed to show notification prompt: " + error.message);
+    }
 }
 
 
