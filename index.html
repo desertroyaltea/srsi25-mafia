@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>SRSI Mafia</title>
     <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.onesignal.com/sdks/web/v16/OneSignalSDK.page.js" defer></script>
     <style>
         body {
             font-family: "Times New Roman", Times, serif;
@@ -232,6 +233,11 @@ dashboard: () => `
          <div class="bg-gray-900 p-5 rounded-lg mt-0">
              <h2 class="text-2xl font-semibold mb-0">Dashboard</h2>
              <p class="text-gray-400 mb-0">Select an action to proceed.</p>
+
+<!-- Add this right after the Dashboard h2 and p tags -->
+<div id="notification-prompt-container" class="hidden bg-blue-900 p-4 rounded-lg mb-4 border border-blue-700">
+    <button id="btn-enable-notifications" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg w-full">Enable Notifications</button>
+</div>
 
              <!-- CURRENT MISSION SECTION -->
              <div class="bg-gray-800 p-4 rounded-lg mb-0 mt-0 border border-gray-700">
@@ -589,6 +595,22 @@ investigationResult: ({ targetName, isMafiaResult }) => `
             appRoot.innerHTML = templates.gameLayout(templates[viewName](data));
         }
     }
+
+    function initOneSignal() {
+  window.OneSignal = window.OneSignal || [];
+  OneSignal.push(function() {
+    OneSignal.init({
+      appId: "YOUR_ONESIGNAL_APP_ID", // <-- IMPORTANT: PASTE YOUR APP ID HERE
+    });
+
+    // Check if user is already subscribed
+    OneSignal.isPushNotificationsEnabled().then(function(isEnabled) {
+        if (!isEnabled) {
+            document.getElementById('notification-prompt-container').classList.remove('hidden');
+        }
+    });
+  });
+}
 
 
 // Add this entire new function
@@ -1589,6 +1611,7 @@ createButton('btn-view-teammates', 'List Detectives', 'bg-cyan-600 hover:bg-cyan
 window.onload = async () => {
     const savedUserId = localStorage.getItem('mafiaGameUserId');
     let initialLoadTimeout;
+    initOneSignal();
 
     showLoadingOverlay(); 
 
@@ -1800,6 +1823,25 @@ appRoot.addEventListener('click', async (e) => {
     const targets = getDisplayableTargets();
     renderView('accusationForm', { targets });
 }
+
+    else if (e.target.id === 'btn-enable-notifications') {
+        OneSignal.showSlidedownPrompt().then(() => {
+            OneSignal.getUserId(async function(userId) {
+                if (userId) {
+                    // Send the ID to your server to save it
+                    await fetch('/.netlify/functions/save-notification-id', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ playerId: state.currentUserId, oneSignalId: userId }),
+                    });
+                    document.getElementById('notification-prompt-container').classList.add('hidden');
+                    showMessage("Notifications enabled!");
+                }
+            });
+        });
+    }
+
+
          else if (e.target.id === 'start-recording') {
             await startRecording();
         } else if (e.target.id === 'stop-recording') {
@@ -1934,6 +1976,7 @@ appRoot.addEventListener('click', async (e) => {
                 showMessage('You have been logged out.');
                 hideLoadingOverlay();
             }
+            
     });
 </script>
 </body>
