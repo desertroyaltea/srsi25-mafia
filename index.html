@@ -603,7 +603,23 @@ function renderView(viewName, data = {}) {
     }
 }
 
-// Replace the entire initOneSignal function with this
+// Add this new function to your script
+function updateNotificationUI() {
+  OneSignalDeferred.push(function(OneSignal) {
+    OneSignal.isPushNotificationsEnabled().then(function(isEnabled) {
+        const promptContainer = document.getElementById('notification-prompt-container');
+        if (promptContainer) {
+            if (isEnabled) {
+                promptContainer.classList.add('hidden');
+            } else {
+                promptContainer.classList.remove('hidden');
+            }
+        }
+    });
+  });
+}
+
+// Replace your old initOneSignal function with this one
 function initOneSignal() {
   if (oneSignalInitialized) return;
   oneSignalInitialized = true;
@@ -613,16 +629,8 @@ function initOneSignal() {
     OneSignal.init({
       appId: "59e43537-34e1-4250-9953-9dd7e57b0a19",
     }).then(function() {
-        OneSignal.isPushNotificationsEnabled().then(function(isEnabled) {
-            const promptContainer = document.getElementById('notification-prompt-container');
-            if (promptContainer) {
-                if (isEnabled) {
-                    promptContainer.classList.add('hidden');
-                } else {
-                    promptContainer.classList.remove('hidden');
-                }
-            }
-        });
+        // After init is complete, THEN we update the UI
+        updateNotificationUI();
     });
   });
 }
@@ -1836,10 +1844,13 @@ appRoot.addEventListener('click', async (e) => {
     renderView('accusationForm', { targets });
 }
 
-// Replace the entire 'btn-enable-notifications' block with this
-     else if (e.target.id === 'btn-enable-notifications') {
+// Replace the 'btn-enable-notifications' block with this
+ else if (e.target.id === 'btn-enable-notifications') {
     OneSignalDeferred.push(function(OneSignal) {
         OneSignal.showSlidedownPrompt().then(function() {
+            // After the prompt is shown, we check the subscription status again
+            updateNotificationUI();
+            // And we get the user ID to save it
             OneSignal.getUserId().then(async function(userId) {
                 if (userId) {
                     await fetch('/.netlify/functions/save-notification-id', {
@@ -1847,7 +1858,6 @@ appRoot.addEventListener('click', async (e) => {
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({ playerId: state.currentUserId, oneSignalId: userId }),
                     });
-                    document.getElementById('notification-prompt-container').classList.add('hidden');
                     showMessage("Notifications enabled!");
                 }
             });
