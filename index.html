@@ -613,19 +613,18 @@ function initOneSignal() {
   oneSignalInitialized = true; // Set the flag
 
   window.OneSignal = window.OneSignal || [];
-  OneSignal.push(function() {
-    OneSignal.init({
+  // The 'OneSignal' object inside this function is the real, fully loaded one
+  OneSignal.push(async function(OneSignal) {
+    await OneSignal.init({
       appId: "59e43537-34e1-4250-9953-9dd7e57b0a19",
       allowSlidedown: true,
     });
 
-    // CORRECTED SYNTAX: Use a callback function instead of .then()
-    OneSignal.isPushNotificationsEnabled(function(isEnabled) {
-        const promptContainer = document.getElementById('notification-prompt-container');
-        if (promptContainer && isEnabled) {
-            promptContainer.classList.add('hidden');
-        }
-    });
+    const isEnabled = await OneSignal.isPushNotificationsEnabled();
+    const promptContainer = document.getElementById('notification-prompt-container');
+    if (promptContainer && isEnabled) {
+        promptContainer.classList.add('hidden');
+    }
   });
 }
 // Add this entire new function
@@ -1839,27 +1838,24 @@ appRoot.addEventListener('click', async (e) => {
 }
 
 // Replace the entire 'btn-enable-notifications' block with this
- else if (e.target.id === 'btn-enable-notifications') {
-    OneSignal.push(function() {
-        // CORRECTED SYNTAX: The prompt doesn't need a .then()
-        OneSignal.Slidedown.prompt();
-
-        // Listen for when the user accepts the prompt
-        OneSignal.on('subscriptionChange', async function (isSubscribed) {
-            if (isSubscribed) {
-                const userId = await OneSignal.getUserId();
-                if (userId) {
-                    // Send the ID to your server to save it
-                    await fetch('/.netlify/functions/save-notification-id', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ playerId: state.currentUserId, oneSignalId: userId }),
-                    });
-                    document.getElementById('notification-prompt-container').classList.add('hidden');
-                    showMessage("Notifications enabled!");
-                }
+     else if (e.target.id === 'btn-enable-notifications') {
+    // We push our commands to OneSignal to ensure they run after initialization
+    OneSignal.push(async function(OneSignal) {
+        await OneSignal.Slidedown.prompt();
+        // After the prompt, we check if the user is subscribed
+        const isSubscribed = await OneSignal.isPushNotificationsEnabled();
+        if (isSubscribed) {
+            const userId = await OneSignal.getUserId();
+            if (userId) {
+                await fetch('/.netlify/functions/save-notification-id', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ playerId: state.currentUserId, oneSignalId: userId }),
+                });
+                document.getElementById('notification-prompt-container').classList.add('hidden');
+                showMessage("Notifications enabled!");
             }
-        });
+        }
     });
 }
 
