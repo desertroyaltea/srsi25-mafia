@@ -588,13 +588,19 @@ investigationResult: ({ targetName, isMafiaResult }) => `
 
     
 
-    function renderView(viewName, data = {}) {
-        if (viewName === 'login') {
-            appRoot.innerHTML = templates.login();
-        } else {
-            appRoot.innerHTML = templates.gameLayout(templates[viewName](data));
-        }
+// Replace the entire renderView function with this
+function renderView(viewName, data = {}) {
+    if (viewName === 'login') {
+        appRoot.innerHTML = templates.login();
+    } else {
+        appRoot.innerHTML = templates.gameLayout(templates[viewName](data));
     }
+
+    // NEW: If we just rendered the dashboard, initialize notifications
+    if (viewName === 'dashboard') {
+        initOneSignal();
+    }
+}
 
     function initOneSignal() {
   window.OneSignal = window.OneSignal || [];
@@ -846,7 +852,6 @@ async function initializeGame(userId, username = null) { // NEW: Receive usernam
         hideLoadingOverlay();
 } else {
             renderView('dashboard');
-                initOneSignal(); // <-- ADD THIS LINE
             // CRITICAL FIX: Await the updateDashboardActions function here.
             await updateDashboardActions(state.gameState?.CurrentPhase || 'Day');
 
