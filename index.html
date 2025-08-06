@@ -645,10 +645,9 @@ function initOneSignal() {
     OneSignalDeferred.push(function(OneSignal) {
         OneSignal.init({
             appId: "59e43537-34e1-4250-9953-9dd7e57b0a19",
-            safari_web_id: "web.onesignal.auto.xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx", // Add this if you need Safari support
-            notifyButton: {
-                enable: false // Disable the default notify button since you have a custom one
-            }
+            allowLocalhostAsSecureOrigin: true, // Add this for local development
+            serviceWorkerParam: { scope: '/' },
+            serviceWorkerPath: 'OneSignalSDKWorker.js'
         }).then(function() {
             console.log('OneSignal initialized successfully');
             // After init is complete, update the UI
