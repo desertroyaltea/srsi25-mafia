@@ -616,21 +616,28 @@ function waitForOneSignal() {
 
 
 async function syncOneSignalId() {
-    // We push to the queue to ensure the SDK is ready.
+    console.log("DEBUG: syncOneSignalId() function has been called.");
+
     OneSignalDeferred.push(async function(OneSignal) {
         const isSubscribed = await OneSignal.isPushNotificationsEnabled();
+        console.log(`DEBUG: Inside sync function, isSubscribed is: ${isSubscribed}`);
+
         if (isSubscribed) {
             const oneSignalId = await OneSignal.getUserId();
             const gameId = state.currentUserId;
 
-            // Only proceed if we have BOTH the OneSignal ID and the Game ID.
+            // This is the most important log. It will tell us what the IDs are.
+            console.log(`DEBUG: Preparing to sync. Game ID (state.currentUserId) is: '${gameId}', OneSignal ID is: '${oneSignalId}'`);
+
             if (oneSignalId && gameId) {
-                console.log(`Syncing... Game ID: ${gameId}, OneSignal ID: ${oneSignalId}`);
+                console.log("DEBUG: SUCCESS! Both IDs are present. Calling the Netlify function now.");
                 await fetch('/.netlify/functions/save-notification-id', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ playerId: gameId, oneSignalId: oneSignalId }),
                 });
+            } else {
+                console.log("DEBUG: FAILED! Sync aborted because one or both IDs are missing.");
             }
         }
     });
