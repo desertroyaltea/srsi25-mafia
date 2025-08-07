@@ -593,27 +593,41 @@ investigationResult: ({ targetName, isMafiaResult }) => `
 function runOneSignalSetup() {
     window.OneSignalDeferred = window.OneSignalDeferred || [];
     window.OneSignalDeferred.push(function(OneSignal) {
-        // This is the block you asked about
         OneSignal.init({
             appId: "59e43537-34e1-4250-9953-9dd7e57b0a19",
             autoResubscribe: true,
-            // Ensure this filename matches the file you copied EXACTLY
+            // This filename must exactly match the file you copied
             serviceWorkerPath: "OneSignalSDKWorker.js"
         }).then(function() {
-            // This part runs after init is successful
+            // This code runs after OneSignal is successfully initialized.
             OneSignal.isPushNotificationsEnabled().then(function(isEnabled) {
                 if (isEnabled) {
+                    // For users who are already subscribed when the page loads
                     const gameId = state.currentUserId;
                     if (gameId) {
                         OneSignal.setExternalUserId(gameId);
                     }
                 } else {
+                    // For users who are NOT yet subscribed.
+                    // We set up a listener that will fire when they do subscribe.
                     OneSignal.on('subscriptionChange', function(isSubscribed) {
                         if (isSubscribed) {
                             const gameId = state.currentUserId;
+                            // First, set the External User ID for future targeting
                             if (gameId) {
                                 OneSignal.setExternalUserId(gameId);
                             }
+
+                            // Then, send the new ID to your Netlify function to save in the sheet
+                            OneSignal.getUserId().then(function(userId) {
+                                if (gameId && userId) {
+                                    fetch('/.netlify/functions/save-notification-id', {
+                                        method: 'POST',
+                                        headers: { 'Content-Type': 'application/json' },
+                                        body: JSON.stringify({ playerId: gameId, oneSignalId: userId })
+                                    });
+                                }
+                            });
                         }
                     });
                 }
