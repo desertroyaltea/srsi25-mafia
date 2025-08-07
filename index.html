@@ -1628,7 +1628,7 @@ createButton('btn-view-teammates', 'List Detectives', 'bg-cyan-600 hover:bg-cyan
 window.onload = async () => {
     const savedUserId = localStorage.getItem('mafiaGameUserId');
     let initialLoadTimeout;
-initOneSignal();
+
     showLoadingOverlay(); 
 
     initialLoadTimeout = setTimeout(() => {
@@ -1650,11 +1650,13 @@ initOneSignal();
         } else {
             renderView('login');
         }
-        updateNotificationUI();
     } catch (error) {
         console.error("Critical error on page load:", error);
         renderView('login');
-        document.getElementById('login-error').textContent = "An unexpected error occurred. Please try again.";
+        const loginError = document.getElementById('login-error');
+        if(loginError) {
+            loginError.textContent = "An unexpected error occurred. Please try again.";
+        }
     } finally {
         clearTimeout(initialLoadTimeout);
         hideLoadingOverlay(); 
