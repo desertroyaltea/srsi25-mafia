@@ -615,47 +615,20 @@ function waitForOneSignal() {
 
 
 function syncOneSignalId() {
-    // This helper will show a new message every 2.5 seconds
-    let messageDelay = 0;
-    const showDebugMessage = (msg) => {
-        setTimeout(() => showMessage(msg), messageDelay);
-        messageDelay += 2500; // Increase delay for the next message
-    };
-
     window.OneSignalDeferred.push(async function(OneSignal) {
         try {
-            showDebugMessage('Debug: Sync process started...');
-
             const isSubscribed = await OneSignal.isPushNotificationsEnabled();
-            showDebugMessage(`Is user subscribed? -> ${isSubscribed}`);
 
             if (isSubscribed) {
-                const oneSignalId = await OneSignal.getUserId();
-                showDebugMessage(`OneSignal ID: ${oneSignalId || 'ERROR: Not Found'}`);
-
+                // This is the most reliable moment to tag the user.
                 const gameId = state.currentUserId;
-
-                if (oneSignalId && gameId) {
-                    showDebugMessage('Attempting to call Netlify function...');
-                    const response = await fetch('/.netlify/functions/save-notification-id', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ playerId: gameId, oneSignalId: oneSignalId }),
-                    });
-
-                    if (response.ok) {
-                        showDebugMessage('SUCCESS: Netlify function called!');
-                    } else {
-                        showDebugMessage(`ERROR: Netlify function failed! Status: ${response.status}`);
-                    }
-                } else {
-                     showDebugMessage('SKIPPED: Missing required ID.');
+                if (gameId) {
+                    await OneSignal.sendTag("player_id", gameId);
                 }
-            } else {
-                showDebugMessage('SKIPPED: User is not subscribed.');
             }
         } catch (e) {
-            showDebugMessage(`CRITICAL ERROR: ${e.message}`);
+            // This catch block will handle any errors from the above calls.
+            console.error("Sync and Tag Error:", e);
         }
     });
 }
@@ -691,13 +664,8 @@ function initOneSignal() {
 OneSignal.push(function() {
     OneSignal.on('subscriptionChange', async function(isSubscribed) {
         if (isSubscribed) {
-            // First, get the OneSignal User ID (player_id in their system)
             const userId = await OneSignal.getUserId();
-            // This is the new, important line:
-            await OneSignal.sendTag("player_id", state.currentUserId);
-
-            // The original logic to save to the sheet can now be considered a backup,
-            // or removed entirely once you confirm tags are working.
+            // The sendTag line has been REMOVED from here.
             if (userId && state.currentUserId) {
                 await fetch('/.netlify/functions/save-notification-id', {
                     method: 'POST',
