@@ -117,7 +117,6 @@
 
 <script type="module">
 const state = { allPlayers: [], currentUserId: null, currentUser: null, isCurrentUserAdmin: false, gameState: null, pendingAccusations: [], currentTrial: null, currentMission: null, nightlyRecap: null };    
-let oneSignalInitPromise;
 const appRoot = document.getElementById('app-root');
     const messageBox = document.getElementById('message-box');
     const loadingOverlay = document.getElementById('loading-overlay');
@@ -615,142 +614,71 @@ function waitForOneSignal() {
 }
 
 
-async function syncOneSignalId() {
-    // This helper will show a new message every 2.5 seconds
-    let messageDelay = 0;
-    const showDebugMessage = (msg) => {
-        setTimeout(() => showMessage(msg), messageDelay);
-        messageDelay += 2500; // Increase delay for the next message
-    };
+function syncOneSignalId() {
+    window.OneSignalDeferred.push(async function(OneSignal) {
+        try {
+            const isSubscribed = await OneSignal.isPushNotificationsEnabled();
+            if (isSubscribed) {
+                const oneSignalId = await OneSignal.getUserId();
+                const gameId = state.currentUserId;
 
-    showDebugMessage('Debug Mode: Sync process started...');
-
-    try {
-        // Wait for the SDK to be fully initialized
-        const OneSignal = await oneSignalInitPromise;
-
-        // Check if initialization was successful
-        if (!OneSignal) {
-            showDebugMessage('ERROR: OneSignal SDK failed to initialize.');
-            return;
-        }
-
-        showDebugMessage('OneSignal is Ready. Checking status...');
-        
-        const isSubscribed = await OneSignal.isPushNotificationsEnabled();
-        showDebugMessage(`Is user subscribed? -> ${isSubscribed}`);
-
-        if (isSubscribed) {
-            const oneSignalId = await OneSignal.getUserId();
-            showDebugMessage(`OneSignal ID: ${oneSignalId || 'ERROR: Not Found'}`);
-
-            const gameId = state.currentUserId;
-
-            if (oneSignalId && gameId) {
-                showDebugMessage('Attempting to call Netlify function...');
-                // Actually call the function
-                const response = await fetch('/.netlify/functions/save-notification-id', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ playerId: gameId, oneSignalId: oneSignalId }),
-                });
-
-                if (response.ok) {
-                    showDebugMessage('SUCCESS: Netlify function called!');
-                } else {
-                    showDebugMessage(`ERROR: Netlify function failed! Status: ${response.status}`);
+                if (oneSignalId && gameId) {
+                    await fetch('/.netlify/functions/save-notification-id', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ playerId: gameId, oneSignalId: oneSignalId }),
+                    });
+                    // You can optionally show a success message here if you want
+                    // showMessage("Sync Complete."); 
                 }
-            } else {
-                 showDebugMessage('SKIPPED: Missing required ID.');
             }
-        } else {
-            showDebugMessage('SKIPPED: User is not subscribed.');
+        } catch (e) {
+            // You can optionally show an error message here
+            // showMessage(`Sync Error: ${e.message}`);
         }
-    } catch (e) {
-        showDebugMessage(`CRITICAL ERROR: ${e.message}`);
-    }
+    });
 }
 
 // Replace your entire initOneSignal function with this
 function initOneSignal() {
     window.OneSignalDeferred = window.OneSignalDeferred || [];
-    oneSignalInitPromise = new Promise((resolve, reject) => {
-        // Set a 15-second timeout for the initialization process
-        const timeout = setTimeout(() => {
-            reject(new Error('OneSignal Init Timeout'));
-        }, 15000);
-
-        OneSignalDeferred.push(function(OneSignal) {
-            showMessage('Debug: Pushing init command...');
-            OneSignal.init({
-                appId: "59e43537-34e1-4250-9953-9dd7e57b0a19",
-                allowLocalhostAsSecureOrigin: true,
-                autoRegister: false,
-                autoResubscribe: true,
-                notifyButton: {
-                    enable: false
-                },
-                serviceWorkerPath: '/onesignalsdkworker.js',
-                serviceWorkerUpdaterPath: '/onesignalsdkupdaterworker.js',
-                promptOptions: {
-                    slidedown: {
-                        enabled: false
-                    }
-                }
-            })
-            .then(() => {
-                clearTimeout(timeout); // Success, so clear the timeout
-                showMessage('Debug: OneSignal.init() completed.');
-                resolve(window.OneSignal); // Resolve with the global object
-            })
-            .catch((error) => {
-                clearTimeout(timeout); // Failed, so clear the timeout
-                showMessage(`Debug: OneSignal.init() FAILED: ${error}`);
-                reject(error);
-            });
-        });
-    });
-
-    // This will display the final error on screen if one occurs
-    oneSignalInitPromise.catch(error => {
-        showMessage(`Debug: FINAL ERROR: ${error.message}`);
-    });
-}
-
-async function setupOneSignalListeners() {
-    try {
-        // Wait for the init promise to complete successfully
-        await oneSignalInitPromise;
-        showMessage('Debug: Init complete. Setting up listeners...');
-
-        // Now, it should be safe to attach listeners to the global object
-        window.OneSignal.on('subscriptionChange', async function(isSubscribed) {
-            console.log("OneSignal subscription changed:", isSubscribed);
-            updateNotificationUI();
-            if (isSubscribed) {
-                const userId = await window.OneSignal.getUserId();
-                if (userId && state.currentUserId) {
-                    await fetch('/.netlify/functions/save-notification-id', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ playerId: state.currentUserId, oneSignalId: userId }),
-                    });
+    window.OneSignalDeferred.push(function(OneSignal) {
+        OneSignal.init({
+            appId: "59e43537-34e1-4250-9953-9dd7e57b0a19",
+            allowLocalhostAsSecureOrigin: true,
+            autoRegister: false,
+            autoResubscribe: true,
+            notifyButton: {
+                enable: false
+            },
+            serviceWorkerPath: '/onesignalsdkworker.js',
+            serviceWorkerUpdaterPath: '/onesignalsdkupdaterworker.js',
+            promptOptions: {
+                slidedown: {
+                    enabled: false
                 }
             }
         });
 
-        // The other checks can also be run here
-        const isSupported = await window.OneSignal.isPushNotificationsSupported();
-        console.log("Push notifications supported:", isSupported);
-        
-        updateNotificationUI();
-        
-        showMessage('Debug: Listeners set up successfully.');
-
-    } catch (error) {
-        showMessage(`Debug: Failed to set up listeners: ${error.message}`);
-    }
+        // This is the classic, most robust pattern for adding event listeners.
+        OneSignal.push(function() {
+            OneSignal.on('subscriptionChange', async function(isSubscribed) {
+                if (isSubscribed) {
+                    const userId = await OneSignal.getUserId();
+                    if (userId && state.currentUserId) {
+                        await fetch('/.netlify/functions/save-notification-id', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ playerId: state.currentUserId, oneSignalId: userId }),
+                        });
+                    }
+                }
+            });
+        });
+    });
 }
+
+
 
 
 // Add this new function
@@ -1766,9 +1694,6 @@ createButton('btn-view-teammates', 'List Detectives', 'bg-cyan-600 hover:bg-cyan
 window.onload = async () => {
     // Start the initialization process, but don't wait for it here
     initOneSignal();
-    // Separately, start the listener setup process. It will wait internally.
-    setupOneSignalListeners();
-
     // The rest of your login logic remains the same
     const savedUserId = localStorage.getItem('mafiaGameUserId');
     let initialLoadTimeout;
