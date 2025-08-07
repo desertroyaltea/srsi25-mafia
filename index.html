@@ -614,25 +614,23 @@ function waitForOneSignal() {
     });
 }
 
-// Add this new function to your script
-async function updateNotificationUI() {
-    try {
-        await waitForOneSignal();
-        const isEnabled = await window.OneSignal.isPushNotificationsEnabled();
-        const promptContainer = document.getElementById('notification-prompt-container');
-        if (promptContainer) {
-            if (isEnabled) {
-                promptContainer.classList.add('hidden');
-            } else {
-                promptContainer.classList.remove('hidden');
+
+
+// Replace your old initOneSignal function with this one
+function updateNotificationUI() {
+    OneSignalDeferred.push(function(OneSignal) {
+        OneSignal.isPushNotificationsEnabled().then(function(isEnabled) {
+            const promptContainer = document.getElementById('notification-prompt-container');
+            if (promptContainer) {
+                if (isEnabled) {
+                    promptContainer.classList.add('hidden');
+                } else {
+                    promptContainer.classList.remove('hidden');
+                }
             }
-        }
-    } catch (error) {
-        console.error('Error updating notification UI:', error);
-    }
+        });
+    });
 }
-
-
 // Add this entire new function
 function renderMafiaFacade() {
     const playerActions = document.getElementById('player-dashboard-actions');
