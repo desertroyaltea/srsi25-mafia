@@ -3,6 +3,7 @@
 const { google } = require('googleapis');
 const { JWT } = require('google-auth-library');
 
+// This helper function remains the same
 async function getSheetsService() {
     const credentials = JSON.parse(process.env.GOOGLE_SERVICE_ACCOUNT_CREDENTIALS);
     const auth = new JWT({
@@ -38,47 +39,25 @@ exports.handler = async (event, context) => {
 
     try {
         const sheets = await getSheetsService();
-        const playersResponse = await sheets.spreadsheets.values.get({
+        
+        // We will append a new row to the 'OneSignal' sheet.
+        // The data is an array within an array. The inner array represents the row.
+        // We use 'null' as a placeholder to skip column B.
+        const values = [[playerId, null, oneSignalId]];
+
+        await sheets.spreadsheets.values.append({
             spreadsheetId: sheetId,
-            range: 'Players!A:Z',
-        });
-
-        const playerHeaders = playersResponse.data.values[0];
-        const players = playersResponse.data.values.slice(1);
-
-        const idCol = playerHeaders.indexOf('PlayerID');
-        const oneSignalCol = playerHeaders.indexOf('OneSignalPlayerID');
-
-        if (idCol === -1 || oneSignalCol === -1) {
-            throw new Error('Required columns (PlayerID, OneSignalPlayerID) not found in Players sheet.');
-        }
-
-        let playerRowIndex = -1;
-        for (let i = 0; i < players.length; i++) {
-            if (String(players[i][idCol]).trim() === playerId) {
-                playerRowIndex = i + 2; // 1-based index for sheet ranges
-                break;
-            }
-        }
-
-        if (playerRowIndex === -1) {
-            return { statusCode: 404, body: JSON.stringify({ error: 'Player not found.' }) };
-        }
-
-        const range = `Players!${String.fromCharCode(65 + oneSignalCol)}${playerRowIndex}`;
-        await sheets.spreadsheets.values.update({
-            spreadsheetId: sheetId,
-            range: range,
+            range: 'OneSignal!A:C', // The sheet and columns to append to
             valueInputOption: 'USER_ENTERED',
             resource: {
-                values: [[oneSignalId]]
+                values: values
             }
         });
 
         return {
             statusCode: 200,
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ message: 'Notification ID saved successfully.' }),
+            body: JSON.stringify({ message: 'Notification ID appended successfully.' }),
         };
 
     } catch (error) {
