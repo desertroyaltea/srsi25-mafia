@@ -615,26 +615,47 @@ function waitForOneSignal() {
 
 
 function syncOneSignalId() {
+    // This helper will show a new message every 2.5 seconds
+    let messageDelay = 0;
+    const showDebugMessage = (msg) => {
+        setTimeout(() => showMessage(msg), messageDelay);
+        messageDelay += 2500; // Increase delay for the next message
+    };
+
     window.OneSignalDeferred.push(async function(OneSignal) {
         try {
+            showDebugMessage('Debug: Sync process started...');
+
             const isSubscribed = await OneSignal.isPushNotificationsEnabled();
+            showDebugMessage(`Is user subscribed? -> ${isSubscribed}`);
+
             if (isSubscribed) {
                 const oneSignalId = await OneSignal.getUserId();
+                showDebugMessage(`OneSignal ID: ${oneSignalId || 'ERROR: Not Found'}`);
+
                 const gameId = state.currentUserId;
 
                 if (oneSignalId && gameId) {
-                    await fetch('/.netlify/functions/save-notification-id', {
+                    showDebugMessage('Attempting to call Netlify function...');
+                    const response = await fetch('/.netlify/functions/save-notification-id', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({ playerId: gameId, oneSignalId: oneSignalId }),
                     });
-                    // You can optionally show a success message here if you want
-                    // showMessage("Sync Complete."); 
+
+                    if (response.ok) {
+                        showDebugMessage('SUCCESS: Netlify function called!');
+                    } else {
+                        showDebugMessage(`ERROR: Netlify function failed! Status: ${response.status}`);
+                    }
+                } else {
+                     showDebugMessage('SKIPPED: Missing required ID.');
                 }
+            } else {
+                showDebugMessage('SKIPPED: User is not subscribed.');
             }
         } catch (e) {
-            // You can optionally show an error message here
-            // showMessage(`Sync Error: ${e.message}`);
+            showDebugMessage(`CRITICAL ERROR: ${e.message}`);
         }
     });
 }
@@ -658,6 +679,12 @@ function initOneSignal() {
                     enabled: false
                 }
             }
+        })
+        .then(() => {
+            showMessage('Debug: OneSignal.init() was successful.');
+        })
+        .catch((error) => {
+            showMessage(`Debug: OneSignal.init() FAILED: ${error}`);
         });
 
         // This is the classic, most robust pattern for adding event listeners.
