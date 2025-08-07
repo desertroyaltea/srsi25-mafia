@@ -1052,14 +1052,14 @@ async function generateNightlyRecapStory(recapData) {
 
     // Doctor Section
     if (successfullyProtected.length > 0) {
-        storyParts.push(`The <span class="text-blue-400 font-bold">Doctors</span>, in a stroke of genius, diagnosed the <span class="text-red-500 font-bold">Mafia</span> with a severe case of "skill issue" and prescribed ${successfullyProtectedNames} a course of "not getting killed." Amazingly, the treatment was 100% effective`);
+        storyParts.push(`Knowing the <span class="text-red-500 font-bold">Mafia</span> are planning something big, the <span class="text-blue-400 font-bold">Doctors</span> administered an experimental 'anti-murder' vaccine to ${successfullyProtectedNames}. Side effects include a sudden craving to "sneak out", a small price to pay for saving their lives.`);
     } else {
         storyParts.push(`The <span class="text-blue-400 font-bold">Doctors</span> were nowhere to be found. Rumor has it they spent the previous night gossiping in Hall 1 and ended up sleeping straight through the chaos. Not their finest hour.`);
     }
         storyParts.push(`It turns out <span class="text-blue-400 font-bold">Ahmed Alharbi</span> wasn't actually dead, just taking a 'strategic nap.' The <span class="text-blue-400 font-bold">Doctors</span> heroically woke them up with a very loud alarm clock, claiming a successful revival and taking all the credit`);
     // Mafia Section
     if (mafiaKills.length > 0) {
-        storyParts.push(`The <span class="text-red-500 font-bold">Mafia</span>, in a brilliant act of culinary evil, ordered a mountain of Albaik for ${mafiaKilledNames} but "forgot" the garlic sauce. The sheer, flavorless tragedy was simply too much for them to handle.`);
+        storyParts.push(`The <span class="text-red-500 font-bold">Mafia's</span> work was cold, precise, and utterly ruthless. One by one, ${mafiaKilledNames} were cornered in the hallways, their pleas for mercy silenced with chilling efficiency. The only evidence left behind was the deafening silence where their voices used to be...`);
     } else {
         storyParts.push(`However, their plans were foiled. It seems their intended victims were lactose intolerant and wisely avoided the soy milk chugging contest altogether.`);
     }
@@ -1068,7 +1068,7 @@ async function generateNightlyRecapStory(recapData) {
     if (sheriffKills.length > 0) {
         storyParts.push(`At long last, the <span class="text-yellow-500 font-bold">Sheriff</span> took a shot. With nerves of steel and dramatic background music playing in their head, they fired and eliminated ${sheriffKilledNames}. Not for being suspicious, but for blatantly ignoring the formal dress code. Justice was served. Fashionably late.`);
     } else {
-        storyParts.push(`After a long and dramatic internal monologue, the <span class="text-yellow-500 font-bold">Sheriff</span> decided the city's lighting just wasn't cinematic enough for the occasion. They'll wait for a night with better ambiance`);
+        storyParts.push(`We are all waiting on you, <span class="text-yellow-500 font-bold">Sheriff</span>, to save this town...`);
     }
 
     // Trial Section
@@ -1088,7 +1088,7 @@ async function generateNightlyRecapStory(recapData) {
     }
 
     // Conclusion
-    storyParts.push(`<span class="font-bold text-blue-400">SRSI25 Cohort</span> now faces a new day. The tension is real. The foxes are still missing. And the <span class="text-red-500 font-bold">Mafia</span>? They are just getting started...`);
+    storyParts.push(`And so, a new day begins for <span class="font-bold text-blue-400">SRSI25</span>. Trust is shattered, the coffee is probably cold, and the only thing thicker than the tension is the humidity. We are truly in the endgame, good luck.`);
 
     return storyParts.map(part => `<p>${part}</p>`).join('');
 }
