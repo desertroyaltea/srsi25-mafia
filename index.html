@@ -211,7 +211,7 @@ login: () => `
 gameLayout: (viewHtml) => `
             <div class="container" id="game-container">
                 <h1 class="text-4xl font-bold text-center text-red-500 mb-1">🩸SRSI Mafia🔫</h1> <!-- mb-2 to mb-1 -->
-                <p class="text-sm text-gray-400 text-center mb-4">v3.5 Made by: Abdulelah AlHarbi | EXCOR 23'24'</p> <!-- mb-6 to mb-4 -->
+                <p class="text-sm text-gray-400 text-center mb-4">v3.4 Made by: Abdulelah AlHarbi | EXCOR 23'24'</p> <!-- mb-6 to mb-4 -->
                 <div class="bg-gray-900 p-4 rounded-lg flex justify-between items-center mb-4">
                     <p class="text-base text-gray-400">Logged in as:</p>
 <span class="font-mono text-blue-400 text-base">${state.currentUser.Name}</span> <!-- Removed role display here -->
@@ -230,10 +230,6 @@ gameLayout: (viewHtml) => `
                     <!-- The Trial Information div has been removed -->
                 </div>
                 <div id="view-content">${viewHtml}</div>
-        <div id="debug-log" class="fixed bottom-0 left-0 w-full bg-black bg-opacity-75 text-white text-xs p-2 z-50 max-h-40 overflow-y-auto">
-            <p class="font-bold">Debug Log:</p>
-        </div>
-
             </div>`,
 dashboard: () => `
          <div class="bg-gray-900 p-5 rounded-lg mt-0">
@@ -618,16 +614,6 @@ function waitForOneSignal() {
     });
 }
 
-function logToScreen(message) {
-    const logContainer = document.getElementById('debug-log');
-    if (logContainer) {
-        const logEntry = document.createElement('p');
-        logEntry.textContent = `> ${message}`;
-        logContainer.appendChild(logEntry);
-        // Auto-scroll to the bottom
-        logContainer.scrollTop = logContainer.scrollHeight;
-    }
-}
 
 async function syncOneSignalId() {
     console.log("DEBUG: syncOneSignalId() function has been called.");
