@@ -7,16 +7,6 @@
     <script src="https://cdn.onesignal.com/sdks/web/v16/OneSignalSDK.page.js" defer></script>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.onesignal.com/sdks/web/v16/OneSignalSDK.page.js" defer></script>
-  <script>
-    window.OneSignalDeferred = window.OneSignalDeferred || [];
-    OneSignalDeferred.push(async function(OneSignal) {
-      await OneSignal.init({
-        appId: "59e43537-34e1-4250-9953-9dd7e57b0a19",
-                    serviceWorkerPath: "OneSignalSDKWorker.js"
-
-      });
-    });
-  </script>
     <link rel="manifest" href="/manifest.json">
     <style>
         body {
@@ -603,16 +593,17 @@ function pollForOneSignalId(playerId, maxAttempts = 15, interval = 2000) {
     const poller = setInterval(function() {
         attempts++;
         if (attempts > maxAttempts) {
-            clearInterval(poller); // Stop polling after 30 seconds
+            clearInterval(poller);
             return;
         }
 
-        OneSignal.getUserId(function(userId) {
+        window.OneSignalDeferred = window.OneSignalDeferred || [];
+        window.OneSignalDeferred.push(function(OneSignal) {
+            // FIXED: Use the new v16 API
+            const userId = OneSignal.User.onesignalId;
             if (userId) {
-                // SUCCESS! We found the ID.
-                clearInterval(poller); // Stop polling
-
-                // Call the Netlify function that we know works.
+                clearInterval(poller);
+                
                 fetch('/.netlify/functions/save-notification-id', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
@@ -634,16 +625,14 @@ function runOneSignalSetup() {
         OneSignal.init({
             appId: "59e43537-34e1-4250-9953-9dd7e57b0a19",
             autoResubscribe: true,
-            serviceWorkerPath: "OneSignalSDKWorker.js"
-        });
-
-        // This listener waits for a user to subscribe for the first time.
-        OneSignal.on('subscriptionChange', function(isSubscribed) {
-            if (isSubscribed) {
-                const gameId = state.currentUserId;
-                OneSignal.getUserId().then(function(userId) {
+            serviceWorkerPath: "/OneSignalSDKWorker.js"
+        }).then(function() {
+            OneSignal.User.addEventListener('change', function(event) {
+                if (event.current.onesignalId) {
+                    const gameId = state.currentUserId;
+                    const userId = OneSignal.User.onesignalId;
+                    
                     if (gameId && userId) {
-                        // Send the two IDs to our new backend function.
                         fetch('/.netlify/functions/identify-onesignal-user', {
                             method: 'POST',
                             headers: { 'Content-Type': 'application/json' },
@@ -653,8 +642,10 @@ function runOneSignalSetup() {
                             })
                         });
                     }
-                });
-            }
+                }
+            });
+        }).catch(function(error) {
+            console.error('OneSignal init failed:', error);
         });
     });
 }
