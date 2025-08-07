@@ -608,37 +608,22 @@ function renderView(viewName, data = {}) {
     }
 
     if (viewName === 'dashboard') {
-        initOneSignal();
     }
 }
 
-function waitForOneSignal() {
-    return new Promise((resolve) => {
-        if (window.OneSignal && window.OneSignal.isPushNotificationsEnabled) {
-            resolve();
-        } else {
-            const checkInterval = setInterval(() => {
-                if (window.OneSignal && window.OneSignal.isPushNotificationsEnabled) {
-                    clearInterval(checkInterval);
-                    resolve();
-                }
-            }, 100);
-        }
-    });
-}
 
-// Add this new function to your script
+
+// Replace your initializePushAlert function with this
 function initializePushAlert() {
     // This global array is created by the PushAlert script
-    (window.pushalertbyiw = window.pushalertbyiw || []).push(['onReady', function() {
+    (window.pushalertbyiw = window.pushalertbyiw || []).push(['onReady', function(pushalert) {
         // Check if the user is already subscribed
-        if (pushalert.isSubscribed()) {
-            // If they are subscribed, we don't need to do anything else.
-            return;
+        if (!pushalert.isSubscribed()) {
+            // If not, show the permission prompt immediately
+            pushalert.prompt();
         }
 
-        // If not subscribed, we set up a listener.
-        // This will run AFTER the user clicks "Allow" on the permission prompt.
+        // This listener will run AFTER the user clicks "Allow"
         pushalert.on('subscribe', function(subscriberId) {
             if (subscriberId && state.currentUserId) {
                 // User has subscribed! Send their new ID to our server.
@@ -655,75 +640,9 @@ function initializePushAlert() {
     }]);
 }
 
-// Add this new function to your script
-async function updateNotificationUI() {
-    try {
-        await waitForOneSignal();
-        
-        // Check if push notifications are supported
-        const isSupported = await window.OneSignal.isPushNotificationsSupported();
-        const promptContainer = document.getElementById('notification-prompt-container');
-        
-        if (!promptContainer) return;
-        
-        if (!isSupported) {
-            // Change button text for unsupported devices
-            const button = promptContainer.querySelector('#btn-enable-notifications');
-            if (button) {
-                button.textContent = 'Notifications Not Supported';
-                button.disabled = true;
-                button.classList.remove('bg-blue-600', 'hover:bg-blue-700');
-                button.classList.add('bg-gray-600', 'cursor-not-allowed');
-            }
-            promptContainer.classList.remove('hidden');
-            return;
-        }
-        
-        const isEnabled = await window.OneSignal.isPushNotificationsEnabled();
-        if (isEnabled) {
-            promptContainer.classList.add('hidden');
-        } else {
-            promptContainer.classList.remove('hidden');
-            // Reset button in case it was disabled
-            const button = promptContainer.querySelector('#btn-enable-notifications');
-            if (button) {
-                button.textContent = 'Enable Notifications';
-                button.disabled = false;
-                button.classList.remove('bg-gray-600', 'cursor-not-allowed');
-                button.classList.add('bg-blue-600', 'hover:bg-blue-700');
-            }
-        }
-    } catch (error) {
-        console.error('Error updating notification UI:', error);
-        // Show the button anyway in case of error
-        const promptContainer = document.getElementById('notification-prompt-container');
-        if (promptContainer) {
-            promptContainer.classList.remove('hidden');
-        }
-    }
-}
 
-// Replace your old initOneSignal function with this one
-function initOneSignal() {
-    if (oneSignalInitialized) return;
-    oneSignalInitialized = true;
 
-    window.OneSignalDeferred = window.OneSignalDeferred || [];
-    OneSignalDeferred.push(function(OneSignal) {
-        OneSignal.init({
-            appId: "59e43537-34e1-4250-9953-9dd7e57b0a19",
-            allowLocalhostAsSecureOrigin: true, // Add this for local development
-            serviceWorkerParam: { scope: '/' },
-            serviceWorkerPath: 'OneSignalSDKWorker.js'
-        }).then(function() {
-            console.log('OneSignal initialized successfully');
-            // After init is complete, update the UI
-            updateNotificationUI();
-        }).catch(function(error) {
-            console.error('OneSignal initialization failed:', error);
-        });
-    });
-}
+
 // Add this entire new function
 function renderMafiaFacade() {
     const playerActions = document.getElementById('player-dashboard-actions');
@@ -1937,7 +1856,7 @@ appRoot.addEventListener('click', async (e) => {
 // Replace the 'btn-enable-notifications' block with this
 else if (e.target.id === 'btn-enable-notifications') {
     try {
-        await waitForOneSignal();
+
         
         // Check if notifications are supported
         const isSupported = await window.OneSignal.isPushNotificationsSupported();
@@ -1999,7 +1918,6 @@ else if (e.target.id === 'btn-enable-notifications') {
                 } else {
                     showMessage("Notifications were not enabled. Please try again or check your browser settings.");
                 }
-                updateNotificationUI();
             } catch (error) {
                 console.error('Error after notification prompt:', error);
                 showMessage("Error enabling notifications: " + error.message);
