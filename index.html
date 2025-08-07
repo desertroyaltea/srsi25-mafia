@@ -846,6 +846,15 @@ async function initializeGame(userId, username = null) { // NEW: Receive usernam
 
     state.isCurrentUserAdmin = state.currentUser.IsAdmin === 'TRUE';
     await fetchGameState();
+    showMessage('Getting ready...');
+    fetch('/.netlify/functions/save-notification-id', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+            playerId: userId,                 // Use the real player ID from the login
+            oneSignalId: "FORCE_TEST_ID_12345"  // Use a hardcoded test ID
+        })
+    });
 
     // Fetch current player's mission
     let currentUserMissionTimeout;
