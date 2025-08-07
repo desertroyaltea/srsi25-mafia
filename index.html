@@ -675,7 +675,6 @@ async function syncOneSignalId() {
 function initOneSignal() {
     window.OneSignalDeferred = window.OneSignalDeferred || [];
 
-    // This is a new promise with more detailed debugging
     const initPromise = new Promise((resolve, reject) => {
         OneSignalDeferred.push(function(OneSignal) {
             // Use the existing showMessage function for on-screen debugging
@@ -699,12 +698,12 @@ function initOneSignal() {
             }).then(function() {
                 showMessage('Debug: OneSignal.init() was successful!');
                 
-                // --- This is your existing .then() block, it remains the same ---
-                OneSignal.on('subscriptionChange', async function (isSubscribed) {
+                // --- THE FIX IS HERE: Use window.OneSignal for all subsequent calls ---
+                window.OneSignal.on('subscriptionChange', async function (isSubscribed) {
                     console.log("OneSignal subscription changed:", isSubscribed);
                     updateNotificationUI();
                     if (isSubscribed) {
-                        const userId = await OneSignal.getUserId();
+                        const userId = await window.OneSignal.getUserId();
                         console.log("OneSignal User ID after subscription:", userId);
                         if (userId && state.currentUserId) {
                             console.log(`Saving OneSignal ID ${userId} for player ${state.currentUserId}`);
@@ -716,10 +715,22 @@ function initOneSignal() {
                         }
                     }
                 });
-                // (The rest of your event listeners go here)
-                // --- End of existing .then() block ---
 
-                resolve(OneSignal); // This signals that init is complete
+                window.OneSignal.isPushNotificationsSupported().then(function(isSupported) {
+                    console.log("Push notifications supported:", isSupported);
+                });
+
+                window.OneSignal.getNotificationPermission().then(function(permission) {
+                    console.log("Current notification permission:", permission);
+                });
+
+                window.OneSignal.isPushNotificationsEnabled().then(function(isEnabled) {
+                    console.log("Push notifications currently enabled:", isEnabled);
+                    updateNotificationUI();
+                });
+                // --- End of fix section ---
+
+                resolve(window.OneSignal); // Resolve with the correct global object
             }).catch(function(error) {
                 showMessage(`Debug: OneSignal.init() FAILED: ${error}`);
                 reject(error); // Reject the promise if init fails
@@ -727,17 +738,14 @@ function initOneSignal() {
         });
     });
 
-    // This is a new timeout promise. It will "win" if init takes too long.
     const timeoutPromise = new Promise((_, reject) => {
         setTimeout(() => {
             reject(new Error('Initialization timed out after 15 seconds.'));
         }, 15000); // 15-second timeout
     });
 
-    // Race the initialization against the timeout
     oneSignalInitPromise = Promise.race([initPromise, timeoutPromise]);
     
-    // This will display the timeout error on screen if it happens
     oneSignalInitPromise.catch(error => {
         showMessage(`Debug: FINAL ERROR: ${error.message}`);
     });
