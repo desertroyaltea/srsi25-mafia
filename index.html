@@ -622,17 +622,47 @@ function waitForOneSignal() {
 async function updateNotificationUI() {
     try {
         await waitForOneSignal();
-        const isEnabled = await window.OneSignal.isPushNotificationsEnabled();
+        
+        // Check if push notifications are supported
+        const isSupported = await window.OneSignal.isPushNotificationsSupported();
         const promptContainer = document.getElementById('notification-prompt-container');
-        if (promptContainer) {
-            if (isEnabled) {
-                promptContainer.classList.add('hidden');
-            } else {
-                promptContainer.classList.remove('hidden');
+        
+        if (!promptContainer) return;
+        
+        if (!isSupported) {
+            // Change button text for unsupported devices
+            const button = promptContainer.querySelector('#btn-enable-notifications');
+            if (button) {
+                button.textContent = 'Notifications Not Supported';
+                button.disabled = true;
+                button.classList.remove('bg-blue-600', 'hover:bg-blue-700');
+                button.classList.add('bg-gray-600', 'cursor-not-allowed');
+            }
+            promptContainer.classList.remove('hidden');
+            return;
+        }
+        
+        const isEnabled = await window.OneSignal.isPushNotificationsEnabled();
+        if (isEnabled) {
+            promptContainer.classList.add('hidden');
+        } else {
+            promptContainer.classList.remove('hidden');
+            // Reset button in case it was disabled
+            const button = promptContainer.querySelector('#btn-enable-notifications');
+            if (button) {
+                button.textContent = 'Enable Notifications';
+                button.disabled = false;
+                button.classList.remove('bg-gray-600', 'cursor-not-allowed');
+                button.classList.add('bg-blue-600', 'hover:bg-blue-700');
             }
         }
     } catch (error) {
         console.error('Error updating notification UI:', error);
+        // Show the button anyway in case of error
+        const promptContainer = document.getElementById('notification-prompt-container');
+        if (promptContainer) {
+            promptContainer.classList.remove('hidden');
+        }
     }
 }
 
@@ -1870,15 +1900,45 @@ appRoot.addEventListener('click', async (e) => {
 else if (e.target.id === 'btn-enable-notifications') {
     try {
         await waitForOneSignal();
-        const result = await window.OneSignal.showSlidedownPrompt();
-        console.log('Slidedown prompt result:', result);
         
-        // Wait a moment for the user to respond to the prompt
+        // Check if notifications are supported
+        const isSupported = await window.OneSignal.isPushNotificationsSupported();
+        if (!isSupported) {
+            showMessage("Push notifications are not supported on this device/browser.");
+            return;
+        }
+        
+        // Check current permission status
+        const permission = await window.OneSignal.getNotificationPermission();
+        console.log('Current permission status:', permission);
+        
+        if (permission === 'blocked' || permission === 'denied') {
+            showMessage("Notifications are blocked. Please enable them in your browser settings and refresh the page.");
+            return;
+        }
+        
+        if (permission === 'granted') {
+            // Already granted, just register
+            const isEnabled = await window.OneSignal.isPushNotificationsEnabled();
+            if (!isEnabled) {
+                await window.OneSignal.registerForPushNotifications();
+            }
+        } else {
+            // Show the prompt for permission
+            const result = await window.OneSignal.showSlidedownPrompt();
+            console.log('Slidedown prompt result:', result);
+        }
+        
+        // Wait a moment then check status
         setTimeout(async () => {
             try {
                 const isEnabled = await window.OneSignal.isPushNotificationsEnabled();
+                console.log('Is push enabled:', isEnabled);
+                
                 if (isEnabled) {
                     const userId = await window.OneSignal.getUserId();
+                    console.log('OneSignal User ID:', userId);
+                    
                     if (userId) {
                         const response = await fetch('/.netlify/functions/save-notification-id', {
                             method: 'POST',
@@ -1895,13 +1955,18 @@ else if (e.target.id === 'btn-enable-notifications') {
                             console.error('Failed to save notification ID:', await response.text());
                             showMessage("Notifications enabled, but failed to save to server.");
                         }
+                    } else {
+                        showMessage("Notification permission granted, but failed to get user ID.");
                     }
+                } else {
+                    showMessage("Notifications were not enabled. Please try again or check your browser settings.");
                 }
                 updateNotificationUI();
             } catch (error) {
                 console.error('Error after notification prompt:', error);
+                showMessage("Error enabling notifications: " + error.message);
             }
-        }, 2000); // Wait 2 seconds for user response
+        }, 3000); // Wait 3 seconds for user response
         
     } catch (error) {
         console.error('Error showing notification prompt:', error);
