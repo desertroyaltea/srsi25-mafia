@@ -6,6 +6,17 @@
     <title>SRSI Mafia</title>
     <script src="https://cdn.onesignal.com/sdks/web/v16/OneSignalSDK.page.js" defer></script>
     <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.onesignal.com/sdks/web/v16/OneSignalSDK.page.js" defer></script>
+  <script>
+    window.OneSignalDeferred = window.OneSignalDeferred || [];
+    OneSignalDeferred.push(async function(OneSignal) {
+      await OneSignal.init({
+        appId: "59e43537-34e1-4250-9953-9dd7e57b0a19",
+                    serviceWorkerPath: "OneSignalSDKWorker.js"
+
+      });
+    });
+  </script>
     <link rel="manifest" href="/manifest.json">
     <style>
         body {
