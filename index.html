@@ -1944,7 +1944,7 @@ else if (e.target.id === 'btn-enable-notifications') {
             console.log("Subscription successful:", isEnabled);
             
             if (isEnabled) {
-                const userId = await window.OneSignal.getUserId();
+                const userId = await window.OneSignal.User.onesignalId();
                 console.log("OneSignal User ID:", userId);
                 
                 if (userId) {
