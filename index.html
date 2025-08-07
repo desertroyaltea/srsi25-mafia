@@ -688,16 +688,22 @@ function initOneSignal() {
         });
 
         // This is the classic, most robust pattern for adding event listeners.
-        OneSignal.push(function() {
-            OneSignal.on('subscriptionChange', async function(isSubscribed) {
-                if (isSubscribed) {
-                    const userId = await OneSignal.getUserId();
-                    if (userId && state.currentUserId) {
-                        await fetch('/.netlify/functions/save-notification-id', {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({ playerId: state.currentUserId, oneSignalId: userId }),
-                        });
+OneSignal.push(function() {
+    OneSignal.on('subscriptionChange', async function(isSubscribed) {
+        if (isSubscribed) {
+            // First, get the OneSignal User ID (player_id in their system)
+            const userId = await OneSignal.getUserId();
+            // This is the new, important line:
+            await OneSignal.sendTag("player_id", state.currentUserId);
+
+            // The original logic to save to the sheet can now be considered a backup,
+            // or removed entirely once you confirm tags are working.
+            if (userId && state.currentUserId) {
+                await fetch('/.netlify/functions/save-notification-id', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ playerId: state.currentUserId, oneSignalId: userId }),
+                });
                     }
                 }
             });
