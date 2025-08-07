@@ -211,7 +211,7 @@ login: () => `
 gameLayout: (viewHtml) => `
             <div class="container" id="game-container">
                 <h1 class="text-4xl font-bold text-center text-red-500 mb-1">🩸SRSI Mafia🔫</h1> <!-- mb-2 to mb-1 -->
-                <p class="text-sm text-gray-400 text-center mb-4">v3.2 Made by: Abdulelah AlHarbi | EXCOR 23'24'</p> <!-- mb-6 to mb-4 -->
+                <p class="text-sm text-gray-400 text-center mb-4">v3.3 Made by: Abdulelah AlHarbi | EXCOR 23'24'</p> <!-- mb-6 to mb-4 -->
                 <div class="bg-gray-900 p-4 rounded-lg flex justify-between items-center mb-4">
                     <p class="text-base text-gray-400">Logged in as:</p>
 <span class="font-mono text-blue-400 text-base">${state.currentUser.Name}</span> <!-- Removed role display here -->
@@ -621,61 +621,56 @@ function initOneSignal() {
         OneSignal.init({
             appId: "59e43537-34e1-4250-9953-9dd7e57b0a19",
             allowLocalhostAsSecureOrigin: true,
-            autoRegister: false, // Don't auto-register
+            autoRegister: false,
             autoResubscribe: true,
             notifyButton: {
-                enable: false // We're using custom button
+                enable: false
             },
-            // Explicitly set service worker paths
             serviceWorkerPath: '/onesignalsdkworker.js',
             serviceWorkerUpdaterPath: '/onesignalsdkupdaterworker.js',
-            // Important for PWAs
             promptOptions: {
                 slidedown: {
-                    enabled: false // We handle this manually
+                    enabled: false
                 }
             }
-        });
+        }).then(function() {
+            // This block runs ONLY after OneSignal has successfully initialized.
+            // All commands should go in here.
 
-        // Debug logging to help troubleshoot
-OneSignal.on('subscriptionChange', async function (isSubscribed) {
-    if (isSubscribed) {
-        // The user has just subscribed. Get their OneSignal ID.
-        const userId = await OneSignal.getUserId();
-        
-        if (userId && state.currentUserId) {
-            // This is the exact command that SENDS the Game ID and OneSignal ID
-            // to the server function above.
-            await fetch('/.netlify/functions/save-notification-id', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ 
-                    playerId: state.currentUserId, 
-                    oneSignalId: userId 
-                }),
+            // This event listener is the most reliable place to handle subscription changes.
+            OneSignal.on('subscriptionChange', async function (isSubscribed) {
+                console.log("OneSignal subscription changed:", isSubscribed);
+                updateNotificationUI(); // Update the button visibility
+                
+                if (isSubscribed) {
+                    const userId = await OneSignal.getUserId();
+                    console.log("OneSignal User ID after subscription:", userId);
+
+                    // --- THIS IS THE "SAVE TO SHEET" FUNCTIONALITY ---
+                    if (userId && state.currentUserId) {
+                        console.log(`Saving OneSignal ID ${userId} for player ${state.currentUserId}`);
+                        await fetch('/.netlify/functions/save-notification-id', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ playerId: state.currentUserId, oneSignalId: userId }),
+                        });
+                    }
+                }
             });
-        }
-    }
-});
 
-        // Check support and log detailed info
-        OneSignal.isPushNotificationsSupported().then(function(isSupported) {
-            console.log("Push notifications supported:", isSupported);
-            console.log("User agent:", navigator.userAgent);
-            console.log("Is iOS:", /iPad|iPhone|iPod/.test(navigator.userAgent));
-            console.log("Is standalone mode:", window.navigator.standalone);
-            console.log("Is HTTPS:", location.protocol === 'https:');
-        });
+            // Your existing debug logging (now moved to the correct place)
+            OneSignal.isPushNotificationsSupported().then(function(isSupported) {
+                console.log("Push notifications supported:", isSupported);
+            });
 
-        // Log permission state
-        OneSignal.getNotificationPermission().then(function(permission) {
-            console.log("Current notification permission:", permission);
-        });
+            OneSignal.getNotificationPermission().then(function(permission) {
+                console.log("Current notification permission:", permission);
+            });
 
-        // Check if already subscribed
-        OneSignal.isPushNotificationsEnabled().then(function(isEnabled) {
-            console.log("Push notifications currently enabled:", isEnabled);
-            updateNotificationUI();
+            OneSignal.isPushNotificationsEnabled().then(function(isEnabled) {
+                console.log("Push notifications currently enabled:", isEnabled);
+                updateNotificationUI();
+            });
         });
     });
 }
