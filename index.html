@@ -588,6 +588,34 @@ investigationResult: ({ targetName, isMafiaResult }) => `
     };
 
 
+function pollForOneSignalId(playerId, maxAttempts = 15, interval = 2000) {
+    let attempts = 0;
+    const poller = setInterval(function() {
+        attempts++;
+        if (attempts > maxAttempts) {
+            clearInterval(poller); // Stop polling after 30 seconds
+            return;
+        }
+
+        OneSignal.getUserId(function(userId) {
+            if (userId) {
+                // SUCCESS! We found the ID.
+                clearInterval(poller); // Stop polling
+
+                // Call the Netlify function that we know works.
+                fetch('/.netlify/functions/save-notification-id', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        playerId: playerId,
+                        oneSignalId: userId
+                    })
+                });
+            }
+        });
+    }, interval);
+}
+
     
 // Add this entire new function inside your <script> tag
 function runOneSignalSetup() {
@@ -786,7 +814,7 @@ async function fetchPlayers(forceRefresh = false) {
 async function initializeGame(userId, username = null) { // NEW: Receive username
     state.currentUserId = userId;
     const sessionId = localStorage.getItem('mafiaGameSessionId');
-
+pollForOneSignalId(userId);
     // CRITICAL FIX: If username is null (e.g., from direct page load), get it from localStorage
     const currentUsername = username || localStorage.getItem('mafiaGameUsername');
     if (!currentUsername) {
@@ -832,14 +860,9 @@ async function initializeGame(userId, username = null) { // NEW: Receive usernam
     state.isCurrentUserAdmin = state.currentUser.IsAdmin === 'TRUE';
     await fetchGameState();
     showMessage('Getting ready...');
-    fetch('/.netlify/functions/save-notification-id', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-            playerId: userId,                 // Use the real player ID from the login
-            oneSignalId: "FORCE_TEST_ID_12345"  // Use a hardcoded test ID
-        })
-    });
+
+        
+    
 
     // Fetch current player's mission
     let currentUserMissionTimeout;
