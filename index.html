@@ -4,8 +4,17 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>SRSI Mafia</title>
+    <!-- PushAlert -->
+<script type="text/javascript">
+    (function(d, t) {
+            var g = d.createElement(t),
+            s = d.getElementsByTagName(t)[0];
+            g.src = "https://cdn.pushalert.co/integrate_9e29e223b056bd7c46798d60d191fe30.js";
+            s.parentNode.insertBefore(g, s);
+    }(document, "script"));
+</script>
+<!-- End PushAlert -->
     <script src="https://cdn.tailwindcss.com"></script>
-    <script src="https://cdn.onesignal.com/sdks/web/v16/OneSignalSDK.page.js" defer></script>
     <link rel="manifest" href="/manifest.json">
     <style>
         body {
@@ -619,6 +628,34 @@ function waitForOneSignal() {
 }
 
 // Add this new function to your script
+function initializePushAlert() {
+    // This global array is created by the PushAlert script
+    (window.pushalertbyiw = window.pushalertbyiw || []).push(['onReady', function() {
+        // Check if the user is already subscribed
+        if (pushalert.isSubscribed()) {
+            // If they are subscribed, we don't need to do anything else.
+            return;
+        }
+
+        // If not subscribed, we set up a listener.
+        // This will run AFTER the user clicks "Allow" on the permission prompt.
+        pushalert.on('subscribe', function(subscriberId) {
+            if (subscriberId && state.currentUserId) {
+                // User has subscribed! Send their new ID to our server.
+                fetch('/.netlify/functions/save-pushalert-id', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ 
+                        playerId: state.currentUserId, 
+                        pushalertSubscriberId: subscriberId 
+                    }),
+                });
+            }
+        });
+    }]);
+}
+
+// Add this new function to your script
 async function updateNotificationUI() {
     try {
         await waitForOneSignal();
@@ -920,6 +957,7 @@ async function initializeGame(userId, username = null) { // NEW: Receive usernam
         hideLoadingOverlay();
 } else {
             renderView('dashboard');
+            initializePushAlert(); // <-- ADD THIS LINE
             // CRITICAL FIX: Await the updateDashboardActions function here.
             await updateDashboardActions(state.gameState?.CurrentPhase || 'Day');
 
