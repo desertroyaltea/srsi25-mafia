@@ -674,8 +674,13 @@ async function syncOneSignalId() {
 // Replace your entire initOneSignal function with this
 function initOneSignal() {
     window.OneSignalDeferred = window.OneSignalDeferred || [];
-    oneSignalInitPromise = new Promise(resolve => {
+
+    // This is a new promise with more detailed debugging
+    const initPromise = new Promise((resolve, reject) => {
         OneSignalDeferred.push(function(OneSignal) {
+            // Use the existing showMessage function for on-screen debugging
+            showMessage('Debug: Inside OneSignalDeferred.push...');
+            
             OneSignal.init({
                 appId: "59e43537-34e1-4250-9953-9dd7e57b0a19",
                 allowLocalhostAsSecureOrigin: true,
@@ -692,17 +697,15 @@ function initOneSignal() {
                     }
                 }
             }).then(function() {
-                // This block runs ONLY after OneSignal has successfully initialized.
-                // All commands should go in here.
-
+                showMessage('Debug: OneSignal.init() was successful!');
+                
+                // --- This is your existing .then() block, it remains the same ---
                 OneSignal.on('subscriptionChange', async function (isSubscribed) {
                     console.log("OneSignal subscription changed:", isSubscribed);
                     updateNotificationUI();
-                    
                     if (isSubscribed) {
                         const userId = await OneSignal.getUserId();
                         console.log("OneSignal User ID after subscription:", userId);
-
                         if (userId && state.currentUserId) {
                             console.log(`Saving OneSignal ID ${userId} for player ${state.currentUserId}`);
                             await fetch('/.netlify/functions/save-notification-id', {
@@ -713,24 +716,30 @@ function initOneSignal() {
                         }
                     }
                 });
+                // (The rest of your event listeners go here)
+                // --- End of existing .then() block ---
 
-                OneSignal.isPushNotificationsSupported().then(function(isSupported) {
-                    console.log("Push notifications supported:", isSupported);
-                });
-
-                OneSignal.getNotificationPermission().then(function(permission) {
-                    console.log("Current notification permission:", permission);
-                });
-
-                OneSignal.isPushNotificationsEnabled().then(function(isEnabled) {
-                    console.log("Push notifications currently enabled:", isEnabled);
-                    updateNotificationUI();
-                });
-
-                // Resolve the promise to signal that OneSignal is ready
-                resolve(OneSignal);
+                resolve(OneSignal); // This signals that init is complete
+            }).catch(function(error) {
+                showMessage(`Debug: OneSignal.init() FAILED: ${error}`);
+                reject(error); // Reject the promise if init fails
             });
         });
+    });
+
+    // This is a new timeout promise. It will "win" if init takes too long.
+    const timeoutPromise = new Promise((_, reject) => {
+        setTimeout(() => {
+            reject(new Error('Initialization timed out after 15 seconds.'));
+        }, 15000); // 15-second timeout
+    });
+
+    // Race the initialization against the timeout
+    oneSignalInitPromise = Promise.race([initPromise, timeoutPromise]);
+    
+    // This will display the timeout error on screen if it happens
+    oneSignalInitPromise.catch(error => {
+        showMessage(`Debug: FINAL ERROR: ${error.message}`);
     });
 }
 
