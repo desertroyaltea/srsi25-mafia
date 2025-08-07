@@ -2011,11 +2011,12 @@ else if (e.target.id === 'btn-enable-notifications') {
                 }
             
 
+// Replace the 'logout-button' block with this
 } else if (e.target.id === 'logout-button') {
     const sessionId = localStorage.getItem('mafiaGameSessionId');
     if (sessionId) {
         stopSessionActivityUpdate();
-        // This was the original logout logging, which is good to keep.
+        // This is your original logout logging. It's good to keep.
         fetch('/.netlify/functions/log-logout', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -2024,9 +2025,12 @@ else if (e.target.id === 'btn-enable-notifications') {
     }
 
     // --- THE CRITICAL FIX IS HERE ---
-    // Tell OneSignal to end the current user's session.
-    if (window.OneSignal) {
-        OneSignal.logout();
+    // This is the correct, official way to call the logout function.
+    // It queues the command to run as soon as the OneSignal SDK is ready.
+    if (window.OneSignalDeferred) {
+        window.OneSignalDeferred.push(function(OneSignal) {
+            OneSignal.logout();
+        });
     }
     // ---------------------------------
 
