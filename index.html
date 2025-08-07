@@ -613,20 +613,35 @@ function renderView(viewName, data = {}) {
 
 
 
-// Replace your initializePushAlert function with this
+// Replace your entire initializePushAlert function with this
 function initializePushAlert() {
-    // This global array is created by the PushAlert script
+    const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
+    const isInStandaloneMode = ('standalone' in window.navigator) && (window.navigator.standalone);
+    const promptContainer = document.getElementById('notification-prompt-container');
+    const iosGuideContainer = document.getElementById('ios-guide-container');
+
     (window.pushalertbyiw = window.pushalertbyiw || []).push(['onReady', function(pushalert) {
-        // Check if the user is already subscribed
-        if (!pushalert.isSubscribed()) {
-            // If not, show the permission prompt immediately
-            pushalert.prompt();
+        if (pushalert.isSubscribed()) {
+            // If already subscribed, hide everything.
+            promptContainer.classList.add('hidden');
+            iosGuideContainer.classList.add('hidden');
+            return;
+        }
+
+        // If not subscribed...
+        if (isIOS && !isInStandaloneMode) {
+            // Show the guide if they are on an iPhone but NOT in the home screen app.
+            promptContainer.classList.add('hidden');
+            iosGuideContainer.classList.remove('hidden');
+        } else {
+            // Show the button for everyone else, OR for iPhones that ARE in the home screen app.
+            promptContainer.classList.remove('hidden');
+            iosGuideContainer.classList.add('hidden');
         }
 
         // This listener will run AFTER the user clicks "Allow"
         pushalert.on('subscribe', function(subscriberId) {
             if (subscriberId && state.currentUserId) {
-                // User has subscribed! Send their new ID to our server.
                 fetch('/.netlify/functions/save-pushalert-id', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
@@ -635,6 +650,7 @@ function initializePushAlert() {
                         pushalertSubscriberId: subscriberId 
                     }),
                 });
+                promptContainer.classList.add('hidden'); // Hide button after subscribing
             }
         });
     }]);
@@ -1853,81 +1869,9 @@ appRoot.addEventListener('click', async (e) => {
     renderView('accusationForm', { targets });
 }
 
-// Replace the 'btn-enable-notifications' block with this
-else if (e.target.id === 'btn-enable-notifications') {
-    try {
-
-        
-        // Check if notifications are supported
-        const isSupported = await window.OneSignal.isPushNotificationsSupported();
-        if (!isSupported) {
-            showMessage("Push notifications are not supported on this device/browser.");
-            return;
-        }
-        
-        // Check current permission status
-        const permission = await window.OneSignal.getNotificationPermission();
-        console.log('Current permission status:', permission);
-        
-        if (permission === 'blocked' || permission === 'denied') {
-            showMessage("Notifications are blocked. Please enable them in your browser settings and refresh the page.");
-            return;
-        }
-        
-        if (permission === 'granted') {
-            // Already granted, just register
-            const isEnabled = await window.OneSignal.isPushNotificationsEnabled();
-            if (!isEnabled) {
-                await window.OneSignal.registerForPushNotifications();
-            }
-        } else {
-            // Show the prompt for permission
-            const result = await window.OneSignal.showSlidedownPrompt();
-            console.log('Slidedown prompt result:', result);
-        }
-        
-        // Wait a moment then check status
-        setTimeout(async () => {
-            try {
-                const isEnabled = await window.OneSignal.isPushNotificationsEnabled();
-                console.log('Is push enabled:', isEnabled);
-                
-                if (isEnabled) {
-                    const userId = await window.OneSignal.getUserId();
-                    console.log('OneSignal User ID:', userId);
-                    
-                    if (userId) {
-                        const response = await fetch('/.netlify/functions/save-notification-id', {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({ 
-                                playerId: state.currentUserId, 
-                                oneSignalId: userId 
-                            }),
-                        });
-                        
-                        if (response.ok) {
-                            showMessage("Notifications enabled successfully!");
-                        } else {
-                            console.error('Failed to save notification ID:', await response.text());
-                            showMessage("Notifications enabled, but failed to save to server.");
-                        }
-                    } else {
-                        showMessage("Notification permission granted, but failed to get user ID.");
-                    }
-                } else {
-                    showMessage("Notifications were not enabled. Please try again or check your browser settings.");
-                }
-            } catch (error) {
-                console.error('Error after notification prompt:', error);
-                showMessage("Error enabling notifications: " + error.message);
-            }
-        }, 3000); // Wait 3 seconds for user response
-        
-    } catch (error) {
-        console.error('Error showing notification prompt:', error);
-        showMessage("Failed to show notification prompt: " + error.message);
-    }
+// Add this block inside your appRoot.addEventListener('click', ...)
+ else if (e.target.id === 'btn-enable-notifications') {
+    (window.pushalertbyiw = window.pushalertbyiw || []).push(['prompt']);
 }
 
 

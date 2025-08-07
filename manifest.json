@@ -4,10 +4,8 @@
   "short_name": "Mafia",
   "display": "standalone",
   "start_url": "/",
-  "scope": "/",
   "theme_color": "#E54B4D",
   "background_color": "#000000",
-  "gcm_sender_id": "482941778795",
   "icons": [
     { "src": "/icon-192x192.png", "sizes": "192x192", "type": "image/png" },
     { "src": "/icon-512x512.png", "sizes": "512x512", "type": "image/png" }
