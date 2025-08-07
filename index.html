@@ -632,21 +632,7 @@ async function updateNotificationUI() {
     }
 }
 
-// Replace your old initOneSignal function with this one
-function updateNotificationUI() {
-    OneSignalDeferred.push(function(OneSignal) {
-        OneSignal.isPushNotificationsEnabled().then(function(isEnabled) {
-            const promptContainer = document.getElementById('notification-prompt-container');
-            if (promptContainer) {
-                if (isEnabled) {
-                    promptContainer.classList.add('hidden');
-                } else {
-                    promptContainer.classList.remove('hidden');
-                }
-            }
-        });
-    });
-}
+
 // Add this entire new function
 function renderMafiaFacade() {
     const playerActions = document.getElementById('player-dashboard-actions');
