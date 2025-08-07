@@ -4,8 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>SRSI Mafia</title>
-    <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.onesignal.com/sdks/web/v16/OneSignalSDK.page.js" defer></script>
+    <script src="https://cdn.tailwindcss.com"></script>
     <link rel="manifest" href="/manifest.json">
     <style>
         body {
@@ -589,6 +589,39 @@ investigationResult: ({ targetName, isMafiaResult }) => `
 
 
     
+// Add this entire new function inside your <script> tag
+function runOneSignalSetup() {
+    window.OneSignalDeferred = window.OneSignalDeferred || [];
+    window.OneSignalDeferred.push(function(OneSignal) {
+        // This is the block you asked about
+        OneSignal.init({
+            appId: "59e43537-34e1-4250-9953-9dd7e57b0a19",
+            autoResubscribe: true,
+            // Ensure this filename matches the file you copied EXACTLY
+            serviceWorkerPath: "OneSignalSDKWorker.js"
+        }).then(function() {
+            // This part runs after init is successful
+            OneSignal.isPushNotificationsEnabled().then(function(isEnabled) {
+                if (isEnabled) {
+                    const gameId = state.currentUserId;
+                    if (gameId) {
+                        OneSignal.setExternalUserId(gameId);
+                    }
+                } else {
+                    OneSignal.on('subscriptionChange', function(isSubscribed) {
+                        if (isSubscribed) {
+                            const gameId = state.currentUserId;
+                            if (gameId) {
+                                OneSignal.setExternalUserId(gameId);
+                            }
+                        }
+                    });
+                }
+            });
+        });
+    });
+}
+
 
 // Replace the entire renderView function with this
 function renderView(viewName, data = {}) {
@@ -615,115 +648,7 @@ function waitForOneSignal() {
 }
 
 
-function syncOneSignalId() {
-    window.OneSignalDeferred.push(async function(OneSignal) {
-        try {
-            // First, check if the user is actually subscribed to notifications.
-            const isSubscribed = await OneSignal.isPushNotificationsEnabled();
 
-            if (isSubscribed) {
-                // Get your internal game ID for the current user.
-                const gameId = state.currentUserId;
-
-                if (gameId) {
-                    // This is the key command: It tells OneSignal to associate
-                    // this device with your internal game ID.
-                    await OneSignal.setExternalUserId(gameId);
-                }
-            }
-        } catch (e) {
-            // Log any errors to the console for future debugging if needed.
-            console.error("OneSignal Set External User ID Error:", e);
-        }
-    });
-}
-
-async function displayOneSignalId() {
-    // Target the span we created in the HTML
-    const displayElement = document.getElementById('onesignal-id-display');
-    if (!displayElement) return; // Exit if the element isn't on the page
-
-    window.OneSignalDeferred.push(async function(OneSignal) {
-        try {
-            const userId = await OneSignal.getUserId();
-            if (userId) {
-                // If we get an ID, display it.
-                displayElement.textContent = userId;
-            } else {
-                // If there's no ID, the user is likely not subscribed.
-                displayElement.textContent = 'Not Subscribed';
-            }
-        } catch (e) {
-            displayElement.textContent = 'Error fetching ID';
-            console.error("Get OneSignal User ID Error:", e);
-        }
-    });
-}
-
-// Replace your entire initOneSignal function with this
-function initOneSignal() {
-    window.OneSignalDeferred = window.OneSignalDeferred || [];
-    window.OneSignalDeferred.push(function(OneSignal) {
-        OneSignal.init({
-            appId: "59e43537-34e1-4250-9953-9dd7e57b0a19",
-            allowLocalhostAsSecureOrigin: true,
-            autoRegister: false,
-            autoResubscribe: true,
-            notifyButton: {
-                enable: false
-            },
-            serviceWorkerPath: '/onesignalsdkworker.js',
-            serviceWorkerUpdaterPath: '/onesignalsdkupdaterworker.js',
-            promptOptions: {
-                slidedown: {
-                    enabled: false
-                }
-            }
-        })
-        .then(() => {
-            showMessage('Debug: OneSignal.init() was successful.');
-        })
-        .catch((error) => {
-            showMessage(`Debug: OneSignal.init() FAILED: ${error}`);
-        });
-
-        // This is the classic, most robust pattern for adding event listeners.
-OneSignal.push(function() {
-    OneSignal.on('subscriptionChange', async function(isSubscribed) {
-        if (isSubscribed) {
-            const userId = await OneSignal.getUserId();
-            // The sendTag line has been REMOVED from here.
-            if (userId && state.currentUserId) {
-                await fetch('/.netlify/functions/save-notification-id', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ playerId: state.currentUserId, oneSignalId: userId }),
-                });
-                    }
-                }
-            });
-        });
-    });
-}
-
-
-
-
-// Add this new function
-function updateNotificationUI() {
-    OneSignalDeferred.push(function(OneSignal) {
-        OneSignal.isPushNotificationsEnabled().then(function(isEnabled) {
-            const promptContainer = document.getElementById('notification-prompt-container');
-            if (promptContainer) {
-                if (isEnabled) {
-                    promptContainer.classList.add('hidden');
-                } else {
-                    promptContainer.classList.remove('hidden');
-                }
-            }
-        });
-    });
-}
 // Add this entire new function
 function renderMafiaFacade() {
     const playerActions = document.getElementById('player-dashboard-actions');
@@ -861,7 +786,6 @@ async function fetchPlayers(forceRefresh = false) {
 
 async function initializeGame(userId, username = null) { // NEW: Receive username
     state.currentUserId = userId;
-    syncOneSignalId();
     const sessionId = localStorage.getItem('mafiaGameSessionId');
 
     // CRITICAL FIX: If username is null (e.g., from direct page load), get it from localStorage
@@ -993,7 +917,7 @@ async function initializeGame(userId, username = null) { // NEW: Receive usernam
             }
         }
     }
-    displayOneSignalId();
+        runOneSignalSetup();
 }
 
 
@@ -1722,7 +1646,6 @@ createButton('btn-view-teammates', 'List Detectives', 'bg-cyan-600 hover:bg-cyan
 
 window.onload = async () => {
     // Start the initialization process, but don't wait for it here
-    initOneSignal();
     // The rest of your login logic remains the same
     const savedUserId = localStorage.getItem('mafiaGameUserId');
     let initialLoadTimeout;
