@@ -211,7 +211,7 @@ login: () => `
 gameLayout: (viewHtml) => `
             <div class="container" id="game-container">
                 <h1 class="text-4xl font-bold text-center text-red-500 mb-1">🩸SRSI Mafia🔫</h1> <!-- mb-2 to mb-1 -->
-                <p class="text-sm text-gray-400 text-center mb-4">v3.1 Made by: Abdulelah AlHarbi | EXCOR 23'24'</p> <!-- mb-6 to mb-4 -->
+                <p class="text-sm text-gray-400 text-center mb-4">v3.2 Made by: Abdulelah AlHarbi | EXCOR 23'24'</p> <!-- mb-6 to mb-4 -->
                 <div class="bg-gray-900 p-4 rounded-lg flex justify-between items-center mb-4">
                     <p class="text-base text-gray-400">Logged in as:</p>
 <span class="font-mono text-blue-400 text-base">${state.currentUser.Name}</span> <!-- Removed role display here -->
@@ -638,17 +638,25 @@ function initOneSignal() {
         });
 
         // Debug logging to help troubleshoot
-        OneSignal.on('subscriptionChange', function (isSubscribed) {
-            console.log("OneSignal subscription changed:", isSubscribed);
-            updateNotificationUI();
-            
-            // Additional debug logging
-            if (isSubscribed) {
-                OneSignal.getUserId().then(function(userId) {
-                    console.log("OneSignal User ID after subscription:", userId);
-                });
-            }
-        });
+OneSignal.on('subscriptionChange', async function (isSubscribed) {
+    if (isSubscribed) {
+        // The user has just subscribed. Get their OneSignal ID.
+        const userId = await OneSignal.getUserId();
+        
+        if (userId && state.currentUserId) {
+            // This is the exact command that SENDS the Game ID and OneSignal ID
+            // to the server function above.
+            await fetch('/.netlify/functions/save-notification-id', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ 
+                    playerId: state.currentUserId, 
+                    oneSignalId: userId 
+                }),
+            });
+        }
+    }
+});
 
         // Check support and log detailed info
         OneSignal.isPushNotificationsSupported().then(function(isSupported) {
