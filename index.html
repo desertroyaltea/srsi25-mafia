@@ -617,18 +617,22 @@ function waitForOneSignal() {
 function syncOneSignalId() {
     window.OneSignalDeferred.push(async function(OneSignal) {
         try {
+            // First, check if the user is actually subscribed to notifications.
             const isSubscribed = await OneSignal.isPushNotificationsEnabled();
 
             if (isSubscribed) {
-                // This is the most reliable moment to tag the user.
+                // Get your internal game ID for the current user.
                 const gameId = state.currentUserId;
+
                 if (gameId) {
-                    await OneSignal.sendTag("player_id", gameId);
+                    // This is the key command: It tells OneSignal to associate
+                    // this device with your internal game ID.
+                    await OneSignal.setExternalUserId(gameId);
                 }
             }
         } catch (e) {
-            // This catch block will handle any errors from the above calls.
-            console.error("Sync and Tag Error:", e);
+            // Log any errors to the console for future debugging if needed.
+            console.error("OneSignal Set External User ID Error:", e);
         }
     });
 }
