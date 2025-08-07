@@ -117,7 +117,7 @@
 
 <script type="module">
 const state = { allPlayers: [], currentUserId: null, currentUser: null, isCurrentUserAdmin: false, gameState: null, pendingAccusations: [], currentTrial: null, currentMission: null, nightlyRecap: null };    
-let oneSignalInitialized = false;
+
 const appRoot = document.getElementById('app-root');
     const messageBox = document.getElementById('message-box');
     const loadingOverlay = document.getElementById('loading-overlay');
@@ -211,7 +211,7 @@ login: () => `
 gameLayout: (viewHtml) => `
             <div class="container" id="game-container">
                 <h1 class="text-4xl font-bold text-center text-red-500 mb-1">🩸SRSI Mafia🔫</h1> <!-- mb-2 to mb-1 -->
-                <p class="text-sm text-gray-400 text-center mb-4">Made by: Abdulelah AlHarbi | EXCOR 23'24'</p> <!-- mb-6 to mb-4 -->
+                <p class="text-sm text-gray-400 text-center mb-4">v2.3 Made by: Abdulelah AlHarbi | EXCOR 23'24'</p> <!-- mb-6 to mb-4 -->
                 <div class="bg-gray-900 p-4 rounded-lg flex justify-between items-center mb-4">
                     <p class="text-base text-gray-400">Logged in as:</p>
 <span class="font-mono text-blue-400 text-base">${state.currentUser.Name}</span> <!-- Removed role display here -->
@@ -597,10 +597,6 @@ function renderView(viewName, data = {}) {
     } else {
         appRoot.innerHTML = templates.gameLayout(templates[viewName](data));
     }
-
-    if (viewName === 'dashboard') {
-        initOneSignal();
-    }
 }
 
 function waitForOneSignal() {
@@ -637,23 +633,17 @@ async function updateNotificationUI() {
 }
 
 // Replace your old initOneSignal function with this one
-function initOneSignal() {
-    if (oneSignalInitialized) return;
-    oneSignalInitialized = true;
-
-    window.OneSignalDeferred = window.OneSignalDeferred || [];
+function updateNotificationUI() {
     OneSignalDeferred.push(function(OneSignal) {
-        OneSignal.init({
-            appId: "59e43537-34e1-4250-9953-9dd7e57b0a19",
-            allowLocalhostAsSecureOrigin: true, // Add this for local development
-            serviceWorkerParam: { scope: '/' },
-            serviceWorkerPath: 'OneSignalSDKWorker.js'
-        }).then(function() {
-            console.log('OneSignal initialized successfully');
-            // After init is complete, update the UI
-            updateNotificationUI();
-        }).catch(function(error) {
-            console.error('OneSignal initialization failed:', error);
+        OneSignal.isPushNotificationsEnabled().then(function(isEnabled) {
+            const promptContainer = document.getElementById('notification-prompt-container');
+            if (promptContainer) {
+                if (isEnabled) {
+                    promptContainer.classList.add('hidden');
+                } else {
+                    promptContainer.classList.remove('hidden');
+                }
+            }
         });
     });
 }
@@ -1654,7 +1644,7 @@ createButton('btn-view-teammates', 'List Detectives', 'bg-cyan-600 hover:bg-cyan
 window.onload = async () => {
     const savedUserId = localStorage.getItem('mafiaGameUserId');
     let initialLoadTimeout;
-
+initOneSignal();
     showLoadingOverlay(); 
 
     initialLoadTimeout = setTimeout(() => {
@@ -1676,6 +1666,7 @@ window.onload = async () => {
         } else {
             renderView('login');
         }
+        updateNotificationUI();
     } catch (error) {
         console.error("Critical error on page load:", error);
         renderView('login');
