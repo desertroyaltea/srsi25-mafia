@@ -614,9 +614,24 @@ function waitForOneSignal() {
     });
 }
 
+// Replace your entire initOneSignal function with this
+function initOneSignal() {
+  window.OneSignalDeferred = window.OneSignalDeferred || [];
+  OneSignalDeferred.push(function(OneSignal) {
+    OneSignal.init({
+      appId: "59e43537-34e1-4250-9953-9dd7e57b0a19",
+      allowSlidedown: true,
+    });
 
+    // This event runs automatically when the user's subscription status changes
+    OneSignal.on('subscriptionChange', function (isSubscribed) {
+      console.log("OneSignal subscription state changed:", isSubscribed);
+      updateNotificationUI(); // Update the button visibility
+    });
+  });
+}
 
-// Replace your old initOneSignal function with this one
+// Add this new function
 function updateNotificationUI() {
     OneSignalDeferred.push(function(OneSignal) {
         OneSignal.isPushNotificationsEnabled().then(function(isEnabled) {
@@ -1628,6 +1643,7 @@ createButton('btn-view-teammates', 'List Detectives', 'bg-cyan-600 hover:bg-cyan
 window.onload = async () => {
     const savedUserId = localStorage.getItem('mafiaGameUserId');
     let initialLoadTimeout;
+    initOneSignal();
 
     showLoadingOverlay(); 
 
