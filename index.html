@@ -211,7 +211,7 @@ login: () => `
 gameLayout: (viewHtml) => `
             <div class="container" id="game-container">
                 <h1 class="text-4xl font-bold text-center text-red-500 mb-1">🩸SRSI Mafia🔫</h1> <!-- mb-2 to mb-1 -->
-                <p class="text-sm text-gray-400 text-center mb-4">v3.2 Made by: Abdulelah AlHarbi | EXCOR 23'24'</p> <!-- mb-6 to mb-4 -->
+                <p class="text-sm text-gray-400 text-center mb-4">v3.1 Made by: Abdulelah AlHarbi | EXCOR 23'24'</p> <!-- mb-6 to mb-4 -->
                 <div class="bg-gray-900 p-4 rounded-lg flex justify-between items-center mb-4">
                     <p class="text-base text-gray-400">Logged in as:</p>
 <span class="font-mono text-blue-400 text-base">${state.currentUser.Name}</span> <!-- Removed role display here -->
@@ -619,7 +619,7 @@ function initOneSignal() {
     window.OneSignalDeferred = window.OneSignalDeferred || [];
     OneSignalDeferred.push(function(OneSignal) {
         OneSignal.init({
-            appId: "59e43537-34e1-4250-9dd7e57b0a19",
+            appId: "59e43537-34e1-4250-9953-9dd7e57b0a19",
             allowLocalhostAsSecureOrigin: true,
             autoRegister: false, // Don't auto-register
             autoResubscribe: true,
@@ -637,31 +637,20 @@ function initOneSignal() {
             }
         });
 
-        // This event listener is the most reliable place to handle subscription changes.
+        // Debug logging to help troubleshoot
         OneSignal.on('subscriptionChange', function (isSubscribed) {
             console.log("OneSignal subscription changed:", isSubscribed);
             updateNotificationUI();
             
+            // Additional debug logging
             if (isSubscribed) {
-                OneSignal.getUserId().then(async function(userId) { // Made this async
+                OneSignal.getUserId().then(function(userId) {
                     console.log("OneSignal User ID after subscription:", userId);
-
-                    // --- NEW CODE ADDED HERE ---
-                    // This checks if we have both IDs and then sends them to the server.
-                    if (userId && state.currentUserId) {
-                        console.log(`Saving OneSignal ID ${userId} for player ${state.currentUserId}`);
-                        await fetch('/.netlify/functions/save-notification-id', {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({ playerId: state.currentUserId, oneSignalId: userId }),
-                        });
-                    }
-                    // --- END OF NEW CODE ---
                 });
             }
         });
 
-        // Your existing debug logging (unchanged)
+        // Check support and log detailed info
         OneSignal.isPushNotificationsSupported().then(function(isSupported) {
             console.log("Push notifications supported:", isSupported);
             console.log("User agent:", navigator.userAgent);
@@ -670,17 +659,18 @@ function initOneSignal() {
             console.log("Is HTTPS:", location.protocol === 'https:');
         });
 
+        // Log permission state
         OneSignal.getNotificationPermission().then(function(permission) {
             console.log("Current notification permission:", permission);
         });
 
+        // Check if already subscribed
         OneSignal.isPushNotificationsEnabled().then(function(isEnabled) {
             console.log("Push notifications currently enabled:", isEnabled);
             updateNotificationUI();
         });
     });
 }
-
 
 // Add this new function
 function updateNotificationUI() {
