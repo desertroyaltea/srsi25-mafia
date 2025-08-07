@@ -211,7 +211,7 @@ login: () => `
 gameLayout: (viewHtml) => `
             <div class="container" id="game-container">
                 <h1 class="text-4xl font-bold text-center text-red-500 mb-1">🩸SRSI Mafia🔫</h1> <!-- mb-2 to mb-1 -->
-                <p class="text-sm text-gray-400 text-center mb-4">v3.1 Made by: Abdulelah AlHarbi | EXCOR 23'24'</p> <!-- mb-6 to mb-4 -->
+                <p class="text-sm text-gray-400 text-center mb-4">v3.2 Made by: Abdulelah AlHarbi | EXCOR 23'24'</p> <!-- mb-6 to mb-4 -->
                 <div class="bg-gray-900 p-4 rounded-lg flex justify-between items-center mb-4">
                     <p class="text-base text-gray-400">Logged in as:</p>
 <span class="font-mono text-blue-400 text-base">${state.currentUser.Name}</span> <!-- Removed role display here -->
@@ -614,62 +614,38 @@ function waitForOneSignal() {
     });
 }
 
-// Replace your entire initOneSignal function with this
+// Replace the entire initOneSignal function with this
 function initOneSignal() {
-    window.OneSignalDeferred = window.OneSignalDeferred || [];
-    OneSignalDeferred.push(function(OneSignal) {
-        OneSignal.init({
-            appId: "59e43537-34e1-4250-9953-9dd7e57b0a19",
-            allowLocalhostAsSecureOrigin: true,
-            autoRegister: false, // Don't auto-register
-            autoResubscribe: true,
-            notifyButton: {
-                enable: false // We're using custom button
-            },
-            // Explicitly set service worker paths
-            serviceWorkerPath: '/onesignalsdkworker.js',
-            serviceWorkerUpdaterPath: '/onesignalsdkupdaterworker.js',
-            // Important for PWAs
-            promptOptions: {
-                slidedown: {
-                    enabled: false // We handle this manually
-                }
-            }
-        });
+  if (oneSignalInitialized) return;
+  oneSignalInitialized = true;
 
-        // Debug logging to help troubleshoot
-        OneSignal.on('subscriptionChange', function (isSubscribed) {
-            console.log("OneSignal subscription changed:", isSubscribed);
-            updateNotificationUI();
-            
-            // Additional debug logging
-            if (isSubscribed) {
-                OneSignal.getUserId().then(function(userId) {
-                    console.log("OneSignal User ID after subscription:", userId);
-                });
-            }
-        });
-
-        // Check support and log detailed info
-        OneSignal.isPushNotificationsSupported().then(function(isSupported) {
-            console.log("Push notifications supported:", isSupported);
-            console.log("User agent:", navigator.userAgent);
-            console.log("Is iOS:", /iPad|iPhone|iPod/.test(navigator.userAgent));
-            console.log("Is standalone mode:", window.navigator.standalone);
-            console.log("Is HTTPS:", location.protocol === 'https:');
-        });
-
-        // Log permission state
-        OneSignal.getNotificationPermission().then(function(permission) {
-            console.log("Current notification permission:", permission);
-        });
-
-        // Check if already subscribed
-        OneSignal.isPushNotificationsEnabled().then(function(isEnabled) {
-            console.log("Push notifications currently enabled:", isEnabled);
-            updateNotificationUI();
-        });
+  window.OneSignalDeferred = window.OneSignalDeferred || [];
+  OneSignalDeferred.push(function(OneSignal) {
+    OneSignal.init({
+      appId: "59e43537-34e1-4250-9dd7e57b0a19",
+      allowSlidedown: true,
     });
+
+    // This event runs automatically whenever the user's subscription status changes.
+    // This is the correct place to save the ID.
+    OneSignal.on('subscriptionChange', async function (isSubscribed) {
+      console.log("OneSignal subscription state changed:", isSubscribed);
+      updateNotificationUI(); // Update the button visibility
+
+      if (isSubscribed) {
+        // The user has just subscribed. Get their ID and save it.
+        const userId = await OneSignal.getUserId();
+        if (userId && state.currentUserId) {
+            console.log("User is subscribed. Saving OneSignal ID:", userId);
+            await fetch('/.netlify/functions/save-notification-id', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ playerId: state.currentUserId, oneSignalId: userId }),
+            });
+        }
+      }
+    });
+  });
 }
 
 // Add this new function
@@ -1901,101 +1877,10 @@ appRoot.addEventListener('click', async (e) => {
 }
 
 // Replace the 'btn-enable-notifications' block with this
-else if (e.target.id === 'btn-enable-notifications') {
-    try {
-        await waitForOneSignal();
-        
-        // Check if we're on iOS Safari (not PWA mode)
-        const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
-        const isInStandaloneMode = window.navigator.standalone === true;
-        
-        if (isIOS && !isInStandaloneMode) {
-            showMessage("Please add this app to your home screen first, then open it from there. Notifications don't work in Safari on iPhone.");
-            return;
-        }
-        
-        // Check if push notifications are supported
-        const isSupported = await window.OneSignal.isPushNotificationsSupported();
-        console.log("Push notifications supported:", isSupported);
-        
-        if (!isSupported) {
-            showMessage("Push notifications are not supported on this device/browser.");
-            return;
-        }
-
-        // Check current permission state
-        const permission = await window.OneSignal.getNotificationPermission();
-        console.log("Current permission state:", permission);
-
-        if (permission === 'denied') {
-            showMessage("Notifications are blocked. Please enable them in your browser/device settings, then refresh and try again.");
-            return;
-        }
-
-        // Show loading message
-        showMessage("Requesting notification permission...");
-
-        try {
-            // Try to register for push notifications
-            const registrationResult = await window.OneSignal.registerForPushNotifications();
-            console.log("Registration result:", registrationResult);
-            
-            // Wait for subscription to complete
-            await new Promise(resolve => setTimeout(resolve, 3000));
-            
-            // Check if we're now subscribed
-            const isEnabled = await window.OneSignal.isPushNotificationsEnabled();
-            console.log("Subscription successful:", isEnabled);
-            
-            if (isEnabled) {
-                const userId = await window.OneSignal.getUserId();
-                console.log("OneSignal User ID:", userId);
-                
-                if (userId) {
-                    // Save to your backend
-                    const response = await fetch('/.netlify/functions/save-notification-id', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ 
-                            playerId: state.currentUserId, 
-                            oneSignalId: userId 
-                        }),
-                    });
-                    
-                    if (response.ok) {
-                        showMessage("🎉 Notifications enabled successfully! You'll now receive game updates.");
-                        
-                        // Send a test notification to confirm it works
-                        console.log("Sending test notification...");
-                        fetch('/.netlify/functions/send-test-notification', {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({ oneSignalId: userId }),
-                        }).catch(err => console.log("Test notification failed:", err));
-                        
-                    } else {
-                        const errorText = await response.text();
-                        console.error('Failed to save notification ID:', errorText);
-                        showMessage("Notifications enabled, but failed to save to server. Please contact support.");
-                    }
-                } else {
-                    showMessage("Notifications enabled, but no user ID received. Please try again.");
-                }
-            } else {
-                showMessage("Failed to enable notifications. Please check your device settings and try again.");
-            }
-            
-        } catch (registrationError) {
-            console.error("Registration error:", registrationError);
-            showMessage("Failed to register for notifications. Error: " + registrationError.message);
-        }
-        
-        updateNotificationUI();
-        
-    } catch (error) {
-        console.error('Error enabling notifications:', error);
-        showMessage("Failed to enable notifications: " + error.message);
-    }
+ else if (e.target.id === 'btn-enable-notifications') {
+    OneSignalDeferred.push(function(OneSignal) {
+        OneSignal.Slidedown.prompt();
+    });
 }
 
 
