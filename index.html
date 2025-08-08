@@ -1077,13 +1077,13 @@ async function generateNightlyRecapStory(recapData) {
 
     // Doctor Section
     if (successfullyProtected.length > 0) {
-        storyParts.push(`Knowing the <span class="text-red-500 font-bold">Mafia</span> are planning something big, the <span class="text-blue-400 font-bold">Doctors</span> administered an experimental 'anti-murder' vaccine to ${successfullyProtectedNames}. Side effects include a sudden craving to "sneak out", a small price to pay for saving their lives.`);
+        storyParts.push(`Anticipating the attack, the <span class="text-blue-400 font-bold">Doctors</span> swapped the room numbers, causing the would-be killers to burst into an empty storage closet instead of finding ${successfullyProtectedNames}'s room.`);
     } else {
         storyParts.push(`The <span class="text-blue-400 font-bold">Doctors</span> were nowhere to be found. Rumor has it they spent the previous night gossiping in Hall 1 and ended up sleeping straight through the chaos. Not their finest hour.`);
     }
     // Mafia Section
     if (mafiaKills.length > 0) {
-        storyParts.push(`The <span class="text-red-500 font-bold">Mafia's</span> work was cold, precise, and utterly ruthless. One by one, ${mafiaKilledNames} were cornered in the hallways, their pleas for mercy silenced with chilling efficiency. The only evidence left behind was the deafening silence where their voices used to be...`);
+        storyParts.push(`The <span class="text-red-500 font-bold">Mafia</span> decided to send a message written in blood. They didn't just eliminate their targets; they made a public spectacle of it, ensuring the town would wake to the horrifying truth that nowhere is safe. The loss of ${mafiaKilledNames} was their mass declaration of absolute CONTROL.`);
     } else {
         storyParts.push(`However, their plans were foiled. It seems their intended victims were lactose intolerant and wisely avoided the soy milk chugging contest altogether.`);
     }
@@ -1092,16 +1092,16 @@ async function generateNightlyRecapStory(recapData) {
     if (sheriffKills.length > 0) {
         storyParts.push(`At long last, the <span class="text-yellow-500 font-bold">Sheriff</span> took a shot. With nerves of steel and dramatic background music playing in their head, they fired and eliminated ${sheriffKilledNames}. Not for being suspicious, but for blatantly ignoring the formal dress code. Justice was served. Fashionably late.`);
     } else {
-        storyParts.push(`We are all waiting on you, <span class="text-yellow-500 font-bold">Sheriff</span>, to save this town...`);
+        storyParts.push(`Another night passed with the <span class="text-yellow-500 font-bold">Sheriff</span>'s gun left cold. The town's hope is turning to suspicion. Whose side are they on?`);
     }
 
     // Trial Section
     if (guiltyTrials.length > 0 || notGuiltyTrials.length > 0) {
-        let trialIntro = `Meanwhile, the town held yet another dramatic trial. Accusations flew, defenses crumbled, but in the end, `;
+        let trialIntro = `Meanwhile, the town held yet another dramatic trial. Accusations flew, defenses crumbled, and in the end, `;
         let trialOutcomes = [];
         if (guiltyTrials.length > 0) {
             const verb = guiltyTrials.length > 1 ? 'were' : 'was';
-            trialOutcomes.push(`${guiltyAccusedNames} ${verb} found <span class="text-red-500 font-bold">GUILTY</span> and has been sentenced to reply to all the unread cohort-wide emails.`);
+            trialOutcomes.push(`${guiltyAccusedNames} ${verb} found <span class="text-red-500 font-bold">GUILTY</span>, a necessary sacrifice for the greater good.`);
         }
         if (notGuiltyTrials.length > 0) {
             const verb = notGuiltyTrials.length > 1 ? 'were' : 'was';
@@ -1112,7 +1112,8 @@ async function generateNightlyRecapStory(recapData) {
     }
 
     // Conclusion
-    storyParts.push(`And so, a new day begins for <span class="font-bold text-blue-400">SRSI25</span>. Trust is shattered, the coffee is probably cold, and the only thing thicker than the tension is the humidity. We are truly in the endgame, good luck.`);
+    storyParts.push(`Another day dawns on <span class="font-bold text-blue-400">SRSI25</span>. The air is thick with unspoken accusations and the stale smell of yesterday's blood spilled. People move like ghosts, their energy drained not by the lack of sleep, but by the weight of their own suspicion.`);
+    storyParts.push(`With so few survivors every night, there is no room left for error...`);
 
     return storyParts.map(part => `<p>${part}</p>`).join('');
 }
