@@ -1073,7 +1073,7 @@ async function generateNightlyRecapStory(recapData) {
     const notGuiltyAccusedNames = await formatPlayerNames(notGuiltyTrials.map(t => t.accusedPlayerId));
 
     // --- STORY CONSTRUCTION ---
-    storyParts.push(`As the first rays of dawn pierced through the darkness, <span class="font-bold text-gray-300">Building 9</span> slowly awoke from a restless night.`);
+    storyParts.push(`The night's silence finally broke, not with the sound of birds, but with the chilling realization of who was missing. <span class="font-bold text-gray-300">Building 9</span> held its breath, counting its dead.`);
 
     // Doctor Section
     if (successfullyProtected.length > 0) {
