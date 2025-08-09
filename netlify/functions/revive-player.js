@@ -67,7 +67,7 @@ exports.handler = async (event, context) => {
             const player = players[i];
             if (player[statusCol] === 'Dead') {
                 eligibleTargets.push({
-                    rowIndex: i + 2, // 1-based index for sheet ranges
+                    rowIndex: i + 2,
                     id: player[idCol],
                     name: player[nameCol]
                 });
@@ -101,6 +101,26 @@ exports.handler = async (event, context) => {
                 data: requests
             }
         });
+
+        // --- NEW LOGGING STEP ---
+        // 6. Log the successful action to the 'Actions_Doctor' sheet
+        const logEntry = [
+            new Date().toISOString(), // Timestamp
+            'Revive',                 // Action Type
+            doctorPlayerId,           // Doctor's PlayerID
+            randomTarget.id,          // Revived Player's ID
+            randomTarget.name         // Revived Player's Name
+        ];
+
+        await sheets.spreadsheets.values.append({
+            spreadsheetId: sheetId,
+            range: 'Actions_Doctor!A:E', // Appends to the Actions_Doctor sheet
+            valueInputOption: 'USER_ENTERED',
+            resource: {
+                values: [logEntry]
+            }
+        });
+        // --- END OF NEW LOGGING STEP ---
 
         return {
             statusCode: 200,

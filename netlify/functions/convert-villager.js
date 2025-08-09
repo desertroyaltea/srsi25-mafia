@@ -41,6 +41,7 @@ exports.handler = async (event, context) => {
         const players = playersResponse.data.values.slice(1);
 
         const idCol = playerHeaders.indexOf('PlayerID');
+        const nameCol = playerHeaders.indexOf('Name');
         const roleCol = playerHeaders.indexOf('Role');
         const statusCol = playerHeaders.indexOf('Status');
         const canConvertCol = playerHeaders.indexOf('MafiaCanConvert');
@@ -66,12 +67,10 @@ exports.handler = async (event, context) => {
         for (let i = 0; i < players.length; i++) {
             const player = players[i];
             if (player[statusCol] === 'Alive' && player[roleCol] === 'Villager') {
-                // Ensure they are not special roles like Jester or Sheriff by checking their original role if needed
-                // For simplicity here, we assume any player with Role='Villager' is a normal one.
                 eligibleTargets.push({
-                    rowIndex: i + 2, // 1-based index for sheet ranges
+                    rowIndex: i + 2,
                     id: player[idCol],
-                    name: player[playerHeaders.indexOf('Name')]
+                    name: player[nameCol]
                 });
             }
         }
@@ -103,6 +102,26 @@ exports.handler = async (event, context) => {
                 data: requests
             }
         });
+
+        // --- NEW LOGGING STEP ---
+        // 6. Log the successful action to the 'Actions_Mafia' sheet
+        const logEntry = [
+            new Date().toISOString(), // Timestamp
+            'Convert',                // Action Type
+            mafiaPlayerId,            // Mafia's PlayerID
+            randomTarget.id,          // Converted Player's ID
+            randomTarget.name         // Converted Player's Name
+        ];
+
+        await sheets.spreadsheets.values.append({
+            spreadsheetId: sheetId,
+            range: 'Actions_Mafia!A:E', // Appends to the Actions_Mafia sheet
+            valueInputOption: 'USER_ENTERED',
+            resource: {
+                values: [logEntry]
+            }
+        });
+        // --- END OF NEW LOGGING STEP ---
 
         return {
             statusCode: 200,

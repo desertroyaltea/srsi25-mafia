@@ -1077,31 +1077,31 @@ async function generateNightlyRecapStory(recapData) {
 
     // Doctor Section
     if (successfullyProtected.length > 0) {
-        storyParts.push(`Anticipating the attack, the <span class="text-blue-400 font-bold">Doctors</span> swapped the room numbers, causing the would-be killers to burst into an empty storage closet instead of finding ${successfullyProtectedNames}'s room.`);
+        storyParts.push(`The <span class="text-blue-400 font-bold">Doctors</span>, apparently running a "buy one, get one free" special on questionable medical procedures, managed to keep ${successfullyProtectedNames} from becoming a human-shaped chalk outline.`);
     } else {
         storyParts.push(`The <span class="text-blue-400 font-bold">Doctors</span> were nowhere to be found. Rumor has it they spent the previous night gossiping in Hall 1 and ended up sleeping straight through the chaos. Not their finest hour.`);
     }
     // Mafia Section
     if (mafiaKills.length > 0) {
-        storyParts.push(`The <span class="text-red-500 font-bold">Mafia</span> decided to send a message written in blood. They didn't just eliminate their targets; they made a public spectacle of it, ensuring the town would wake to the horrifying truth that nowhere is safe. The loss of ${mafiaKilledNames} was their mass declaration of absolute CONTROL.`);
+        storyParts.push(`It seems the <span class="text-red-500 font-bold">Mafia</span> hosted an exclusive, invite-only party last night. Unfortunately for ${mafiaKilledNames}, the theme was "surprise funerals."`);
     } else {
         storyParts.push(`However, their plans were foiled. It seems their intended victims were lactose intolerant and wisely avoided the soy milk chugging contest altogether.`);
     }
 
     // Sheriff Section
     if (sheriffKills.length > 0) {
-        storyParts.push(`At long last, the <span class="text-yellow-500 font-bold">Sheriff</span> took a shot. With nerves of steel and dramatic background music playing in their head, they fired and eliminated ${sheriffKilledNames}. Not for being suspicious, but for blatantly ignoring the formal dress code. Justice was served. Fashionably late.`);
+        storyParts.push(`The <span class="text-yellow-500 font-bold">Sheriff</span>, clearly on a tight schedule, saw the guilty verdict for ${sheriffKilledNames} and decided to cut out the middleman, delivering a personal and very permanent form of justice.`);
     } else {
         storyParts.push(`Another night passed with the <span class="text-yellow-500 font-bold">Sheriff</span>'s gun left cold. The town's hope is turning to suspicion. Whose side are they on?`);
     }
 
     // Trial Section
     if (guiltyTrials.length > 0 || notGuiltyTrials.length > 0) {
-        let trialIntro = `Meanwhile, the town held yet another dramatic trial. Accusations flew, defenses crumbled, and in the end, `;
+        let trialIntro = `The air in the town square grew heavy with paranoia. Another so-called trial began, where whispers turned to shouts, and in the end, `;
         let trialOutcomes = [];
         if (guiltyTrials.length > 0) {
             const verb = guiltyTrials.length > 1 ? 'were' : 'was';
-            trialOutcomes.push(`${guiltyAccusedNames} ${verb} found <span class="text-red-500 font-bold">GUILTY</span>, a necessary sacrifice for the greater good.`);
+            trialOutcomes.push(`${guiltyAccusedNames} ${verb} found <span class="text-red-500 font-bold">GUILTY</span>, a verdict that will be carved into their flesh as a final warning to all traitors.`);
         }
         if (notGuiltyTrials.length > 0) {
             const verb = notGuiltyTrials.length > 1 ? 'were' : 'was';
