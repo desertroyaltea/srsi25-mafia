@@ -13,18 +13,19 @@ exports.handler = async (event) => {
     if (event.httpMethod !== 'POST') return { statusCode: 405, body: JSON.stringify({ error: 'Method Not Allowed' }) };
 
     try {
-        const { actionId, status, adminPlayerId, sessionId } = JSON.parse(event.body);
-        if (!actionId || !status || !adminPlayerId || !sessionId) {
+        // The sessionId is no longer needed for validation here
+        const { actionId, status, adminPlayerId } = JSON.parse(event.body);
+        if (!actionId || !status || !adminPlayerId) {
             return { statusCode: 400, body: JSON.stringify({ error: 'Missing required fields.' }) };
         }
 
         const auth = await getAuthenticatedClient(['https://www.googleapis.com/auth/spreadsheets']);
         const sheets = google.sheets({ version: 'v4', auth });
 
-        // Verify admin status and session
+        // Verify admin status
         const playersData = await sheets.spreadsheets.values.get({
             spreadsheetId: process.env.GOOGLE_SHEET_ID,
-            range: 'Players!A:F', // Read up to SessionID column
+            range: 'Players!A:C', // Only need up to IsAdmin column
         });
         const allPlayers = playersData.data.values || [];
         const adminRow = allPlayers.find(p => p[0] === adminPlayerId);
@@ -34,9 +35,9 @@ exports.handler = async (event) => {
         }
 
         const isAdmin = (adminRow[2] || '').trim().toUpperCase() === 'TRUE'; // IsAdmin is in Column C
-        const isValidSession = adminRow[5] === sessionId; // SessionID is in Column F
 
-        if (!isAdmin || !isValidSession) {
+        // FIX: Removed the strict session check
+        if (!isAdmin) {
             return { statusCode: 403, body: JSON.stringify({ error: 'Unauthorized.' }) };
         }
 
