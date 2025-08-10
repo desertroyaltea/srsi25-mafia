@@ -431,10 +431,10 @@ adminReviewKillsModal: ({ pendingKills }) => `
                         <p class="text-gray-300"><strong>Target:</strong> ${kill.TargetPlayerName}</p>
                         <p class="text-gray-300"><strong>Submitted:</strong> ${new Date(kill.Timestamp).toLocaleString()}</p>
                         <div class="mt-3 mb-4">
-                            ${kill.embedLink ? `
-                                <iframe src="${kill.embedLink}" class="w-full h-64 rounded-lg border border-gray-600" allow="autoplay"></iframe>
+                            ${kill.Link ? `
+                                <a href="${kill.Link}" target="_blank" class="text-blue-400 hover:text-blue-300 underline">Watch Video Evidence (Opens in New Tab)</a>
                             ` : `
-                                <p class="text-gray-400">Video link is missing or invalid.</p>
+                                <p class="text-gray-400">Video link is missing.</p>
                             `}
                         </div>
                         <div class="flex flex-col md:flex-row gap-2">
