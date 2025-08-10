@@ -29,7 +29,7 @@ exports.handler = async (event) => {
             }),
             sheets.spreadsheets.values.get({
                 spreadsheetId: process.env.GOOGLE_SHEET_ID,
-                range: 'Players!A:B', // Only need ID and Status columns
+                range: 'Players!A:E', // Read up to column E
             })
         ]);
         
@@ -55,10 +55,10 @@ exports.handler = async (event) => {
         if (status === 'Accepted') {
             const targetPlayerRowIndex = allPlayers.findIndex(p => p[0] === targetPlayerId);
             if (targetPlayerRowIndex !== -1) {
-                // Update player status to "Dead" in Players sheet (column B)
+                // FIX: Update player status to "Dead" in Players sheet (column E)
                 await sheets.spreadsheets.values.update({
                     spreadsheetId: process.env.GOOGLE_SHEET_ID,
-                    range: `Players!B${targetPlayerRowIndex + 1}`,
+                    range: `Players!E${targetPlayerRowIndex + 1}`,
                     valueInputOption: 'USER_ENTERED',
                     resource: { values: [['Dead']] },
                 });

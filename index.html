@@ -2081,7 +2081,6 @@ else if (e.target.id === 'btn-review-kills') {
 else if (e.target.classList.contains('btn-accept-kill')) {
     const actionId = e.target.dataset.actionId;
     const success = await performFetchAction('/.netlify/functions/update-kill-status', { actionId, status: 'Accepted', adminPlayerId: state.currentUserId });
-    // Refresh the view ONLY if the action was successful
     if (success) {
         document.getElementById('btn-review-kills').click();
     }
@@ -2089,7 +2088,6 @@ else if (e.target.classList.contains('btn-accept-kill')) {
 else if (e.target.classList.contains('btn-reject-kill')) {
     const actionId = e.target.dataset.actionId;
     const success = await performFetchAction('/.netlify/functions/update-kill-status', { actionId, status: 'Rejected', adminPlayerId: state.currentUserId });
-    // Refresh the view ONLY if the action was successful
     if (success) {
         document.getElementById('btn-review-kills').click();
     }
