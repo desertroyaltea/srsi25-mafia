@@ -431,7 +431,11 @@ adminReviewKillsModal: ({ pendingKills }) => `
                         <p class="text-gray-300"><strong>Target:</strong> ${kill.TargetPlayerName}</p>
                         <p class="text-gray-300"><strong>Submitted:</strong> ${new Date(kill.Timestamp).toLocaleString()}</p>
                         <div class="mt-3 mb-4">
-                            <a href="https://drive.google.com/file/d/${kill.FileID}/view" target="_blank" class="text-blue-400 hover:text-blue-300 underline">Watch Video Evidence (New Tab)</a>
+                            ${kill.embedLink ? `
+                                <iframe src="${kill.embedLink}" class="w-full h-64 rounded-lg border border-gray-600" allow="autoplay"></iframe>
+                            ` : `
+                                <p class="text-gray-400">Video link is missing or invalid.</p>
+                            `}
                         </div>
                         <div class="flex flex-col md:flex-row gap-2">
                             <button type="button" class="btn-accept-kill bg-green-700 hover:bg-green-800 text-white font-bold py-2 px-4 rounded-lg w-full" data-action-id="${kill.ActionID}">Accept Kill</button>

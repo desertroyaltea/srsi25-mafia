@@ -17,7 +17,7 @@ exports.handler = async (event) => {
         const [killData, playerData] = await Promise.all([
             sheets.spreadsheets.values.get({
                 spreadsheetId: process.env.GOOGLE_SHEET_ID,
-                range: 'Video_Kill!A:F',
+                range: 'Video_Kill!A:G', // Read up to the Link column
             }),
             sheets.spreadsheets.values.get({
                 spreadsheetId: process.env.GOOGLE_SHEET_ID,
@@ -31,33 +31,29 @@ exports.handler = async (event) => {
 
         const pendingKills = kills
             .filter(row => row[5] === 'Pending') // Filter by Status in column F
-            .map(row => ({
-                ActionID: row[0],
-                Day: row[1],
-                MafiaPlayerID: row[2],
-                TargetPlayerID: row[3],
-                Timestamp: row[4],
-                Status: row[5],
-                FileID: row[3], // Assuming FileID is logged in the same column as TargetPlayerID for now
-                MafiaPlayerName: playerMap.get(row[2]) || 'Unknown',
-                TargetPlayerName: playerMap.get(row[3]) || 'Unknown',
-            }));
-            
-        // A correction to get the FileID from the Actions_Mafia sheet
-        const actionsData = await sheets.spreadsheets.values.get({
-             spreadsheetId: process.env.GOOGLE_SHEET_ID,
-             range: 'Actions_Mafia!A:D',
-        });
-        const actions = actionsData.data.values || [];
-        const actionMap = new Map(actions.map(a => [a[0], a[3]])); // ActionID -> Details
+            .map(row => {
+                const webViewLink = row[6] || '';
+                let embedLink = '';
 
-        pendingKills.forEach(kill => {
-            const details = actionMap.get(kill.ActionID);
-            if (details && details.startsWith('FileID: ')) {
-                 kill.FileID = details.replace('FileID: ', '').trim();
-            }
-        });
+                // Extract file ID from the link, e.g., https://drive.google.com/file/d/FILE_ID/view?usp=sharing
+                const fileIdMatch = webViewLink.match(/d\/(.*?)\//);
+                if (fileIdMatch && fileIdMatch[1]) {
+                    const fileId = fileIdMatch[1];
+                    embedLink = `https://drive.google.com/file/d/${fileId}/preview`;
+                }
 
+                return {
+                    ActionID: row[0],
+                    Day: row[1],
+                    MafiaPlayerID: row[2],
+                    TargetPlayerID: row[3],
+                    Timestamp: row[4],
+                    Status: row[5],
+                    embedLink: embedLink, // Provide the embeddable link to the frontend
+                    MafiaPlayerName: playerMap.get(row[2]) || 'Unknown',
+                    TargetPlayerName: playerMap.get(row[3]) || 'Unknown',
+                };
+            });
 
         return {
             statusCode: 200,
