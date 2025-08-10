@@ -13,7 +13,6 @@ exports.handler = async (event) => {
     if (event.httpMethod !== 'POST') return { statusCode: 405, body: JSON.stringify({ error: 'Method Not Allowed' }) };
 
     try {
-        // The sessionId is no longer needed for validation here
         const { actionId, status, adminPlayerId } = JSON.parse(event.body);
         if (!actionId || !status || !adminPlayerId) {
             return { statusCode: 400, body: JSON.stringify({ error: 'Missing required fields.' }) };
@@ -36,7 +35,7 @@ exports.handler = async (event) => {
 
         const isAdmin = (adminRow[2] || '').trim().toUpperCase() === 'TRUE'; // IsAdmin is in Column C
 
-        // FIX: Removed the strict session check
+        // FIX: Removed the strict session check that was causing the 403 error
         if (!isAdmin) {
             return { statusCode: 403, body: JSON.stringify({ error: 'Unauthorized.' }) };
         }
