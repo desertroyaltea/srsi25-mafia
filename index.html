@@ -278,7 +278,9 @@ dashboard: () => `
              <div id="player-dashboard-actions" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-0 mt-0"></div>
              <div id="admin-dashboard-actions" class="grid-cols-1 md:grid-cols-2 gap-0 mt-0 ${state.isCurrentUserAdmin ? 'grid' : 'hidden'}">
                  <button id="btn-review-accusations" class="bg-green-700 hover:bg-green-800 text-white font-bold py-3 px-6 rounded-lg">Review Accusations</button>
-             </div>
+             <button id="btn-review-kills" class="bg-yellow-700 hover:bg-yellow-800 text-white font-bold py-3 px-6 rounded-lg">Review Kills</button>
+                 </div>
+             
          </div>`,
 actionModal: ({ title, buttonText, targets, actionType }) => `
             <div class="bg-gray-900 p-5 rounded-lg mt-4">
@@ -389,10 +391,17 @@ accusationForm: ({ targets }) => `
     </div>
 `,
 
-videoUploadModal: () => `
+videoUploadModal: ({ targets }) => `
     <div class="bg-gray-900 p-5 rounded-lg mt-4">
         <h2 class="text-2xl font-semibold mb-4 text-red-400">Upload Kill Video</h2>
         <form id="video-upload-form">
+            <div class="mb-4">
+                <label for="target-player-video-kill" class="block text-gray-300 text-lg font-bold mb-2">Select Target:</label>
+                <select id="target-player-video-kill" class="shadow border rounded w-full py-3 px-4 text-lg leading-tight focus:outline-none focus:shadow-outline bg-gray-700 border-gray-600 text-white" required>
+                    <option value="">-- Select a player to eliminate --</option>
+                    ${targets.map(p => `<option value="${p.PlayerID}">${p.Name}</option>`).join('')}
+                </select>
+            </div>
             <div class="mb-6">
                 <label for="video-file-input" class="block text-gray-300 text-lg font-bold mb-2">Select Video File:</label>
                 <input type="file" id="video-file-input" accept="video/*" class="w-full text-white file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-red-700 file:text-white hover:file:bg-red-800" required>
@@ -406,6 +415,33 @@ videoUploadModal: () => `
                 <button type="button" id="back-to-dashboard" class="bg-gray-600 hover:bg-gray-700 text-white font-bold py-3 px-6 rounded-lg w-full md:w-1/2 text-xl">Cancel</button>
             </div>
         </form>
+    </div>
+`,
+
+
+adminReviewKillsModal: ({ pendingKills }) => `
+    <div class="bg-gray-900 p-5 rounded-lg mt-4">
+        <h2 class="text-2xl font-semibold mb-4 text-red-400">Admin: Review Pending Kills</h2>
+        ${pendingKills.length > 0 ? `
+            <div class="space-y-6 max-h-[60vh] overflow-y-auto pr-2">
+                ${pendingKills.map(kill => `
+                    <div class="bg-gray-800 p-4 rounded-lg border border-gray-700">
+                        <p class="text-gray-300"><strong>Action ID:</strong> ${kill.ActionID}</p>
+                        <p class="text-gray-300"><strong>Mafia:</strong> ${kill.MafiaPlayerName}</p>
+                        <p class="text-gray-300"><strong>Target:</strong> ${kill.TargetPlayerName}</p>
+                        <p class="text-gray-300"><strong>Submitted:</strong> ${new Date(kill.Timestamp).toLocaleString()}</p>
+                        <div class="mt-3 mb-4">
+                            <a href="https://drive.google.com/file/d/${kill.FileID}/view" target="_blank" class="text-blue-400 hover:text-blue-300 underline">Watch Video Evidence (New Tab)</a>
+                        </div>
+                        <div class="flex flex-col md:flex-row gap-2">
+                            <button type="button" class="btn-accept-kill bg-green-700 hover:bg-green-800 text-white font-bold py-2 px-4 rounded-lg w-full" data-action-id="${kill.ActionID}">Accept Kill</button>
+                            <button type="button" class="btn-reject-kill bg-red-700 hover:bg-red-800 text-white font-bold py-2 px-4 rounded-lg w-full" data-action-id="${kill.ActionID}">Reject Kill</button>
+                        </div>
+                    </div>
+                `).join('')}
+            </div>
+        ` : '<p class="text-gray-400">No pending kills to review.</p>'}
+        <button type="button" id="back-to-dashboard" class="mt-6 bg-gray-600 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded-lg w-full">Back to Dashboard</button>
     </div>
 `,
 
@@ -1254,6 +1290,12 @@ async function handleVideoUpload(videoFile) {
     const submitBtn = document.getElementById('submit-video-btn');
     const progressContainer = document.getElementById('upload-progress-container');
     const progressBar = document.getElementById('upload-progress-bar');
+    const targetPlayerId = document.getElementById('target-player-video-kill').value;
+
+    if (!targetPlayerId) {
+        showMessage("You must select a target player.");
+        return;
+    }
 
     submitBtn.disabled = true;
     progressContainer.classList.remove('hidden');
@@ -1263,6 +1305,7 @@ async function handleVideoUpload(videoFile) {
         const formData = new FormData();
         formData.append('videoFile', videoFile);
         formData.append('playerId', state.currentUserId);
+        formData.append('targetPlayerId', targetPlayerId); // New field
         formData.append('sessionId', localStorage.getItem('mafiaGameSessionId'));
 
         const response = await fetch('/.netlify/functions/upload-kill-video', {
@@ -1270,24 +1313,22 @@ async function handleVideoUpload(videoFile) {
             body: formData,
         });
 
-        // Simple progress simulation
         progressBar.style.width = '50%';
-
         const result = await response.json();
         progressBar.style.width = '100%';
 
         if (response.ok) {
             showMessage(result.message || 'Video uploaded successfully!');
-            await fetchPlayers(true); // Refresh data
+            await fetchPlayers(true);
             await fetchGameState();
-            initializeGame(state.currentUserId); // Re-initialize the game view
+            initializeGame(state.currentUserId);
         } else {
             throw new Error(result.error || 'Upload failed.');
         }
     } catch (error) {
         console.error("Video upload error:", error);
         showMessage(`Upload failed: ${error.message}`);
-        submitBtn.disabled = false; // Re-enable button on failure
+        submitBtn.disabled = false;
         progressContainer.classList.add('hidden');
     }
 }
@@ -2018,8 +2059,36 @@ else if (e.target.id === 'btn-kill-by-vote') {
     const targets = getDisplayableTargets(false, false);
     renderView('actionModal', { title: 'Choose a Target to Kill', buttonText: 'Confirm Kill', targets, actionType: 'kill' });
 }
+else if (e.target.id === 'btn-review-kills') {
+    showLoadingOverlay();
+    try {
+        const response = await fetch('/.netlify/functions/review-kill-videos');
+        if (!response.ok) throw new Error('Failed to fetch pending kills.');
+        const pendingKills = await response.json();
+        renderView('adminReviewKillsModal', { pendingKills });
+    } catch (error) {
+        showMessage(error.message);
+        console.error("Error fetching pending kills:", error);
+    } finally {
+        hideLoadingOverlay();
+    }
+}
+else if (e.target.classList.contains('btn-accept-kill')) {
+    const actionId = e.target.dataset.actionId;
+    await performFetchAction('/.netlify/functions/update-kill-status', { actionId, status: 'Accepted', adminPlayerId: state.currentUserId });
+    // Refresh the view after action
+    document.getElementById('btn-review-kills').click();
+}
+else if (e.target.classList.contains('btn-reject-kill')) {
+    const actionId = e.target.dataset.actionId;
+    await performFetchAction('/.netlify/functions/update-kill-status', { actionId, status: 'Rejected', adminPlayerId: state.currentUserId });
+    // Refresh the view after action
+    document.getElementById('btn-review-kills').click();
+}
+
 else if (e.target.id === 'btn-kill-by-video') {
-    renderView('videoUploadModal');
+    const targets = getDisplayableTargets(false, false); // Get targets
+    renderView('videoUploadModal', { targets }); // Pass targets to the template
 }
 else if (e.target.id === 'video-file-input') {
     // This is a click on the input itself, let the default action happen.
