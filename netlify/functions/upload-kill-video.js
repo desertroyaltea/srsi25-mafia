@@ -6,7 +6,8 @@ const stream = require('stream');
 
 // --- Google Sheets API Helper (You should move this to a shared file later) ---
 async function getGoogleSheetsClient() {
-    const credentials = JSON.parse(process.env.GOOGLE_CREDENTIALS);
+    // FIX: Use the correct environment variable name
+    const credentials = JSON.parse(process.env.GOOGLE_SERVICE_ACCOUNT_CREDENTIALS);
     const auth = new google.auth.GoogleAuth({
         credentials,
         scopes: ['https://www.googleapis.com/auth/spreadsheets'],
@@ -110,7 +111,8 @@ exports.handler = async (event) => {
 
         // --- Upload to Google Drive ---
         const driveAuth = new google.auth.GoogleAuth({
-            credentials: JSON.parse(process.env.GOOGLE_CREDENTIALS),
+            // FIX: Use the correct environment variable name
+            credentials: JSON.parse(process.env.GOOGLE_SERVICE_ACCOUNT_CREDENTIALS),
             scopes: ['https://www.googleapis.com/auth/drive'],
         });
         const drive = google.drive({ version: 'v3', auth: driveAuth });
