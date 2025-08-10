@@ -1,10 +1,9 @@
 // File: netlify/functions/upload-kill-video.js
-// REPLACES the previous version entirely.
 
 const { google } = require('googleapis');
 const busboy = require('busboy');
 const stream = require('stream');
-const { v4: uuidv4 } = require('uuid'); // Add UUID for unique ActionIDs
+const { v4: uuidv4 } = require('uuid');
 
 async function getAuthenticatedClient(scopes) {
     const { GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, GOOGLE_REFRESH_TOKEN } = process.env;
@@ -77,17 +76,24 @@ exports.handler = async (event) => {
 
         const auth = await getAuthenticatedClient(['https://www.googleapis.com/auth/spreadsheets', 'https://www.googleapis.com/auth/drive']);
         
-        const [playersData, gameStateData] = await Promise.all([
-            getSheetData(auth, 'Players!A:B'),
-            getSheetData(auth, 'GameState!A:B')
-        ]);
+        // --- FIX: Isolate the GameState fetch to prevent crashes ---
+        let currentDay = 'N/A';
+        try {
+            const gameStateData = await getSheetData(auth, 'GameState!A2:B2'); // More specific range
+            if (gameStateData[0] && gameStateData[0][1]) {
+                currentDay = gameStateData[0][1];
+            }
+        } catch (e) {
+            console.warn("Could not fetch CurrentDay from GameState sheet. Defaulting to 'N/A'. Error:", e.message);
+        }
+        // --- END FIX ---
 
+        const playersData = await getSheetData(auth, 'Players!A:B');
         const playerRow = playersData.find(row => row[0] === playerId);
         if (!playerRow) return { statusCode: 404, body: JSON.stringify({ error: 'Player not found.' }) };
         
         const playerName = playerRow[1];
         const playerRowIndex = playersData.findIndex(row => row[0] === playerId) + 1;
-        const currentDay = gameStateData[0] ? gameStateData[0][1] : 'N/A'; // Assuming Day is in B1
 
         const drive = google.drive({ version: 'v3', auth });
         const timestamp = new Date().toISOString();
@@ -106,17 +112,15 @@ exports.handler = async (event) => {
         const fileId = response.data.id;
         const actionId = uuidv4();
 
-        // Log to the new Video_Kill sheet
         await appendSheetData(auth, 'Video_Kill!A:F', [
             actionId,
             currentDay,
             playerId,
             targetPlayerId,
             timestamp,
-            'Pending' // Initial status
+            'Pending'
         ]);
 
-        // Mark MainUsed as TRUE for the player
         await updateSheetData(auth, `Players!D${playerRowIndex}`, ['TRUE']);
 
         return { statusCode: 200, body: JSON.stringify({ message: 'Video uploaded for review!' }) };
