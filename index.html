@@ -1073,17 +1073,17 @@ async function generateNightlyRecapStory(recapData) {
     const notGuiltyAccusedNames = await formatPlayerNames(notGuiltyTrials.map(t => t.accusedPlayerId));
 
     // --- STORY CONSTRUCTION ---
-    storyParts.push(`The night's silence finally broke, not with the sound of birds, but with the chilling realization of who was missing. <span class="font-bold text-gray-300">Building 9</span> held its breath, counting its dead.`);
+    storyParts.push(`The sun rose not as a new hope, but as a harsh spotlight on the previous night's massacre. A cold dread settled over <span class="font-bold text-gray-300">Building 9</span> as the living began to fear the faces of their friends.`);
 
     // Doctor Section
     if (successfullyProtected.length > 0) {
         storyParts.push(`The <span class="text-blue-400 font-bold">Doctors</span>, apparently running a "buy one, get one free" special on questionable medical procedures, managed to keep ${successfullyProtectedNames} from becoming a human-shaped chalk outline.`);
     } else {
-        storyParts.push(`The <span class="text-blue-400 font-bold">Doctors</span> were nowhere to be found. Rumor has it they spent the previous night gossiping in Hall 1 and ended up sleeping straight through the chaos. Not their finest hour.`);
+        storyParts.push(`A strange silence fell over the clinic last night. The <span class="text-blue-400 font-bold">Doctors</span> claimed they ran out of supplies, but the truth hangs in the air like poison: lives were left to be extinguished, and not a single hand was lifted to help.`);
     }
     // Mafia Section
     if (mafiaKills.length > 0) {
-        storyParts.push(`It seems the <span class="text-red-500 font-bold">Mafia</span> hosted an exclusive, invite-only party last night. Unfortunately for ${mafiaKilledNames}, the theme was "surprise funerals."`);
+        storyParts.push(`It was supposed to be a friendly meeting, a chance to form an alliance. But Baskin Robins was a trap. The <span class="text-red-500 font-bold">Mafia</span> bolted the doors, the air filled with the stench of gasoline, and the desperate screams of ${mafiaKilledNames} were the last sounds heard before the building was consumed by fire."`);
     } else {
         storyParts.push(`However, their plans were foiled. It seems their intended victims were lactose intolerant and wisely avoided the soy milk chugging contest altogether.`);
     }
@@ -1112,8 +1112,8 @@ async function generateNightlyRecapStory(recapData) {
     }
 
     // Conclusion
-    storyParts.push(`Another dawn breaks over <span class="font-bold text-blue-400">SRSI25</span>, not with hope, but with the cold certainty of more bloodshed to come. The living no longer see friends, only potential traitors and future ghosts.`);
-    storyParts.push(`Trust is a currency YOU can no longer afford...`);
+    storyParts.push(`The morning air hangs heavy over <span class="font-bold text-blue-400">SRSI25</span>, thick with the stench of fear and decay. The few who remain walk in silence, knowing their numbers are dwindling.`);
+    storyParts.push(`Soon, there will be nowhere left to hide...`);
 
     return storyParts.map(part => `<p>${part}</p>`).join('');
 }
