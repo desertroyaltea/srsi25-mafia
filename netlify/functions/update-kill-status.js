@@ -13,40 +13,29 @@ exports.handler = async (event) => {
     if (event.httpMethod !== 'POST') return { statusCode: 405, body: JSON.stringify({ error: 'Method Not Allowed' }) };
 
     try {
-        // The sessionId is no longer needed for validation here
-        const { actionId, status, adminPlayerId } = JSON.parse(event.body);
-        if (!actionId || !status || !adminPlayerId) {
-            return { statusCode: 400, body: JSON.stringify({ error: 'Missing required fields.' }) };
+        const { actionId, status } = JSON.parse(event.body);
+        if (!actionId || !status) {
+            return { statusCode: 400, body: JSON.stringify({ error: 'Missing actionId or status.' }) };
         }
 
         const auth = await getAuthenticatedClient(['https://www.googleapis.com/auth/spreadsheets']);
         const sheets = google.sheets({ version: 'v4', auth });
 
-        // Verify admin status
-        const playersData = await sheets.spreadsheets.values.get({
-            spreadsheetId: process.env.GOOGLE_SHEET_ID,
-            range: 'Players!A:C', // Only need up to IsAdmin column
-        });
-        const allPlayers = playersData.data.values || [];
-        const adminRow = allPlayers.find(p => p[0] === adminPlayerId);
-
-        if (!adminRow) {
-            return { statusCode: 403, body: JSON.stringify({ error: 'Unauthorized: Admin user not found.' }) };
-        }
-
-        const isAdmin = (adminRow[2] || '').trim().toUpperCase() === 'TRUE'; // IsAdmin is in Column C
-
-        // FIX: Removed the strict session check
-        if (!isAdmin) {
-            return { statusCode: 403, body: JSON.stringify({ error: 'Unauthorized.' }) };
-        }
-
-        const killData = await sheets.spreadsheets.values.get({
-            spreadsheetId: process.env.GOOGLE_SHEET_ID,
-            range: 'Video_Kill!A:F',
-        });
-
+        // Get all data needed in one go
+        const [killData, playersData] = await Promise.all([
+            sheets.spreadsheets.values.get({
+                spreadsheetId: process.env.GOOGLE_SHEET_ID,
+                range: 'Video_Kill!A:F',
+            }),
+            sheets.spreadsheets.values.get({
+                spreadsheetId: process.env.GOOGLE_SHEET_ID,
+                range: 'Players!A:B', // Only need ID and Status columns
+            })
+        ]);
+        
         const kills = killData.data.values || [];
+        const allPlayers = playersData.data.values || [];
+
         const killRowIndex = kills.findIndex(row => row[0] === actionId);
 
         if (killRowIndex === -1) {
