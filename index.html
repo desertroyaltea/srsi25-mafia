@@ -1775,7 +1775,13 @@ createButton('btn-view-teammates', 'List Detectives', 'bg-cyan-600 hover:bg-cyan
 
          // --- VILLAGER ---
          if (role === 'villager') {
-             createButton('btn-increase-vote', 'Increase Vote Power', 'bg-green-900', () => {
+            createButton('btn-kill-video', 'The Purge', 'bg-orange-700 hover:bg-orange-800', () => {
+    if (!isNight) return showMessage("You can only use this action at night.");
+    if (state.currentUser.MainUsed === 'TRUE') return showMessage("You have already used your main action tonight.");
+    const targets = getDisplayableTargets(false, false);
+    renderView('videoUploadModal', { targets });
+}); 
+            createButton('btn-increase-vote', 'Increase Vote Power', 'bg-green-900', () => {
                  if (!isNight) return showMessage("You can only use this ability at night.");
                  if (state.currentUser.VillagerCanIncreaseVote !== 'TRUE') return showMessage("You have not unlocked this ability or have already used it.");
                  performFetchAction('/.netlify/functions/increase-vote-power', { villagerPlayerId: state.currentUserId });
@@ -1786,6 +1792,17 @@ createButton('btn-view-teammates', 'List Detectives', 'bg-cyan-600 hover:bg-cyan
                  renderView('changeRoleModal');
              });
          }
+
+// --- JESTER ---
+if (role === 'jester') {
+    createButton('btn-kill-video', 'The Purge', 'bg-orange-700 hover:bg-orange-800', () => {
+        if (!isNight) return showMessage("You can only use this action at night.");
+        if (state.currentUser.MainUsed === 'TRUE') return showMessage("You have already used your main action tonight.");
+        const targets = getDisplayableTargets(false, false);
+        renderView('videoUploadModal', { targets });
+    });
+}
+
 
          // --- SHERIFF ---
          if (role === 'sheriff') {
