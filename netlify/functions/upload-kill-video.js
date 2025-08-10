@@ -76,17 +76,15 @@ exports.handler = async (event) => {
 
         const auth = await getAuthenticatedClient(['https://www.googleapis.com/auth/spreadsheets', 'https://www.googleapis.com/auth/drive']);
         
-        // --- FIX: Isolate the GameState fetch to prevent crashes ---
         let currentDay = 'N/A';
         try {
-            const gameStateData = await getSheetData(auth, 'Game_State!A2:B2'); // More specific range
+            const gameStateData = await getSheetData(auth, 'GameState!A2:B2');
             if (gameStateData[0] && gameStateData[0][1]) {
                 currentDay = gameStateData[0][1];
             }
         } catch (e) {
             console.warn("Could not fetch CurrentDay from GameState sheet. Defaulting to 'N/A'. Error:", e.message);
         }
-        // --- END FIX ---
 
         const playersData = await getSheetData(auth, 'Players!A:B');
         const playerRow = playersData.find(row => row[0] === playerId);
@@ -106,22 +104,34 @@ exports.handler = async (event) => {
         const response = await drive.files.create({
             requestBody: { name: newFileName, parents: [process.env.GOOGLE_DRIVE_FOLDER_ID] },
             media: { mimeType: videoFile.contentType, body: bufferStream },
-            fields: 'id',
+            fields: 'id, webViewLink', // FIX: Request the webViewLink
         });
 
         const fileId = response.data.id;
+        const fileLink = response.data.webViewLink; // FIX: Get the link from the response
+        
+        await drive.permissions.create({
+            fileId: fileId,
+            requestBody: {
+                role: 'reader',
+                type: 'anyone',
+            },
+        });
+
         const actionId = uuidv4();
 
-        await appendSheetData(auth, 'Video_Kill!A:F', [
+        // FIX: Append to column G and include the fileLink
+        await appendSheetData(auth, 'Video_Kill!A:G', [
             actionId,
             currentDay,
             playerId,
             targetPlayerId,
             timestamp,
-            'Pending'
+            'Pending',
+            fileLink // Add the link to the new "Link" column
         ]);
 
-        await updateSheetData(auth, `Players!D${playerRowIndex}`, ['TRUE']);
+        await updateSheetData(auth, `Players!U${playerRowIndex}`, ['TRUE']);
 
         return { statusCode: 200, body: JSON.stringify({ message: 'Video uploaded for review!' }) };
 
