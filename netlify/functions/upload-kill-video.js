@@ -153,7 +153,7 @@ exports.handler = async (event) => {
         const fileId = response.data.id;
         const fileLink = response.data.webViewLink;
 
-        // --- Update Google Sheets ---
+        // --- Update G oogle Sheets ---
         await appendSheetData(auth, 'Actions_Mafia!A:D', [
             timestamp,
             playerId,
