@@ -6,7 +6,7 @@ const stream = require('stream');
 
 // --- Google Sheets API Helper (You should move this to a shared file later) ---
 async function getGoogleSheetsClient() {
-    const credentials = JSON.parse(process.env.GOOGLE_SERVICE_ACCOUNT_CREDENTIALS);
+    const credentials = JSON.parse(process.env.GOOGLE_CREDENTIALS);
     const auth = new google.auth.GoogleAuth({
         credentials,
         scopes: ['https://www.googleapis.com/auth/spreadsheets'],
@@ -89,20 +89,20 @@ exports.handler = async (event) => {
 
     try {
         const { fields, files } = await parseMultipartForm(event);
-        const { playerId, sessionId } = fields;
+        const { playerId, sessionId } = fields; // sessionId is no longer used for validation but kept for potential future use
         const videoFile = files.videoFile;
 
-        if (!playerId || !sessionId || !videoFile) {
-            return { statusCode: 400, body: JSON.stringify({ error: 'Missing required fields: playerId, sessionId, or videoFile.' }) };
+        if (!playerId || !videoFile) {
+            return { statusCode: 400, body: JSON.stringify({ error: 'Missing required fields: playerId or videoFile.' }) };
         }
 
-        // --- Authenticate Player Session ---
+        // --- Get Player Info (Session check removed as requested) ---
         const auth = await getGoogleSheetsClient();
         const playersData = await getSheetData(auth, 'Players!A:F'); // Assuming SessionID is in F
         const playerRow = playersData.find(row => row[0] === playerId);
 
-        if (!playerRow || playerRow[5] !== sessionId) {
-            return { statusCode: 401, body: JSON.stringify({ error: 'Invalid session. Please log in again.' }) };
+        if (!playerRow) {
+            return { statusCode: 404, body: JSON.stringify({ error: 'Player not found.' }) };
         }
         
         const playerName = playerRow[1]; // Assuming Name is in column B
@@ -110,7 +110,7 @@ exports.handler = async (event) => {
 
         // --- Upload to Google Drive ---
         const driveAuth = new google.auth.GoogleAuth({
-            credentials: JSON.parse(process.env.GOOGLE_SERVICE_ACCOUNT_CREDENTIALS),
+            credentials: JSON.parse(process.env.GOOGLE_CREDENTIALS),
             scopes: ['https://www.googleapis.com/auth/drive'],
         });
         const drive = google.drive({ version: 'v3', auth: driveAuth });
