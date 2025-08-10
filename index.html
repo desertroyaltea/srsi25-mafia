@@ -1250,6 +1250,48 @@ async function performFetchAction(endpoint, payload) {
     }
 
 
+async function handleVideoUpload(videoFile) {
+    const submitBtn = document.getElementById('submit-video-btn');
+    const progressContainer = document.getElementById('upload-progress-container');
+    const progressBar = document.getElementById('upload-progress-bar');
+
+    submitBtn.disabled = true;
+    progressContainer.classList.remove('hidden');
+    progressBar.style.width = '0%';
+
+    try {
+        const formData = new FormData();
+        formData.append('videoFile', videoFile);
+        formData.append('playerId', state.currentUserId);
+        formData.append('sessionId', localStorage.getItem('mafiaGameSessionId'));
+
+        const response = await fetch('/.netlify/functions/upload-kill-video', {
+            method: 'POST',
+            body: formData,
+        });
+
+        // Simple progress simulation
+        progressBar.style.width = '50%';
+
+        const result = await response.json();
+        progressBar.style.width = '100%';
+
+        if (response.ok) {
+            showMessage(result.message || 'Video uploaded successfully!');
+            await fetchPlayers(true); // Refresh data
+            await fetchGameState();
+            initializeGame(state.currentUserId); // Re-initialize the game view
+        } else {
+            throw new Error(result.error || 'Upload failed.');
+        }
+    } catch (error) {
+        console.error("Video upload error:", error);
+        showMessage(`Upload failed: ${error.message}`);
+        submitBtn.disabled = false; // Re-enable button on failure
+        progressContainer.classList.add('hidden');
+    }
+}
+
 // --- Audio Recording Functions ---
     async function startRecording() {
         try {
