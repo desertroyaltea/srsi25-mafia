@@ -79,7 +79,7 @@ exports.handler = async (event) => {
         // --- FIX: Isolate the GameState fetch to prevent crashes ---
         let currentDay = 'N/A';
         try {
-            const gameStateData = await getSheetData(auth, 'GameState!A2:B2'); // More specific range
+            const gameStateData = await getSheetData(auth, 'Game_State!A2:B2'); // More specific range
             if (gameStateData[0] && gameStateData[0][1]) {
                 currentDay = gameStateData[0][1];
             }
