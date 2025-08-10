@@ -13,21 +13,32 @@ exports.handler = async (event) => {
     if (event.httpMethod !== 'POST') return { statusCode: 405, body: JSON.stringify({ error: 'Method Not Allowed' }) };
 
     try {
-        const { actionId, status, adminPlayerId } = JSON.parse(event.body);
-        if (!actionId || !status || !adminPlayerId) {
+        const { actionId, status, adminPlayerId, sessionId } = JSON.parse(event.body);
+        if (!actionId || !status || !adminPlayerId || !sessionId) {
             return { statusCode: 400, body: JSON.stringify({ error: 'Missing required fields.' }) };
         }
 
         const auth = await getAuthenticatedClient(['https://www.googleapis.com/auth/spreadsheets']);
         const sheets = google.sheets({ version: 'v4', auth });
 
-        // Verify admin status
+        // Verify admin status and session
         const playersData = await sheets.spreadsheets.values.get({
             spreadsheetId: process.env.GOOGLE_SHEET_ID,
-            range: 'Players!A:C',
+            range: 'Players!A:F', // Read up to SessionID column
         });
-        const admin = playersData.data.values.find(p => p[0] === adminPlayerId && p[2] === 'TRUE');
-        if (!admin) return { statusCode: 403, body: JSON.stringify({ error: 'Unauthorized.' }) };
+        const allPlayers = playersData.data.values || [];
+        const adminRow = allPlayers.find(p => p[0] === adminPlayerId);
+
+        if (!adminRow) {
+            return { statusCode: 403, body: JSON.stringify({ error: 'Unauthorized: Admin user not found.' }) };
+        }
+
+        const isAdmin = (adminRow[2] || '').trim().toUpperCase() === 'TRUE'; // IsAdmin is in Column C
+        const isValidSession = adminRow[5] === sessionId; // SessionID is in Column F
+
+        if (!isAdmin || !isValidSession) {
+            return { statusCode: 403, body: JSON.stringify({ error: 'Unauthorized.' }) };
+        }
 
         const killData = await sheets.spreadsheets.values.get({
             spreadsheetId: process.env.GOOGLE_SHEET_ID,
@@ -52,7 +63,6 @@ exports.handler = async (event) => {
         });
 
         if (status === 'Accepted') {
-            const allPlayers = playersData.data.values || [];
             const targetPlayerRowIndex = allPlayers.findIndex(p => p[0] === targetPlayerId);
             if (targetPlayerRowIndex !== -1) {
                 // Update player status to "Dead" in Players sheet (column B)

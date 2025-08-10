@@ -1236,58 +1236,59 @@ async function generateNightlyRecapStory(recapData) {
 
 
 async function performFetchAction(endpoint, payload) {
-        let loadingTimeout;
-        showLoadingOverlay();
+    let loadingTimeout;
+    showLoadingOverlay();
 
-        loadingTimeout = setTimeout(() => {
-            hideLoadingOverlay();
-            showMessage('Action timed out. Please try again or check your connection.');
-            console.warn(`performFetchAction: Timeout occurred for endpoint: ${endpoint}`);
-        }, 15000);
+    loadingTimeout = setTimeout(() => {
+        hideLoadingOverlay();
+        showMessage('Action timed out. Please try again or check your connection.');
+        console.warn(`performFetchAction: Timeout occurred for endpoint: ${endpoint}`);
+    }, 15000);
 
-        try {
-            const sessionId = localStorage.getItem('mafiaGameSessionId'); // CRITICAL FIX: Get sessionId
-            if (!sessionId) {
-                throw new Error('No active session. Please log in again.');
-            }
-            
-            // CRITICAL FIX: Add sessionId to the payload
-            const authorizedPayload = { ...payload, sessionId: sessionId };
-
-            const response = await fetch(endpoint, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify(authorizedPayload), // Send payload with sessionId
-            });
-
-            const result = await response.json();
-
-            if (response.ok) {
-                showMessage(result.message || 'Action performed successfully!');
-                await fetchPlayers(true);
-                await fetchGameState();
-                initializeGame(state.currentUserId);
-            } else {
-                console.error(`performFetchAction: Server responded with status ${response.status} for ${endpoint}. Response:`, result);
-                // If unauthorized, force logout
-                if (response.status === 401 || response.status === 403) {
-                    showMessage(result.error || 'Unauthorized action. Please log in again.');
-                    localStorage.removeItem('mafiaGameUserId');
-                    localStorage.removeItem('mafiaGameSessionId');
-                    renderView('login');
-                }
-                throw new Error(result.message || `Error: ${response.status} ${response.statusText}`);
-            }
-        } catch (error) {
-            console.error("Error performing action:", error);
-            showMessage(`Failed to perform action: ${error.message}`);
-        } finally {
-            clearTimeout(loadingTimeout);
-            hideLoadingOverlay();
+    try {
+        const sessionId = localStorage.getItem('mafiaGameSessionId');
+        if (!sessionId) {
+            throw new Error('No active session. Please log in again.');
         }
+        
+        const authorizedPayload = { ...payload, sessionId: sessionId };
+
+        const response = await fetch(endpoint, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(authorizedPayload),
+        });
+
+        const result = await response.json();
+
+        if (response.ok) {
+            showMessage(result.message || 'Action performed successfully!');
+            // Don't re-initialize here for admin actions to allow for manual refresh
+            if (endpoint !== '/.netlify/functions/update-kill-status') {
+                 await fetchPlayers(true);
+                 await fetchGameState();
+                 initializeGame(state.currentUserId);
+            }
+            return true; // Return true on success
+        } else {
+            if (response.status === 401 || response.status === 403) {
+                showMessage(result.error || 'Unauthorized action. Please log in again.');
+                localStorage.removeItem('mafiaGameUserId');
+                localStorage.removeItem('mafiaGameSessionId');
+                localStorage.removeItem('mafiaGameUsername');
+                renderView('login');
+            }
+            throw new Error(result.error || `Error: ${response.status} ${response.statusText}`);
+        }
+    } catch (error) {
+        console.error("Error performing action:", error);
+        showMessage(`Failed to perform action: ${error.message}`);
+        return false; // Return false on failure
+    } finally {
+        clearTimeout(loadingTimeout);
+        hideLoadingOverlay();
     }
+}
 
 
 async function handleVideoUpload(videoFile) {
@@ -2079,15 +2080,19 @@ else if (e.target.id === 'btn-review-kills') {
 }
 else if (e.target.classList.contains('btn-accept-kill')) {
     const actionId = e.target.dataset.actionId;
-    await performFetchAction('/.netlify/functions/update-kill-status', { actionId, status: 'Accepted', adminPlayerId: state.currentUserId });
-    // Refresh the view after action
-    document.getElementById('btn-review-kills').click();
+    const success = await performFetchAction('/.netlify/functions/update-kill-status', { actionId, status: 'Accepted', adminPlayerId: state.currentUserId });
+    // Refresh the view ONLY if the action was successful
+    if (success) {
+        document.getElementById('btn-review-kills').click();
+    }
 }
 else if (e.target.classList.contains('btn-reject-kill')) {
     const actionId = e.target.dataset.actionId;
-    await performFetchAction('/.netlify/functions/update-kill-status', { actionId, status: 'Rejected', adminPlayerId: state.currentUserId });
-    // Refresh the view after action
-    document.getElementById('btn-review-kills').click();
+    const success = await performFetchAction('/.netlify/functions/update-kill-status', { actionId, status: 'Rejected', adminPlayerId: state.currentUserId });
+    // Refresh the view ONLY if the action was successful
+    if (success) {
+        document.getElementById('btn-review-kills').click();
+    }
 }
 
 else if (e.target.id === 'btn-kill-by-video') {
