@@ -374,6 +374,41 @@ accusationForm: ({ targets }) => `
             </div>
         `,
 
+        killChoiceModal: () => `
+    <div class="bg-gray-900 p-5 rounded-lg mt-4 text-center">
+        <h2 class="text-2xl font-semibold mb-6 text-red-400">How do you want to eliminate your target?</h2>
+        <div class="flex flex-col md:flex-row gap-4">
+            <button type="button" id="btn-kill-by-vote" class="bg-gray-700 hover:bg-gray-800 text-white font-bold py-3 px-6 rounded-lg w-full text-xl">
+                By Vote
+            </button>
+            <button type="button" id="btn-kill-by-video" class="bg-red-700 hover:bg-red-800 text-white font-bold py-3 px-6 rounded-lg w-full text-xl">
+                By Video
+            </button>
+        </div>
+        <button type="button" id="back-to-dashboard" class="mt-6 bg-gray-600 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded-lg w-full">Cancel</button>
+    </div>
+`,
+
+videoUploadModal: () => `
+    <div class="bg-gray-900 p-5 rounded-lg mt-4">
+        <h2 class="text-2xl font-semibold mb-4 text-red-400">Upload Kill Video</h2>
+        <form id="video-upload-form">
+            <div class="mb-6">
+                <label for="video-file-input" class="block text-gray-300 text-lg font-bold mb-2">Select Video File:</label>
+                <input type="file" id="video-file-input" accept="video/*" class="w-full text-white file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-red-700 file:text-white hover:file:bg-red-800" required>
+                <p id="file-name-display" class="text-gray-400 mt-2 text-sm"></p>
+            </div>
+            <div id="upload-progress-container" class="w-full bg-gray-700 rounded-full h-2.5 mb-4 hidden">
+                <div id="upload-progress-bar" class="bg-red-600 h-2.5 rounded-full" style="width: 0%"></div>
+            </div>
+            <div class="flex flex-col md:flex-row gap-4">
+                <button type="submit" id="submit-video-btn" class="bg-green-700 hover:bg-green-800 text-white font-bold py-3 px-6 rounded-lg w-full md:w-1/2 text-xl" disabled>Upload Video</button>
+                <button type="button" id="back-to-dashboard" class="bg-gray-600 hover:bg-gray-700 text-white font-bold py-3 px-6 rounded-lg w-full md:w-1/2 text-xl">Cancel</button>
+            </div>
+        </form>
+    </div>
+`,
+
 // NEW DEAD PAGE TEMPLATE
 deadPage: ({ accuserName, targets }) => `
                 <div class="bg-gray-900 p-5 rounded-lg mt-4 text-center flex flex-col justify-center items-center min-h-[80vh]">
@@ -1529,12 +1564,12 @@ if (state.currentUser.Role.toLowerCase() === 'detective') {
 
          // --- MAFIA ---
          if (role === 'mafia') {
-             createButton('btn-kill', 'Kill Player', 'bg-red-700 hover:bg-red-800', () => {
-                 if (!isNight) return showMessage("You can only use this action at night.");
-                 if (state.currentUser.MainUsed === 'TRUE') return showMessage("You have already used your main action tonight.");
-                 const targets = getDisplayableTargets(false, false);
-                 renderView('actionModal', { title: 'Choose a Target to Kill', buttonText: 'Confirm Kill', targets, actionType: 'kill' });
-             });
+createButton('btn-kill', 'Kill Player', 'bg-red-700 hover:bg-red-800', () => {
+    if (!isNight) return showMessage("You can only use this action at night.");
+    if (state.currentUser.MainUsed === 'TRUE') return showMessage("You have already used your main action tonight.");
+    // This now opens the new choice modal
+    renderView('killChoiceModal');
+});
              createButton('btn-convert', 'Convert Villager', 'bg-red-900', () => {
                  if (!isNight) return showMessage("You can only use this ability at night.");
                  if (state.currentUser.MafiaCanConvert !== 'TRUE') return showMessage("You have not unlocked this ability or have already used it.");
@@ -1886,9 +1921,50 @@ const targetPlayerName_display = await getPlayerNameById(targetPlayerId_display)
          const accusedPlayerId = document.getElementById('accused-player-select').value; // CRITICAL FIX: Get PlayerID
          await submitAccusation(accusedPlayerId, recordedAudioBlob); // CRITICAL FIX: Send PlayerID
      }
-    });
+     else if (e.target.id === 'btn-kill-by-vote') {
+    const targets = getDisplayableTargets(false, false);
+    renderView('actionModal', { title: 'Choose a Target to Kill', buttonText: 'Confirm Kill', targets, actionType: 'kill' });
+}
+else if (e.target.id === 'btn-kill-by-video') {
+    renderView('videoUploadModal');
+}
+else if (e.target.id === 'video-file-input') {
+    // This is a click on the input itself, let the default action happen.
+    // We'll handle the 'change' event separately.
+}
 
-appRoot.addEventListener('click', async (e) => {
+// Also, find the appRoot.addEventListener('submit', ...) function.
+// Add this new 'else if' block inside it to handle the video form submission.
+
+else if (e.target.id === 'video-upload-form') {
+    const fileInput = document.getElementById('video-file-input');
+    const videoFile = fileInput.files[0];
+    if (videoFile) {
+        await handleVideoUpload(videoFile);
+    } else {
+        showMessage("Please select a video file first.");
+    }
+}
+    });
+    
+
+
+    appRoot.addEventListener('change', (e) => {
+    if (e.target.id === 'video-file-input') {
+        const fileInput = e.target;
+        const submitBtn = document.getElementById('submit-video-btn');
+        const fileNameDisplay = document.getElementById('file-name-display');
+        if (fileInput.files.length > 0) {
+            fileNameDisplay.textContent = `Selected: ${fileInput.files[0].name}`;
+            submitBtn.disabled = false;
+        } else {
+            fileNameDisplay.textContent = '';
+            submitBtn.disabled = true;
+        }
+    }
+})
+
+    appRoot.addEventListener('click', async (e) => {
         if (e.target.id === 'back-to-dashboard') {
             renderView('dashboard');
         // Add this block inside the appRoot.addEventListener('click', ...)
@@ -1896,6 +1972,18 @@ appRoot.addEventListener('click', async (e) => {
     const targets = getDisplayableTargets();
     renderView('accusationForm', { targets });
 }
+else if (e.target.id === 'btn-kill-by-vote') {
+    const targets = getDisplayableTargets(false, false);
+    renderView('actionModal', { title: 'Choose a Target to Kill', buttonText: 'Confirm Kill', targets, actionType: 'kill' });
+}
+else if (e.target.id === 'btn-kill-by-video') {
+    renderView('videoUploadModal');
+}
+else if (e.target.id === 'video-file-input') {
+    // This is a click on the input itself, let the default action happen.
+    // We'll handle the 'change' event separately.
+}
+
 
 // Replace the 'btn-enable-notifications' block with this
 else if (e.target.id === 'btn-enable-notifications') {
