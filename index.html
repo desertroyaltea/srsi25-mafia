@@ -1147,27 +1147,27 @@ async function generateNightlyRecapStory(recapData) {
     const guiltyAccusedNames = await formatPlayerNames(guiltyTrials.map(t => t.accusedPlayerId));
     const notGuiltyAccusedNames = await formatPlayerNames(notGuiltyTrials.map(t => t.accusedPlayerId));
 
-    // --- STORY CONSTRUCTION ---
-    storyParts.push(`The sun rose not as a new hope, but as a harsh spotlight on the previous night's massacre. A cold dread settled over <span class="font-bold text-gray-300">Building 9</span> as the living began to fear the faces of their friends.`);
+        // --- STORY CONSTRUCTION ---
+    storyParts.push(`The day arrived like an unwelcome guest, revealing the night's brutal work. A new paranoia took root in <span class="font-bold text-gray-300">Building 9</span>; the person next to you could be a friend, or the reason you don't see tomorrow.`);
 
     // Doctor Section
     if (successfullyProtected.length > 0) {
-        storyParts.push(`The <span class="text-blue-400 font-bold">Doctors</span>, apparently running a "buy one, get one free" special on questionable medical procedures, managed to keep ${successfullyProtectedNames} from becoming a human-shaped chalk outline.`);
+        storyParts.push(`The assassins were met not with a victim, but with the steely resolve of the <span class="text-blue-400 font-bold">Doctors</span>, who successfully defended ${successfullyProtectedNames} and sent a clear message: not everyone is easy prey.`);
     } else {
-        storyParts.push(`A strange silence fell over the clinic last night. The <span class="text-blue-400 font-bold">Doctors</span> claimed they ran out of supplies, but the truth hangs in the air like poison: lives were left to be extinguished, and not a single hand was lifted to help.`);
+        storyParts.push(`The town's healers proved useless last night. Whether through fear or incompetence, the <span class="text-blue-400 font-bold">Doctors</span> stood by as the darkness claimed another soul, their oaths forgotten in the face of terror.`);
     }
     // Mafia Section
     if (mafiaKills.length > 0) {
-        storyParts.push(`It was supposed to be a friendly meeting, a chance to form an alliance. But Baskin Robins was a trap. The <span class="text-red-500 font-bold">Mafia</span> bolted the doors, the air filled with the stench of gasoline, and the desperate screams of ${mafiaKilledNames} were the last sounds heard before the building was consumed by fire."`);
+        storyParts.push(`The promise of safety was a lie. The <span class="text-red-500 font-bold">Mafia</span> lured ${mafiaKilledNames} into a trap with whispers of an alliance, only to reveal their true colors in a bloody betrayal.`);
     } else {
-        storyParts.push(`However, their plans were foiled. It seems their intended victims were lactose intolerant and wisely avoided the soy milk chugging contest altogether.`);
+        storyParts.push(`The <span class="text-red-500 font-bold">Mafia's</span> ambush was clumsy and loud, foiled by a dropped weapon and a surprisingly alert security guard. Their intended victims escaped, leaving the assassins to fume in the shadows.`);
     }
 
     // Sheriff Section
     if (sheriffKills.length > 0) {
-        storyParts.push(`The <span class="text-yellow-500 font-bold">Sheriff</span>, clearly on a tight schedule, saw the guilty verdict for ${sheriffKilledNames} and decided to cut out the middleman, delivering a personal and very permanent form of justice.`);
+        storyParts.push(`The <span class="text-yellow-500 font-bold">Sheriff</span>, acting on a gut feeling and a steady hand, took matters into their own hands. A single shot echoed in the night, and ${sheriffKilledNames} was no longer a threat.`);
     } else {
-        storyParts.push(`Another night passed with the <span class="text-yellow-500 font-bold">Sheriff</span>'s gun left cold. The town's hope is turning to suspicion. Whose side are they on?`);
+        storyParts.push(`The sound of justice was silence. The <span class="text-yellow-500 font-bold">Sheriff</span> once again failed to act, and their indecisiveness has cost the town another precious night.`);
     }
 
     // Trial Section
@@ -1187,8 +1187,7 @@ async function generateNightlyRecapStory(recapData) {
     }
 
     // Conclusion
-    storyParts.push(`The morning air hangs heavy over <span class="font-bold text-blue-400">SRSI25</span>, thick with the stench of fear and decay. The few who remain walk in silence, knowing their numbers are dwindling.`);
-    storyParts.push(`Soon, there will be nowhere left to hide...`);
+    storyParts.push(`The air in <span class="font-bold text-blue-400">SRSI25</span> grows thin, and the shadows grow long. The time for games is over; these are the final days, and only the ruthless will survive.`);
 
     return storyParts.map(part => `<p>${part}</p>`).join('');
 }
